@@ -3,8 +3,16 @@
 Veille automatisée d'offres d'emploi pour un profil développeur front-end
 React / TypeScript, zone Marseille / Aix-en-Provence et full-remote national.
 
-- Design : `docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md`
-- Plan d'implémentation : `docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md`
+| Document | À quoi il sert |
+|---|---|
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Vision produit, les 5 phases, décisions structurantes et ce que la mesure a démenti |
+| [`docs/ETAT.md`](docs/ETAT.md) | **Où on en est, ce qui reste, problèmes ouverts priorisés.** À lire en premier pour reprendre le travail |
+| [`docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md`](docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md) | Design détaillé de la phase 1 |
+| [`docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md`](docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md) | Plan d'implémentation, tâche par tâche |
+
+**Tenir `ETAT.md` à jour** fait partie du travail : chaque tâche terminée, chaque
+problème découvert et chaque décision prise y sont consignés. C'est le document
+qui permet de reprendre après une interruption.
 
 ## Qualité — non négociable
 
