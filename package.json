@@ -1,0 +1,18 @@
+{
+  "name": "fast-travail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Veille automatisée d'offres d'emploi dev web — collecte API et scraping",
+  "scripts": {
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "fn:serve": "supabase functions serve --env-file .env.local",
+    "fn:deploy:ft": "supabase functions deploy collect-france-travail",
+    "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
+    "test": "deno test --allow-read --allow-env supabase/functions/"
+  },
+  "devDependencies": {
+    "supabase": "^2.117.0"
+  }
+}
