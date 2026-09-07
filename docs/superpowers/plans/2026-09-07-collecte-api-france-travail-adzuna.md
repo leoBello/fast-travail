@@ -28,6 +28,47 @@
 - **Commandes CLI** : toujours `npx supabase …`, jamais `supabase` nu. Le CLI existe aussi en global sur cette machine, mais `npx` résout vers la devDependency, donc la version reste pinnée dans le dépôt et reproductible.
 - **Node** : 26.3.0 (exécute TypeScript nativement). **Supabase CLI** : 2.117.0, présent en global et en devDependency. **Deno** : 2.9.6, installé via winget dans `%LOCALAPPDATA%\Microsoft\WinGet\Links\` mais **absent du PATH des shells déjà ouverts** — redémarrer le terminal avant de commencer.
 
+## Protocole d'exécution
+
+Ce plan s'exécute **en sous-agents pilotés** : un sous-agent frais par tâche, suivi d'une revue, avant de passer à la suivante. Un sous-agent démarre sans contexte — ce protocole est ce qui lui dit comment travailler.
+
+### Skills que chaque sous-agent d'implémentation DOIT charger
+
+| Skill | Quand | Pourquoi ici |
+|---|---|---|
+| `test-driven-development` | **Tâches 3 à 7, 10** — tout code TypeScript | Le plan donne le test avant l'implémentation pour chaque étape. Le skill impose de vérifier que le test échoue d'abord, ce qui prouve qu'il teste réellement quelque chose |
+| `verification-before-completion` | **Toutes les tâches, sans exception** | Interdit d'annoncer « fait » sans la sortie de commande à l'appui. Ce plan contient des `Expected:` explicites à chaque étape : ce sont eux, la preuve |
+| `systematic-debugging` | Dès qu'un test échoue autrement qu'attendu, ou qu'un appel API renvoie l'inattendu | Les tâches 7 et 10 confrontent le mapper à de vraies réponses d'API : c'est là que les surprises arrivent, et il ne faut pas y bricoler au hasard |
+| `receiving-code-review` | À la réception du retour de revue | Vérifier techniquement chaque remarque avant de l'appliquer, plutôt que d'acquiescer |
+
+### Skills pour les tâches non-code
+
+| Tâche | Skill | Note |
+|---|---|---|
+| 0 (outillage) | `verification-before-completion` | Chaque installation se prouve par une commande de version |
+| 1, 2 (SQL) | `verification-before-completion` | Les étapes de contrôle SQL du plan sont la preuve : comptages, `db diff`, test de la vue de score |
+| 9, 11 (déploiement, cron) | `verification-before-completion` | Un cron n'est validé que par une ligne `trigger = 'cron'` réellement présente dans `collection_runs` |
+
+### Revue après chaque tâche
+
+Chaque tâche est relue avant de passer à la suivante, en deux temps :
+
+1. **Revue de conformité au plan** — les fichiers annoncés existent-ils, les tests annoncés passent-ils, les `Expected:` sont-ils tenus ? Une tâche dont un `Expected:` n'est pas vérifié est rejetée.
+2. **Revue de code** via `/code-review` sur le diff de la tâche — correction, réutilisation, simplification.
+
+**Critères de rejet spécifiques à ce projet**, à vérifier à chaque revue :
+
+- Un fichier de `_shared/` qui touche à `Deno.env` ou `node:process` → **rejet**. La neutralité runtime est la condition de réutilisation par le plan B.
+- Une clé, un token ou une référence de projet en dur dans un fichier commité → **rejet**.
+- `verify_jwt` passé à `false` → **rejet**.
+- Une table créée sans `enable row level security` → **rejet**.
+- Un `catch` qui avale une erreur sans l'écrire dans `collection_query_results` → **rejet**. La télémétrie est le seul moyen de savoir qu'une requête a cessé de produire.
+- Un test qui ne fait qu'affirmer le comportement de l'implémentation qu'il accompagne, sans avoir été vu échouer → **rejet**.
+
+### Ordre non négociable
+
+Les tâches 3 et 4 produisent les types et fonctions que toutes les suivantes consomment. Les tâches 5, 6 et 7 sont indépendantes entre elles une fois 3 et 4 faites, mais la tâche 8 les requiert toutes les trois. Ne pas paralléliser 1 et 2 : la tâche 2 insère dans les tables créées par la tâche 1.
+
 ---
 
 ### Task 0: Outillage, initialisation du projet et liaison au projet Supabase
