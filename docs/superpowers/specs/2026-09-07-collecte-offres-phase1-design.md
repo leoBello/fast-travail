@@ -63,11 +63,19 @@ Source : [francetravail.io](https://francetravail.io/data/api/offres-emploi), co
 - Codes INSEE utiles : Marseille `13055`, Aix-en-Provence `13001`
 - Quota : 10–20 requêtes/seconde
 
-### À trancher empiriquement pendant le développement
+### Questions tranchées par mesure directe, le 2026-09-07
 
-1. Comportement de `motsCles` sur les variantes orthographiques : `front-end` / `frontend` / `front end`
-2. Sémantique des mots-clés multi-mots : ET logique, ou phrase exacte ?
-3. Existence et comportement d'un filtre `teletravail`
+1. **Les variantes orthographiques donnent des résultats différents, et toutes marginales** : `front-end` rend 2 offres localement, `frontend` en rend 0. Aucune n'est exploitable.
+2. **Les mots-clés multiples se comportent en ET logique** : `développeur web` rend 16 offres là où `développeur` en rend 35 et `web` 29. Le résultat est bien l'intersection, pas l'union.
+3. **Le filtre `teletravail` n'existe pas — il est silencieusement ignoré.** `teletravail=true`, `=1` et `=oui` rendent tous 187 offres, exactement comme sans le paramètre. Le télétravail ne peut donc être ciblé que par mot-clé, puis déduit du texte par le mapper.
+
+### Le constat qui a réorienté la stratégie
+
+**`motsCles` n'indexe pas les technologies de façon exploitable.** Mesuré à Marseille, rayon 40 km, fenêtre 31 jours : `React` 0, `TypeScript` 0, `Next.js` 0, `Supabase` 0, `LLM` 0, `IA générative` 0. Le stock complet, sans fenêtre temporelle, donne toujours 0 pour `React`.
+
+Indice sur le mécanisme : `Docker` rend 314 offres nationales mais `Jest` 0 ; `Angular` en rend 241 mais `React` seulement 27. Ce n'est donc pas une recherche plein texte sur la description, plutôt un index de compétences partiel et inégalement alimenté.
+
+**Conséquence : les deux couches de la section 8 s'inversent.** La couche 1 cesse de cibler les technologies et ratisse large avec le vocabulaire réel du marché français ; le lexique de compétences devient le filtre **principal**, et non un bonus — c'est lui qui trouve « React » dans les descriptions, là où l'API en est incapable.
 
 ## 5. Faits vérifiés — API Adzuna
 
@@ -79,11 +87,16 @@ Source : [developer.adzuna.com](https://developer.adzuna.com/docs/search).
 - **`results_per_page`** : 50 au maximum d'après les sources secondaires
 - **`max_days_old`** joue le rôle de `publieeDepuis` chez France Travail → même stratégie de delta quotidien
 
-### À vérifier pendant le développement
+### Faits établis par mesure directe, le 2026-09-07
 
-1. Existence et unité du paramètre `distance` (associé à `where`) — non confirmé dans la doc consultée
-2. Quota quotidien réel du free tier — non documenté publiquement
-3. Valeur maximale effective de `results_per_page` et plafond de pagination
+1. **Le paramètre `distance` existe et fonctionne**, associé à `where`. React à Marseille : 36 offres sans le paramètre, 37 à `distance=5`, 60 à `40`, 126 à `200`. Le défaut est d'environ 5 km — l'omettre restreint donc sévèrement, sans le dire.
+2. **`what` n'est pas un ET logique, `what_and` l'est.** `what="React télétravail"` rend 1 offre, `what_and` en rend 313. Sur un mot unique les deux sont identiques, donc `what_and` s'utilise partout.
+3. **`results_per_page` plafonne à 50** : la valeur 100 renvoie tout de même 50 résultats. La pagination fonctionne au moins jusqu'à la page 20.
+4. **Un référentiel de 30 catégories existe** (`GET /v1/api/jobs/fr/categories`) et le paramètre `category` filtre réellement. `category=it-jobs`, Marseille rayon 40 km : 385 offres sur 31 jours, 77 sur 3 jours.
+5. **Catégorie et mots-clés sont complémentaires, non cumulables** : à Marseille, `React` seul rend 60 offres, `it-jobs` 385, leur intersection 8 seulement. 52 des 60 offres React ne sont pas classées « informatique ». Il faut donc deux requêtes distinctes, jamais une seule combinée.
+6. **Adzuna indexe les technologies, France Travail non** : React rend 36 offres à Marseille et 1481 au national, contre 0 et 27 pour France Travail. **Adzuna est donc la source principale pour ce profil**, contrairement à ce que supposait ce spec.
+
+Reste non documenté et non mesuré : le quota quotidien réel du free tier.
 
 ## 6. Contrainte de runtime : pourquoi le scraping sort des Edge Functions
 
@@ -139,19 +152,26 @@ Le CV n'est pas utile au même endroit que les mots-clés. `motsCles` est un ins
 
 On interroge sur l'**identité de poste** et les technos à fort signal uniquement. 19 requêtes par run pour France Travail.
 
-**Passe locale** — Marseille `13055`, rayon 40 km (12 requêtes)
+> **Révisé le 2026-09-07 après mesure.** La matrice ci-dessous est celle qui a été retenue *après* avoir constaté que les technologies ne sont pas indexées par France Travail. La version initiale, bâtie sur `React` / `TypeScript` / `Next.js`, rendait zéro offre : 11 de ses 19 requêtes en rendaient 0 à 3.
 
-| Catégorie | Mots-clés |
+**Passe locale à fort recall** — Marseille `13055`, rayon 40 km. Volume mesuré sur 31 jours entre parenthèses :
+
+| Axe | Mots-clés |
 |---|---|
-| Technos noyau | `React`, `TypeScript`, `Next.js` |
-| Identité de poste | `front-end`, `développeur web`, `développeur JavaScript`, `full stack` |
-| Séniorité (7 ans d'XP) | `lead développeur`, `tech lead front` |
-| Vocabulaire ESN | `ingénieur d'études`, `consultant développeur` |
-| Signal rare | `Supabase` |
+| Vocabulaire du secteur | `informatique` (196), `logiciel` (99), `technicien informatique` (78), `ingénieur informatique` (58) |
+| Vocabulaire ESN | `ingénieur d'études` (100) |
+| Identité de poste | `développeur` (35), `web` (29), `développeur web` (16), `développeur JavaScript` (9), `full stack` (3) |
+| Domaine adjacent | `data` (19), `application` (19), `digital` (10) |
 
-**Passe full-remote nationale** — pas de `commune` (4 requêtes) : `React`, `TypeScript`, `Next.js`, `développeur front-end`
+**Passe locale par code ROME** — même géographie, 7 requêtes : M1802 (27), M1810 (17), M1801 (16), M1806 (12), M1805 (11), M1804 (4), M1803 (3).
 
-**Passe IA/LLM nationale** (3 requêtes) : `LLM`, `IA générative`, `agent IA`
+Le brief initial jugeait le ROME « trop générique ». La mesure dit l'inverse : ses 7 codes cumulent 93 offres locales, soit plus que le mot-clé `développeur` seul, et ils sont complémentaires des mots-clés.
+
+**Passe full-remote nationale** — pas de `commune`, 3 requêtes : `développeur télétravail` (195), M1805 + `télétravail` (53), M1802 + `télétravail` (50).
+
+**Passe IA nationale** — 1 requête : `agent IA` (36). `LLM` (4) et `IA générative` (9) sont trop rares pour justifier un appel quotidien.
+
+→ **24 requêtes actives**, environ 43 offres brutes par jour avant dédoublonnage. Les 14 requêtes improductives restent en base, désactivées, réactivables par un `UPDATE` si l'index de France Travail s'améliore.
 
 Justification des entrées non évidentes :
 
@@ -160,11 +180,13 @@ Justification des entrées non évidentes :
 
 Écartés délibérément : **Java EE** (2019–2021, périmé, ramènerait des offres Java hors cible), **WordPress** (remonte massivement du bas de gamme), **Python / PyTorch** (trop éloigné de la cible).
 
-Adzuna réutilise la même matrice via `what`, mappée sur ses propres paramètres. Les scrapers n'ont pas de matrice : ils parcourent le sitemap et laissent le filtrage au lexique.
+**Adzuna a sa propre matrice, et c'est la source principale pour ce profil** : il indexe les technologies là où France Travail ne le fait pas (React : 36 offres locales et 1481 nationales, contre 0 et 27). Six requêtes, sur deux axes délibérément séparés — `category=it-jobs` (385 offres locales sur 31 jours) d'un côté, les mots-clés technos de l'autre. Les combiner perdrait 87 % des offres React, leur intersection ne rendant que 8 offres sur 60. Voir la section 5 pour les mesures.
+
+Les scrapers n'ont pas de matrice : ils parcourent le sitemap et laissent le filtrage au lexique.
 
 ### Couche 2 — Lexique de compétences : le CV miné, exploitable sans IA
 
-Le CV est miné en ~70 termes pondérés stockés en table. Chaque offre est confrontée à ce lexique **en SQL** sur le texte intégral de sa description. Résultat immédiat, coût nul, aucun appel à Claude : « cette offre mentionne 9 compétences dont 3 du noyau, et zéro signal rouge ».
+Le CV est miné en 66 termes pondérés stockés en table. Chaque offre est confrontée à ce lexique **en SQL** sur le texte intégral de sa description. Résultat immédiat, coût nul, aucun appel à Claude : « cette offre mentionne 9 compétences dont 3 du noyau, et zéro signal rouge ».
 
 | Rang | Poids | Termes |
 |---|---|---|
@@ -172,7 +194,11 @@ Le CV est miné en ~70 termes pondérés stockés en table. Chaque offre est con
 | IA — différenciateur rare | **+3** | llm, mcp, agentique, prompt, ia générative, claude, openai, copilot, cursor, rag |
 | Compétences fortes | **+2** | javascript, node.js, angular, postgresql, supabase, firebase, api rest, oauth, sso, jest, react testing library, tdd, tests unitaires, ci/cd, gitlab, microservices, event-driven, performance, scalabilité, google cloud functions |
 | Contexte / bonus | **+1** | agile, scrum, safe, pi planning, revue de code, responsive, html5, css3, es6, python, anglais, e-commerce, billetterie, dématérialisation, retail, sharepoint, wordpress, apps script |
-| Signaux rouges | **−3** | php, symfony, laravel, drupal, .net, c#, java ee, alternance, stage, bac+2, junior, débutant |
+| Signaux rouges | **−3** | php, symfony, laravel, drupal, .net, c#, java ee, **cobol**, alternance, stage, bac+2, junior, débutant |
+
+`cobol` a été ajouté après avoir constaté qu'il remonte réellement : deux offres COBOL parmi dix intitulés d'un échantillon `it-jobs` de Marseille.
+
+`java` a été ajouté en **contexte à +1, délibérément pas en signal rouge**. Un signal rouge écarterait les offres « React + Java Spring », qui sont un vrai marché pour un expert React capable de lire le back. Et il n'apporterait rien : une offre Java pure a zéro `core_hits` et sort déjà du filtre de travail `where red_flags = 0 and core_hits >= 1`. Concrètement, « React + Java Spring » marque +4 et remonte bien, tandis que « Développeur Java » est écarté sans qu'aucun signal rouge n'intervienne.
 
 La catégorie **signaux rouges** est celle qui économise le plus de temps, et elle devient encore plus utile avec les scrapers : Codeur.com a un volume élevé et une qualité hétérogène, le lexique est ce qui rend ce flux supportable.
 

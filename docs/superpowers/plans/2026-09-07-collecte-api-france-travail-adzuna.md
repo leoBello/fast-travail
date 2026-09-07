@@ -3052,16 +3052,27 @@ npx supabase migration new seed_adzuna_queries
 ```
 
 ```sql
--- Adzuna : passe locale (where + distance) et passe nationale remote.
--- Le rayon est porté par radius_km comme pour France Travail ; le mapper
--- Adzuna le traduit en paramètre `distance`.
-insert into search_queries (source, label, keywords, commune_insee, radius_km, published_since_days, priority) values
-  ('adzuna', 'adzuna:local:react',      'React',                  '13055', 40, 3, 10),
-  ('adzuna', 'adzuna:local:typescript', 'TypeScript',             '13055', 40, 3, 10),
-  ('adzuna', 'adzuna:local:frontend',   'développeur front-end',  '13055', 40, 3, 20),
-  ('adzuna', 'adzuna:local:fullstack',  'full stack javascript',  '13055', 40, 3, 20),
-  ('adzuna', 'adzuna:remote:react',     'React télétravail',      null,  null, 3, 50),
-  ('adzuna', 'adzuna:remote:nextjs',    'Next.js',                null,  null, 3, 50)
+-- Matrice Adzuna, etablie sur des volumes MESURES le 2026-09-07.
+--
+-- Adzuna indexe les technologies, contrairement a France Travail : React rend
+-- 36 offres a Marseille et 1481 au national sur 31 jours, contre 0 et 27 pour
+-- France Travail. C'est donc la source principale pour ce profil.
+--
+-- Les deux axes restent DELIBEREMENT SEPARES, jamais combines : a Marseille,
+-- `React` seul rend 60 offres, `category=it-jobs` en rend 385, mais leur
+-- intersection seulement 8. 52 des 60 offres React ne sont pas classees
+-- « informatique » par Adzuna : les combiner en perdrait 87 %.
+insert into search_queries (source, label, keywords, commune_insee, radius_km, extra_params, published_since_days, priority) values
+  -- Axe categorie : le filet large. 385 offres / 31 j, 77 / 3 j.
+  ('adzuna', 'adzuna:local:it-jobs',     null,                     '13055', 40, '{"category":"it-jobs"}'::jsonb, 3, 5),
+  -- Axe mot-cle : rattrape les offres tech mal categorisees.
+  ('adzuna', 'adzuna:local:react',       'React',                  '13055', 40, '{}'::jsonb, 3, 10),
+  ('adzuna', 'adzuna:local:typescript',  'TypeScript',             '13055', 40, '{}'::jsonb, 3, 10),
+  ('adzuna', 'adzuna:local:developpeur', 'développeur',            '13055', 40, '{}'::jsonb, 3, 15),
+  -- Passe remote nationale par mot-cle : category=it-jobs au national rend
+  -- 1889 offres en 3 jours, au-dela de ce que la pagination peut ramener.
+  ('adzuna', 'adzuna:remote:react',      'React télétravail',      null, null, '{}'::jsonb, 3, 50),
+  ('adzuna', 'adzuna:remote:typescript', 'TypeScript télétravail', null, null, '{}'::jsonb, 3, 50)
 on conflict (label) do nothing;
 ```
 
@@ -3111,7 +3122,9 @@ Deno.test('buildAdzunaUrl cible la France et met la page dans le chemin', () => 
   assertEquals(url.pathname, '/v1/api/jobs/fr/search/1');
   assertEquals(url.searchParams.get('app_id'), 'app-1');
   assertEquals(url.searchParams.get('app_key'), 'key-1');
-  assertEquals(url.searchParams.get('what'), 'React');
+  // what_and et non what : `what` n'est pas un ET logique.
+  assertEquals(url.searchParams.get('what_and'), 'React');
+  assertEquals(url.searchParams.has('what'), false);
   assertEquals(url.searchParams.get('results_per_page'), String(ADZUNA_PAGE_SIZE));
   assertEquals(url.searchParams.get('max_days_old'), '3');
 });
@@ -3126,6 +3139,32 @@ Deno.test('buildAdzunaUrl omet where et distance sur la passe nationale', () => 
   const url = new URL(buildAdzunaUrl(cfg, remoteQuery, 'delta', 1));
   assertEquals(url.searchParams.has('where'), false);
   assertEquals(url.searchParams.has('distance'), false);
+});
+
+Deno.test('buildAdzunaUrl transmet la catégorie depuis extra_params', () => {
+  // Axe catégorie et axe mot-clé sont deux requêtes distinctes : à Marseille,
+  // React seul rend 60 offres, it-jobs 385, et leur intersection seulement 8.
+  const catQuery: SearchQueryRow = {
+    ...localQuery,
+    id: 102,
+    label: 'adzuna:local:it-jobs',
+    keywords: null,
+    extra_params: { category: 'it-jobs' },
+  };
+  const url = new URL(buildAdzunaUrl(cfg, catQuery, 'delta', 1));
+
+  assertEquals(url.searchParams.get('category'), 'it-jobs');
+  assertEquals(url.searchParams.has('what_and'), false);
+  assertEquals(url.searchParams.get('where'), 'Marseille');
+  assertEquals(url.searchParams.get('distance'), '40');
+});
+
+Deno.test('buildAdzunaUrl groupe les mots-clés multiples dans what_and', () => {
+  const multi: SearchQueryRow = { ...remoteQuery, id: 103, keywords: 'React télétravail' };
+  const url = new URL(buildAdzunaUrl(cfg, multi, 'delta', 1));
+
+  // Le ET logique porte sur les deux mots : 313 offres, contre 1 avec `what`.
+  assertEquals(url.searchParams.get('what_and'), 'React télétravail');
 });
 
 Deno.test('buildAdzunaUrl passe à 31 jours en backfill', () => {
@@ -3257,7 +3296,11 @@ export function buildAdzunaUrl(
     'content-type': 'application/json',
   });
 
-  if (query.keywords) params.set('what', query.keywords);
+  // `what` n'est PAS un ET logique : `what=React télétravail` rend 1 offre la ou
+  // `what_and` en rend 313. Sur un mot unique les deux sont strictement
+  // identiques (React : 1481 dans les deux cas), donc on utilise `what_and`
+  // partout, sans logique conditionnelle.
+  if (query.keywords) params.set('what_and', query.keywords);
 
   if (query.commune_insee) {
     const place = INSEE_TO_PLACE[query.commune_insee];
@@ -3267,6 +3310,8 @@ export function buildAdzunaUrl(
       );
     }
     params.set('where', place);
+    // Sans `distance`, Adzuna retombe sur un rayon d'environ 5 km : mesure a
+    // 36 offres sans le parametre contre 60 avec distance=40.
     if (query.radius_km !== null) params.set('distance', String(query.radius_km));
   }
 
@@ -3340,13 +3385,21 @@ Expected : `ok | 7 passed`.
 
 ```bash
 mkdir -p supabase/functions/collect-adzuna/__tests__/fixtures
-curl -s "https://api.adzuna.com/v1/api/jobs/fr/search/1?app_id=$ADZUNA_APP_ID&app_key=$ADZUNA_APP_KEY&what=React&where=Marseille&distance=40&results_per_page=10&max_days_old=31&content-type=application/json" \
+curl -s "https://api.adzuna.com/v1/api/jobs/fr/search/1?app_id=$ADZUNA_APP_ID&app_key=$ADZUNA_APP_KEY&category=it-jobs&where=Marseille&distance=40&results_per_page=10&max_days_old=31&content-type=application/json" \
   -o supabase/functions/collect-adzuna/__tests__/fixtures/adzuna-search-response.json
 
 deno eval "const d = JSON.parse(await Deno.readTextFile('supabase/functions/collect-adzuna/__tests__/fixtures/adzuna-search-response.json')); console.log('count:', d.count); console.log(Object.keys(d.results[0]).join('\n'));"
 ```
 
 Expected : un `count` numérique et la liste des champs. Compare-la aux champs utilisés à l'étape 8 (`id`, `title`, `description`, `redirect_url`, `created`, `company.display_name`, `location.display_name`, `location.area`, `latitude`, `longitude`, `contract_type`, `contract_time`, `salary_min`, `salary_max`). **Si un nom diffère, corrige mapper et test ensemble.**
+
+> **Couverture reelle des champs**, mesuree sur 50 offres `it-jobs` de Marseille :
+> `id`, `title`, `description`, `created`, `company`, `location`, `category` et
+> `redirect_url` a 100 % ; `latitude`/`longitude` a 96 % ; `contract_type` a
+> 68 % ; `salary_min`/`salary_max` a 62 % ; `contract_time` a 44 % seulement.
+> Le mapper traite deja ces champs comme optionnels, donc rien a changer — mais
+> ne compte pas filtrer sur le salaire, il manquera pour pres de quatre offres
+> sur dix.
 
 - [ ] **Step 7: Écrire le test du mapper Adzuna**
 
