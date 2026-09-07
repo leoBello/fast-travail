@@ -1,7 +1,7 @@
 import { assertEquals } from '@std/assert';
 import { emptyOffer, WINDOW_DAYS } from '../types.ts';
 
-Deno.test('emptyOffer renseigne l\'identité et met tout le reste à null', () => {
+Deno.test("emptyOffer renseigne l'identité et met tout le reste à null", () => {
   const offer = emptyOffer('france_travail', 'ABC123', 'Développeur React');
 
   assertEquals(offer.source, 'france_travail');

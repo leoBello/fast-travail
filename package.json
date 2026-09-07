@@ -10,7 +10,9 @@
     "fn:serve": "supabase functions serve --env-file .env.local",
     "fn:deploy:ft": "supabase functions deploy collect-france-travail",
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
-    "test": "deno test --allow-read --allow-env supabase/functions/"
+    "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",
+    "fmt": "deno fmt supabase/functions/",
+    "check": "deno check --config supabase/functions/deno.json supabase/functions/**/*.ts"
   },
   "devDependencies": {
     "supabase": "^2.117.0"

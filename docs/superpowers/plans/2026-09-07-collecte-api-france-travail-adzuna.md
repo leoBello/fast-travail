@@ -133,7 +133,9 @@ Le fichier existe mais ne contient que `devDependencies`. Remplace-le intégrale
     "fn:serve": "supabase functions serve --env-file .env.local",
     "fn:deploy:ft": "supabase functions deploy collect-france-travail",
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
-    "test": "deno test --allow-read --allow-env supabase/functions/"
+    "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",
+    "fmt": "deno fmt supabase/functions/",
+    "check": "deno check --config supabase/functions/deno.json supabase/functions/**/*.ts"
   },
   "devDependencies": {
     "supabase": "^2.117.0"
@@ -168,6 +170,10 @@ Create `supabase/functions/deno.json` :
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "@std/assert": "jsr:@std/assert@1"
+  },
+  "fmt": {
+    "singleQuote": true,
+    "lineWidth": 100
   }
 }
 ```

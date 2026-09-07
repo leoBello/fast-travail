@@ -40,7 +40,7 @@ Deno.test('getAccessToken demande un token en client_credentials avec le bon sco
   assertEquals(url.includes('realm=%2Fpartenaire'), true);
 });
 
-Deno.test('getAccessToken réutilise le token tant qu\'il est valide', async () => {
+Deno.test("getAccessToken réutilise le token tant qu'il est valide", async () => {
   resetTokenCache();
   const calls = { count: 0 };
   const f = fakeFetch('tok-2', 1500, calls);
@@ -52,7 +52,7 @@ Deno.test('getAccessToken réutilise le token tant qu\'il est valide', async () 
   assertEquals(calls.count, 1);
 });
 
-Deno.test('getAccessToken redemande un token dont l\'expiration est imminente', async () => {
+Deno.test("getAccessToken redemande un token dont l'expiration est imminente", async () => {
   resetTokenCache();
   const calls = { count: 0 };
   // 30 s d'expiration, sous la marge de sécurité de 60 s : jamais mis en cache.
@@ -66,8 +66,9 @@ Deno.test('getAccessToken redemande un token dont l\'expiration est imminente', 
 
 Deno.test('getAccessToken remonte une erreur explicite sur réponse non-2xx', async () => {
   resetTokenCache();
-  const failing = (() =>
-    Promise.resolve(new Response('accès refusé', { status: 401 }))) as unknown as typeof fetch;
+  const failing =
+    (() =>
+      Promise.resolve(new Response('accès refusé', { status: 401 }))) as unknown as typeof fetch;
 
   await assertRejects(
     () => getAccessToken(cfg, failing),
