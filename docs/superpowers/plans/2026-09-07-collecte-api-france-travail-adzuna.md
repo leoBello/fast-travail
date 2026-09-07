@@ -703,7 +703,7 @@ delete from offers where external_id = 'TEST-0001';
 
 ```bash
 git add supabase/migrations
-git commit -m "feat(db): données de référence — sources, 19 requêtes FT, lexique CV de 74 termes"
+git commit -m "feat(db): données de référence — sources, 19 requêtes FT, lexique CV de 64 termes"
 ```
 
 ---
