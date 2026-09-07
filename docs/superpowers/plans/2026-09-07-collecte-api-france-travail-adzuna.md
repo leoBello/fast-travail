@@ -1657,6 +1657,8 @@ Expected : FAIL — `Module not found "../client.ts"`.
 
 - [ ] **Step 4: Écrire `client.ts`**
 
+Attention à la boucle de pagination : `FT_MAX_RESULTS` (1150) n'est pas un multiple de `FT_PAGE_SIZE` (150). Une boucle naïve demanderait `1050-1199` en dernière page, au-delà du plafond dur de l'API, et ramènerait 1200 offres au lieu de 1150 — ce que les tests de l'étape 2 détectent. La dernière page est donc recadrée sur `1000-1149`, et le chevauchement qui en résulte est retiré avant concaténation.
+
 Create `supabase/functions/collect-france-travail/client.ts` :
 
 ```ts
@@ -1801,16 +1803,24 @@ export async function fetchAllPages(args: {
   let httpStatus = 200;
 
   for (let start = 0; start < FT_MAX_RESULTS; start += FT_PAGE_SIZE) {
-    const page = await fetchPage({ ...args, rangeStart: start });
+    // FT_MAX_RESULTS n'est pas un multiple de FT_PAGE_SIZE (1150 / 150) : la
+    // dernière page est ramenée à 1000-1149 pour ne jamais demander au-delà
+    // du plafond dur de l'API (range max 1000-1149).
+    const rangeStart = Math.min(start, FT_MAX_RESULTS - FT_PAGE_SIZE);
+    const page = await fetchPage({ ...args, rangeStart });
     httpStatus = page.httpStatus;
 
     if (page.contentRange) totalAvailable = page.contentRange.total;
     else if (page.httpStatus === 204 && totalAvailable === null) totalAvailable = 0;
 
-    collected.push(...page.offers);
+    // Ce recadrage peut faire chevaucher la dernière page avec la précédente
+    // (ex. 900-1049 puis 1000-1149) : on ne réinjecte que les offres neuves.
+    const overlap = Math.max(0, collected.length - rangeStart);
+    collected.push(...page.offers.slice(overlap));
 
     if (page.offers.length === 0) break;
     if (totalAvailable !== null && collected.length >= totalAvailable) break;
+    if (rangeStart !== start) break;
   }
 
   return {
