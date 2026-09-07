@@ -731,7 +731,7 @@ git commit -m "feat(db): données de référence — sources, 19 requêtes FT, l
 Create `supabase/functions/_shared/types.ts` :
 
 ```ts
-// Runtime-neutre : aucun accès à Deno.env ni à node:process ici.
+// Runtime-neutre : aucun accès à l'environnement d'exécution dans ce fichier.
 // Ce fichier est importé par les Edge Functions (Deno) ET par les scrapers (Node).
 
 export type SourceKey =
