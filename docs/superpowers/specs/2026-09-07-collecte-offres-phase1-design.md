@@ -354,8 +354,28 @@ Il tape la vraie API et exécute réellement le mapping, mais **n'écrit rien** 
 
 ## 12. Prérequis avant de coder
 
-1. **Identifiants France Travail** : compte sur `francetravail.io`, création d'une application, souscription à l'API « Offres d'emploi v2 » → `client_id` / `client_secret`. *En cours côté utilisateur.*
-2. **Projet Supabase Cloud** créé : URL du projet + clé `service_role`. *À confirmer.*
-3. **Outillage local** : Deno et Supabase CLI (absents de la machine). Node 26.3.0, npm 11.16.0 et Docker 29.6.2 sont présents.
+Trois prérequis, tous à la charge de l'utilisateur, aucun automatisable.
 
-Le niveau de test unitaire ne dépend d'aucun de ces prérequis et peut démarrer immédiatement.
+### 12.1 Identifiants France Travail — *en cours*
+
+1. Créer un compte sur `francetravail.io`
+2. Créer une application
+3. **Souscrire explicitement à l'API « Offres d'emploi v2 »**
+4. Récupérer `client_id` et `client_secret`
+
+### 12.2 Projet Supabase Cloud — *à créer*
+
+1. Créer un projet sur `supabase.com` (free tier), **région `eu-west-3` (Paris)** — proximité des sources et données hébergées en UE
+2. Noter la **référence du projet**, l'**URL** et la clé **`service_role`** (Settings → API)
+3. Noter le **mot de passe de la base** (nécessaire pour `supabase link` et l'application des migrations)
+4. Activer les extensions **`pg_cron`** et **`pg_net`** (Database → Extensions) — requises pour le déclenchement quotidien
+5. Ne rien créer à la main dans le schéma : tout passe par les migrations du dépôt
+
+### 12.3 Outillage local — *à installer*
+
+- **Deno** et **Supabase CLI** : absents de la machine
+- Node 26.3.0, npm 11.16.0 et Docker 29.6.2 sont déjà présents
+
+### Ce qui n'attend aucun de ces prérequis
+
+Le niveau de test unitaire — mapping, parsing du `Content-Range`, pagination, backoff — se code et se teste avec un `fetch` mocké, sans identifiant ni base. Les migrations SQL et le `seed.sql` s'écrivent également hors ligne. Le développement peut donc démarrer dès que Deno et le Supabase CLI sont installés, sans attendre 12.1 ni 12.2.
