@@ -416,3 +416,6 @@ enabled = true
 
 [functions.collect-france-travail]
 verify_jwt = true
+
+[functions.collect-adzuna]
+verify_jwt = true
