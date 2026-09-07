@@ -8,6 +8,8 @@
     "db:push": "supabase db push",
     "db:diff": "supabase db diff",
     "fn:serve": "supabase functions serve --env-file .env.local",
+    "fn:local:ft": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/collect-france-travail/index.ts",
+    "fn:local:adzuna": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/collect-adzuna/index.ts",
     "fn:deploy:ft": "supabase functions deploy collect-france-travail",
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
     "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",

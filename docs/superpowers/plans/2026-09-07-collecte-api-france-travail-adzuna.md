@@ -246,7 +246,9 @@ Design : `docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md`
 
     npm run db:push          # applique les migrations sur le projet distant
     npm test                 # tests unitaires Deno
-    npm run fn:serve         # sert les Edge Functions en local
+    npm run fn:local:ft      # lance la fonction FT en local, sur la base DISTANTE
+    npm run fn:local:adzuna  # idem pour Adzuna
+    npm run fn:serve         # ⚠ écrase SUPABASE_* : n'écrit PAS sur le distant
     npm run fn:deploy:ft     # déploie la collecte France Travail
 
 ## Consulter les offres
@@ -2797,18 +2799,27 @@ Expected : tous les tests passent (types, upsert, auth, client, mapper).
 Dans un premier terminal :
 
 ```bash
-npm run fn:serve
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm run fn:local:ft
 ```
 
-Expected : `Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>`. Laisse tourner.
+Expected : `Listening on http://0.0.0.0:8000/`. Laisse tourner. La fonction lit
+`.env.local` et parle donc bien au **projet distant**.
+
+> **Ne pas utiliser `npm run fn:serve` pour cette validation.**
+> `supabase functions serve` **réserve** les noms `SUPABASE_URL` et
+> `SUPABASE_SERVICE_ROLE_KEY` et ignore **silencieusement** les valeurs de
+> `.env.local` : la fonction écrirait alors dans une Postgres locale
+> éphémère et vide en croyant écrire sur le projet distant. Aucun message
+> d'erreur, aucune ligne en base. Passer par `deno run --env-file=.env.local`
+> sur le point d'entrée, qui n'a pas ce comportement.
 
 - [ ] **Step 6: Appeler la fonction en `dryRun` sur une seule requête**
 
-Dans un second terminal — récupère d'abord ta clé anon dans Settings → API :
+Dans un second terminal. Pas d'en-tête `Authorization` ici : `verify_jwt`
+est appliqué par la plateforme Supabase, pas par `Deno.serve` en local.
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-france-travail' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":true,"queryIds":[1]}' | head -c 3000
 ```
@@ -2830,8 +2841,7 @@ Expected : `offers = 0`, `runs = 0`. Si ce n'est pas le cas, `dryRun` ne court-c
 - [ ] **Step 8: Lancer la collecte réelle en backfill**
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-france-travail' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":false}' | head -c 4000
 ```
@@ -3693,11 +3703,26 @@ Expected : tous les tests passent, aucune erreur de type.
 
 - [ ] **Step 13: Valider en local en `dryRun` puis en réel**
 
-Avec `npm run fn:serve` actif dans un autre terminal :
+> **Ne pas utiliser `npm run fn:serve` pour cette validation.**
+> `supabase functions serve` **réserve** les noms `SUPABASE_URL` et
+> `SUPABASE_SERVICE_ROLE_KEY` et ignore **silencieusement** les valeurs de
+> `.env.local` : la fonction écrirait alors dans une Postgres locale
+> éphémère et vide en croyant écrire sur le projet distant. Aucun message
+> d'erreur, aucune ligne en base. Passer par `deno run --env-file=.env.local`
+> sur le point d'entrée, qui n'a pas ce comportement.
+
+Avec, dans un autre terminal :
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-adzuna' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm run fn:local:adzuna
+```
+
+Expected : `Listening on http://0.0.0.0:8000/`. Puis, sans en-tête
+`Authorization` — `verify_jwt` est appliqué par la plateforme, pas par
+`Deno.serve` en local :
+
+```bash
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":true}' | head -c 3000
 ```
@@ -3707,8 +3732,7 @@ Expected : `"dryRun": true`, 6 entrées dans `queries`, des offres dans `preview
 Puis en réel :
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-adzuna' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":false}' | head -c 3000
 ```

@@ -74,6 +74,15 @@ quand le code déplaît au linter.
   échoue sur `@std/assert`. Les scripts npm le font déjà.
 - **Supabase CLI** : toujours `npx supabase`, jamais `supabase` nu. La version
   est pinnée en devDependency, donc reproductible.
+- **`supabase functions serve` ne sert pas à tester une collecte.** La commande
+  **réserve** les noms `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY` et ignore
+  **silencieusement** les valeurs de `.env.local`. Une collecte lancée ainsi
+  écrit dans une Postgres locale éphémère et vide en croyant écrire sur le
+  projet distant : aucune erreur, aucune ligne, un faux succès complet. Pour un
+  essai local contre la base distante, lancer le point d'entrée directement —
+  `npm run fn:local:ft` ou `npm run fn:local:adzuna`, qui font
+  `deno run --env-file=.env.local`. L'absence de `verify_jwt` en local est
+  normale : il est appliqué par la plateforme, pas par `Deno.serve`.
 - **VS Code** : l'extension `denoland.vscode-deno` est **indispensable**. Sans
   elle, le serveur TypeScript de Node analyse les Edge Functions et signale des
   erreurs qui n'existent pas (`Deno.serve` inconnu, imports en `.ts` refusés).
