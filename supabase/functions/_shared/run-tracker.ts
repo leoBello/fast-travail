@@ -1,5 +1,5 @@
 import type { DbClient } from './db.ts';
-import type { CollectionMode, RunStatus, RunTrigger, SourceKey } from './types.ts';
+import type { CollectionMode, QueryReportLine, RunStatus, RunTrigger, SourceKey } from './types.ts';
 
 export async function startRun(
   db: DbClient,
@@ -39,19 +39,6 @@ export async function finishRun(
   if (error) throw new Error(`clôture du run : ${error.message}`);
 }
 
-export interface QueryResultRow {
-  query_id?: number | null;
-  unit_label: string;
-  http_status?: number | null;
-  total_available?: number | null;
-  fetched?: number | null;
-  new_offers?: number | null;
-  updated_offers?: number | null;
-  truncated?: boolean | null;
-  duration_ms?: number | null;
-  error?: string | null;
-}
-
 /**
  * Écrit une ligne de télémétrie. N'échoue jamais bruyamment : perdre une ligne
  * de télémétrie ne doit pas faire échouer une collecte réussie.
@@ -59,7 +46,7 @@ export interface QueryResultRow {
 export async function recordQueryResult(
   db: DbClient,
   runId: string,
-  row: QueryResultRow,
+  row: QueryReportLine,
 ): Promise<void> {
   const { error } = await db
     .from('collection_query_results')

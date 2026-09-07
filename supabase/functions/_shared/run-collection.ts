@@ -5,11 +5,16 @@ import { upsertOffers } from './upsert.ts';
 import type {
   CollectionMode,
   NormalizedOffer,
+  QueryReportLine,
   RunStatus,
   RunTrigger,
   SearchQueryRow,
   SourceKey,
 } from './types.ts';
+
+// Ré-exporté pour ne pas casser un importateur qui prenait ce type d'ici.
+// La forme canonique vit maintenant dans types.ts.
+export type { QueryReportLine } from './types.ts';
 
 /** Nombre d'offres renvoyées en exemple dans une réponse dryRun. */
 const PREVIEW_PER_QUERY = 3;
@@ -20,19 +25,6 @@ export interface FetchResult {
   totalAvailable: number | null;
   truncated?: boolean;
   httpStatus: number;
-}
-
-export interface QueryReportLine {
-  query_id: number | null;
-  unit_label: string;
-  http_status: number | null;
-  total_available: number | null;
-  fetched: number;
-  new_offers: number;
-  updated_offers: number;
-  truncated: boolean;
-  duration_ms: number;
-  error: string | null;
 }
 
 export interface CollectionSummary {

@@ -43,6 +43,25 @@ export interface NormalizedOffer {
   raw: unknown;
 }
 
+/**
+ * Forme canonique d'une ligne de `collection_query_results`.
+ * Source de vérité unique : run-tracker.ts (écriture) et run-collection.ts
+ * (construction pendant la boucle de collecte) importent ce type d'ici,
+ * pour n'avoir qu'un seul endroit à corriger si la table évolue.
+ */
+export interface QueryReportLine {
+  query_id: number | null;
+  unit_label: string;
+  http_status: number | null;
+  total_available: number | null;
+  fetched: number;
+  new_offers: number;
+  updated_offers: number;
+  truncated: boolean;
+  duration_ms: number;
+  error: string | null;
+}
+
 export interface SearchQueryRow {
   id: number;
   source: string;
