@@ -402,24 +402,29 @@ order by score desc, published_at desc;
 
 ## 11. Arborescence
 
+Le code partagé vit dans **`supabase/functions/_shared/`**, et non à la racine. Raison vérifiée : le CLI Supabase embarque automatiquement dans le bundle tout dossier préfixé d'un underscore sous `supabase/functions`, alors qu'importer depuis hors de `supabase/` exige le flag expérimental `--use-api` (CLI ≥ 2.13.3). L'architecture ne repose pas sur un flag expérimental. Les scripts Node importent ces fichiers par chemin relatif — l'emplacement leur est indifférent.
+
+Les données de référence (sources, requêtes, lexique) sont chargées par une **migration**, pas par `seed.sql` : `seed.sql` ne s'exécute que sur un `db reset` local, or il n'y a pas de base locale dans cette architecture. Les inserts sont idempotents (`on conflict do nothing`).
+
 ```
 fast-travail/
-├─ shared/                          -- TS neutre : importable par Deno ET par Node
-│  ├─ types.ts                      -- NormalizedOffer, SourceKey, types DB
-│  ├─ db.ts                         -- client Supabase, config INJECTÉE en paramètre
-│  ├─ upsert.ts                     -- upsert dédoublonné + comptage new/updated
-│  ├─ run-tracker.ts                -- ouverture/fermeture de collection_runs
-│  └─ logger.ts
 ├─ supabase/
 │  ├─ config.toml
 │  ├─ migrations/
-│  │  ├─ 0001_offers.sql
-│  │  ├─ 0002_sources.sql
-│  │  ├─ 0003_collection_telemetry.sql
-│  │  ├─ 0004_skill_lexicon.sql
-│  │  └─ 0005_views.sql
-│  ├─ seed.sql                      -- sources + 19 requêtes + ~70 termes du lexique
+│  │  ├─ …_offers.sql
+│  │  ├─ …_sources.sql
+│  │  ├─ …_collection_telemetry.sql
+│  │  ├─ …_skill_lexicon.sql
+│  │  ├─ …_views.sql
+│  │  └─ …_seed_reference_data.sql   -- sources + 19 requêtes + ~70 termes, idempotent
 │  └─ functions/
+│     ├─ deno.json                   -- import map partagée
+│     ├─ _shared/                    -- TS neutre : importable par Deno ET par Node
+│     │  ├─ types.ts                 -- NormalizedOffer, SourceKey, types DB
+│     │  ├─ db.ts                    -- client Supabase, config INJECTÉE en paramètre
+│     │  ├─ upsert.ts                -- upsert dédoublonné + comptage new/updated
+│     │  ├─ run-tracker.ts           -- ouverture/fermeture de collection_runs
+│     │  └─ logger.ts
 │     ├─ collect-france-travail/
 │     │  ├─ index.ts                -- entrée HTTP + orchestration
 │     │  ├─ auth.ts                 -- OAuth2 client_credentials + cache token
@@ -453,7 +458,9 @@ fast-travail/
 └─ README.md
 ```
 
-**Frontière d'extension** : chaque source produit le même `NormalizedOffer` ; `shared/upsert.ts` assure dédoublonnage et télémétrie de façon identique pour les six. Un nouveau scraper = un `index.ts` de config + un `parser.ts` + des fixtures. `scrapers/lib/` (politesse, robots, sitemap, boucle) est écrit une seule fois.
+**Frontière d'extension** : chaque source produit le même `NormalizedOffer` ; `_shared/upsert.ts` assure dédoublonnage et télémétrie de façon identique pour les six. Un nouveau scraper = un `index.ts` de config + un `parser.ts` + des fixtures. `scrapers/lib/` (politesse, robots, sitemap, boucle) est écrit une seule fois.
+
+Les scrapers importent le code partagé par chemin relatif : `import type { NormalizedOffer } from '../../supabase/functions/_shared/types.ts'`.
 
 Pas de Next.js scaffoldé : aucun dashboard en phase 1. Il s'ajoutera à la racine sans rien déplacer.
 
