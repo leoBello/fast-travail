@@ -14,7 +14,8 @@
     "fmt": "deno fmt --config supabase/functions/deno.json supabase/functions/",
     "lint": "deno lint --config supabase/functions/deno.json supabase/functions/",
     "fmt:check": "deno fmt --check --config supabase/functions/deno.json supabase/functions/",
-    "verify": "npm run fmt:check && npm run lint && npm test"
+    "verify": "npm run fmt:check && npm run lint && npm run check && npm test",
+    "check": "deno check --config supabase/functions/deno.json supabase/functions/"
   },
   "devDependencies": {
     "supabase": "^2.117.0"

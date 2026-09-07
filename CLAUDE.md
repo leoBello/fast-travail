@@ -15,8 +15,18 @@ unique est :
 export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm run verify
 ```
 
-`verify` enchaîne `fmt:check`, `lint` puis `test`. Il doit passer avant tout
-commit. Une tâche dont `verify` échoue n'est pas terminée.
+`verify` enchaîne `fmt:check`, `lint`, `check` puis `test`. Il doit passer
+avant tout commit. Une tâche dont `verify` échoue n'est pas terminée.
+
+Le `check` (typecheck) n'est pas redondant avec `test` : les `index.ts` des
+Edge Functions ne sont importés par aucun test, donc `deno test` ne les
+typecheck pas. Sans cette étape, une erreur de type dans un point d'entrée
+passerait inaperçue jusqu'au déploiement.
+
+Piège à connaître en écrivant ces commandes : `deno check` accepte très bien
+un **dossier**, mais un glob `**/*.ts` que le shell n'expanse pas matche zéro
+fichier et sort en 0 — un succès silencieux qui ne vérifie rien. Toujours
+passer un dossier.
 
 **Aucun contournement du linter n'est autorisé.** Sont interdits :
 
