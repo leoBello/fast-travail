@@ -57,10 +57,31 @@ export function buildAdzunaUrl(
     if (query.radius_km !== null) params.set('distance', String(query.radius_km));
   }
 
-  // extra_params porte category (axe catégorie) et what_phrase (Résolution A : locution
-  // exacte, complémentaire de what_and) — les deux se combinent avec what_and, jamais
-  // de logique conditionnelle entre eux.
+  // extra_params porte deux natures de clés qui ne vont pas au même endroit :
+  // des paramètres d'URL Adzuna (`category`, `what_phrase`) et des métadonnées
+  // pour le mapper (`implies_remote`, lue par provenanceOf dans mapper.ts,
+  // jamais par l'API). Liste BLANCHE volontaire, et non liste noire des clés
+  // de métadonnées connues : mesuré contre l'API réelle, un paramètre inconnu
+  // ne dégrade pas la requête, il la fait échouer en HTTP 400 (constaté avec
+  // `implies_remote` transmis tel quel). Une liste blanche échoue fermée —
+  // une clé de métadonnée oubliée dans une liste noire serait, elle,
+  // transmise et casserait la requête en silence à la prochaine addition.
+  const ADZUNA_URL_PARAMS = new Set(['category', 'what_phrase']);
+  // Clés connues qui ne sont PAS des paramètres d'URL : consommées ailleurs
+  // (implies_remote par provenanceOf dans mapper.ts), on les ignore ici sans
+  // bruit. Toute autre clé est très probablement une faute de frappe dans la
+  // matrice en base (colonne extra_params) : on échoue fort plutôt que de
+  // l'ignorer en silence, pour qu'elle reste détectable sans lire le code.
+  const KNOWN_NON_URL_KEYS = new Set(['implies_remote']);
   for (const [key, value] of Object.entries(query.extra_params ?? {})) {
+    if (KNOWN_NON_URL_KEYS.has(key)) continue;
+    if (!ADZUNA_URL_PARAMS.has(key)) {
+      throw new Error(
+        `extra_params contient une clé inconnue "${key}" pour ${query.label} — ` +
+          `paramètres d'URL admis : ${[...ADZUNA_URL_PARAMS].join(', ')} ; ` +
+          `métadonnées admises : ${[...KNOWN_NON_URL_KEYS].join(', ')}`,
+      );
+    }
     if (value !== null && value !== undefined) params.set(key, String(value));
   }
 

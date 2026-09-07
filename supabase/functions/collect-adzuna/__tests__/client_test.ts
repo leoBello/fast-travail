@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assertEquals, assertMatch, assertThrows } from '@std/assert';
 import { ADZUNA_PAGE_SIZE, buildAdzunaUrl, fetchAllAdzunaPages } from '../client.ts';
 import type { SearchQueryRow } from '../../_shared/types.ts';
 
@@ -110,6 +110,80 @@ Deno.test('buildAdzunaUrl combine what_and, category et what_phrase sur une mêm
   assertEquals(url.searchParams.get('category'), 'it-jobs');
   assertEquals(url.searchParams.get('what_phrase'), 'full remote');
 });
+
+// --- Liste blanche des clés d'extra_params transmises à l'URL Adzuna ---
+//
+// Mesuré contre l'API réelle : un paramètre inconnu ne dégrade pas la
+// requête Adzuna, il la fait échouer en HTTP 400. `implies_remote` est une
+// métadonnée pour provenanceOf (mapper.ts), jamais un paramètre d'URL — la
+// transmettre a produit ce 400 en pratique.
+
+Deno.test("buildAdzunaUrl transmet category depuis extra_params vers l'URL", () => {
+  const catOnly: SearchQueryRow = {
+    ...remoteQuery,
+    id: 106,
+    keywords: null,
+    extra_params: { category: 'it-jobs' },
+  };
+  const url = new URL(buildAdzunaUrl(cfg, catOnly, 'delta', 1));
+  assertEquals(url.searchParams.get('category'), 'it-jobs');
+});
+
+Deno.test("buildAdzunaUrl transmet what_phrase depuis extra_params vers l'URL, encodé", () => {
+  const phraseOnly: SearchQueryRow = {
+    ...remoteQuery,
+    id: 107,
+    keywords: null,
+    extra_params: { what_phrase: 'full remote' },
+  };
+  const url = new URL(buildAdzunaUrl(cfg, phraseOnly, 'delta', 1));
+  assertEquals(url.searchParams.get('what_phrase'), 'full remote');
+  // Encodage produit par URLSearchParams : l'espace devient `+` dans la query string brute.
+  assertMatch(url.search, /what_phrase=full\+remote/);
+});
+
+Deno.test(
+  'buildAdzunaUrl ne transmet JAMAIS implies_remote à Adzuna (régression du HTTP 400 mesuré)',
+  () => {
+    // implies_remote est une métadonnée pour provenanceOf (mapper.ts), pas un
+    // paramètre Adzuna. La transmettre telle quelle a produit un HTTP 400
+    // mesuré contre l'API réelle sur une requête par ailleurs valide
+    // (what_phrase=full remote&what_and=TypeScript, 200 sans elle).
+    const remoteAxisQuery: SearchQueryRow = {
+      ...remoteQuery,
+      id: 108,
+      keywords: 'TypeScript',
+      extra_params: { what_phrase: 'full remote', implies_remote: 'full' },
+    };
+    const url = new URL(buildAdzunaUrl(cfg, remoteAxisQuery, 'delta', 1));
+
+    assertEquals(url.searchParams.get('what_phrase'), 'full remote');
+    assertEquals(url.searchParams.get('what_and'), 'TypeScript');
+    assertEquals(url.searchParams.has('implies_remote'), false);
+  },
+);
+
+Deno.test(
+  'buildAdzunaUrl échoue fort sur une clé extra_params inconnue (faute de frappe détectable)',
+  () => {
+    // Ni un paramètre d'URL admis, ni une métadonnée connue du mapper : très
+    // probablement une faute de frappe dans la matrice en base. On refuse de
+    // choisir entre « l'ignorer » (la requête tourne, dégradée, en silence)
+    // et « l'envoyer » (HTTP 400) : les deux masquent l'erreur à quelqu'un
+    // qui ne lit pas ce fichier.
+    const typoQuery: SearchQueryRow = {
+      ...remoteQuery,
+      id: 109,
+      keywords: null,
+      extra_params: { nimportequoi: 'x' },
+    };
+    assertThrows(
+      () => buildAdzunaUrl(cfg, typoQuery, 'delta', 1),
+      Error,
+      'nimportequoi',
+    );
+  },
+);
 
 function pagedFetch(total: number, calls: { pages: number[] }): typeof fetch {
   return ((url: string | URL) => {
