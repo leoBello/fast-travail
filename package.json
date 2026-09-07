@@ -11,7 +11,10 @@
     "fn:deploy:ft": "supabase functions deploy collect-france-travail",
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
     "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",
-    "fmt": "deno fmt supabase/functions/"
+    "fmt": "deno fmt --config supabase/functions/deno.json supabase/functions/",
+    "lint": "deno lint --config supabase/functions/deno.json supabase/functions/",
+    "fmt:check": "deno fmt --check --config supabase/functions/deno.json supabase/functions/",
+    "verify": "npm run fmt:check && npm run lint && npm test"
   },
   "devDependencies": {
     "supabase": "^2.117.0"

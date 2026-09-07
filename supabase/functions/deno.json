@@ -12,6 +12,9 @@
   },
   "fmt": {
     "singleQuote": true,
-    "lineWidth": 100
+    "lineWidth": 100,
+    "exclude": [
+      "**/__tests__/fixtures/**"
+    ]
   }
 }

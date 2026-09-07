@@ -25,6 +25,7 @@
 - **Géographie par défaut** : commune INSEE `13055` (Marseille), `distance = 40` km.
 - **Plafond France Travail** : 1 150 résultats par requête, pages de 150 (`range=0-149`).
 - **Isolation des erreurs** : une requête qui échoue n'interrompt jamais le run ; le run se termine en `partial`.
+- **Zéro erreur de lint, zéro erreur de formatage, zéro test rouge.** La porte unique est `npm run verify` (enchaîne `fmt:check`, `lint`, `test`), à faire passer avant chaque commit. **Aucun contournement du linter n'est autorisé** : ni `deno-lint-ignore`, ni `eslint-disable`, ni `@ts-ignore`, ni `@ts-expect-error`, ni `as any`, ni `--no-check`. Si le linter signale quelque chose, le code change, pas la règle. Seule exception : `as unknown as DbClient` dans les fichiers `__tests__/`, pour fabriquer un double de test. Voir `CLAUDE.md`.
 - **Commandes CLI** : toujours `npx supabase …`, jamais `supabase` nu. Le CLI existe aussi en global sur cette machine, mais `npx` résout vers la devDependency, donc la version reste pinnée dans le dépôt et reproductible.
 - **Node** : 26.3.0 (exécute TypeScript nativement). **Supabase CLI** : 2.117.0, présent en global et en devDependency.
 - **Deno 2.9.6 est installé mais hors du PATH hérité par les shells de cette session.** Toute commande `deno` doit être précédée, dans le même appel shell, de :
@@ -71,6 +72,7 @@ Chaque tâche est relue avant de passer à la suivante, en deux temps :
 - Une table créée sans `enable row level security` → **rejet**.
 - Un `catch` qui avale une erreur sans l'écrire dans `collection_query_results` → **rejet**. La télémétrie est le seul moyen de savoir qu'une requête a cessé de produire.
 - Un test qui ne fait qu'affirmer le comportement de l'implémentation qu'il accompagne, sans avoir été vu échouer → **rejet**.
+- Un contournement du linter ou du typage — `deno-lint-ignore`, `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `as any` hors tests — → **rejet**. De même pour un `npm run verify` qui n'a pas été lancé, ou qui échoue.
 
 ### Ordre non négociable
 

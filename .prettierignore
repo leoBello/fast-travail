@@ -1,0 +1,7 @@
+# Les Edge Functions sont du code Deno : deno fmt les formate, avec les
+# guillemets simples imposes par supabase/functions/deno.json. Prettier
+# ferait exactement l inverse.
+supabase/functions/
+supabase/migrations/
+node_modules/
+.superpowers/

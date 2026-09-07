@@ -1,0 +1,7 @@
+{
+  // L'extension Deno est INDISPENSABLE : sans elle, VS Code analyse les Edge
+  // Functions avec le serveur TypeScript de Node et signale des erreurs qui
+  // n'existent pas — `Deno.serve` inconnu, imports en .ts refusés, import map
+  // ignorée. `deno lint` en ligne de commande, lui, est propre.
+  "recommendations": ["denoland.vscode-deno"]
+}
