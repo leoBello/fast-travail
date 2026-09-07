@@ -46,8 +46,11 @@ values
   -- ---------------------------------------------------------------------
   -- AXE LOCAL : Marseille, rayon 40 km (rayon valide empiriquement sur
   -- France Travail : 20 km=136, 40=196, 70=212, 100=272 offres).
-  -- Les termes techniques d'abord : ce sont les plus precis, et l'ordre de
-  -- priorite decide a quelle requete le dedoublonnage attribue une offre.
+  -- ATTENTION : le raisonnement sur les priorites qui figurait ici etait FAUX.
+  -- Il est corrige par la migration 20260907234512_fix_adzuna_priority_order.
+  -- Seuls ces commentaires ont ete rectifies apres application (un commentaire
+  -- est inerte, le SQL execute n'a pas change) ; les valeurs, elles, sont
+  -- corrigees par la migration suivante et non ici.
   -- ---------------------------------------------------------------------
   ('adzuna', 'adzuna:local:react-ts',    'React TypeScript',      '13055', 40, '{}'::jsonb,                     3,  5),  --  2 / 5
   ('adzuna', 'adzuna:local:typescript',  'TypeScript',            '13055', 40, '{}'::jsonb,                     3, 10),  --  3 / 11
@@ -56,11 +59,11 @@ values
   ('adzuna', 'adzuna:local:dev-front',   'développeur front-end', '13055', 40, '{}'::jsonb,                     3, 20),  --  6 / 20
   ('adzuna', 'adzuna:local:dev-web',     'développeur web',       '13055', 40, '{}'::jsonb,                     3, 25),  --  4 / 36
 
-  -- Le filet large, en DERNIERE priorite : il passe apres les requetes
-  -- precises, qui recuperent donc la paternite des offres communes.
-  -- Bruyant et non filtrable faute de texte (Java, Angular, infra, paie
-  -- s'y melent), mais c'est le seul rattrapage d'une offre pertinente dont
-  -- le titre ne porte aucun terme technique reconnaissable.
+  -- Le filet large. Bruyant et non filtrable faute de texte (Java, Angular,
+  -- infra, paie s'y melent), mais c'est le seul rattrapage d'une offre
+  -- pertinente dont le titre ne porte aucun terme technique reconnaissable.
+  -- Sa priorite est corrigee par la migration suivante : voir l'avertissement
+  -- en tete de l'axe local.
   ('adzuna', 'adzuna:local:it-jobs',     null,                    '13055', 40, '{"category":"it-jobs"}'::jsonb, 3, 90),  -- 77 / 385
 
   -- ---------------------------------------------------------------------
