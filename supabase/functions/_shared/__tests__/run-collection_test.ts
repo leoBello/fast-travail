@@ -26,7 +26,10 @@ interface Recorded {
 }
 
 /** Faux client couvrant les seules chaînes d'appels que runCollection déclenche. */
-function fakeDb(knownExternalIds: string[] = []): { db: DbClient; rec: Recorded } {
+function fakeDb(
+  knownExternalIds: string[] = [],
+  opts: { failFinishRun?: boolean } = {},
+): { db: DbClient; rec: Recorded } {
   const rec: Recorded = { runsOpened: 0, runsFinished: [], telemetry: [], upserts: [] };
 
   const db = {
@@ -43,7 +46,12 @@ function fakeDb(knownExternalIds: string[] = []): { db: DbClient; rec: Recorded 
           },
           update(row: Record<string, unknown>) {
             rec.runsFinished.push(row);
-            return { eq: () => Promise.resolve({ error: null }) };
+            return {
+              eq: () =>
+                opts.failFinishRun
+                  ? Promise.reject(new Error('base indisponible'))
+                  : Promise.resolve({ error: null }),
+            };
           },
         };
       }
@@ -251,3 +259,26 @@ Deno.test('runCollection distingue les offres déjà connues', async () => {
   assertEquals(summary.offersNew, 1);
   assertEquals(summary.offersUpdated, 2);
 });
+
+Deno.test(
+  'runCollection renvoie le résumé complet même si la clôture du run échoue',
+  async () => {
+    const { db } = fakeDb([], { failFinishRun: true });
+
+    const summary = await runCollection({
+      db,
+      source: 'france_travail',
+      mode: 'delta',
+      trigger: 'manual',
+      dryRun: false,
+      queries: [query(1, 'a'), query(2, 'b')],
+      fetchAll: okFetch(3),
+      map: mapAll,
+    });
+
+    assertEquals(summary.status, 'success');
+    assertEquals(summary.offersNew, 6);
+    assertEquals(summary.offersUpdated, 0);
+    assertEquals(summary.queries.length, 2);
+  },
+);

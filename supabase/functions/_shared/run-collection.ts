@@ -140,7 +140,14 @@ export async function runCollection(opts: RunCollectionOptions): Promise<Collect
     ? 'failed'
     : 'partial';
 
-  if (runId) await finishRun(db, runId, { status, offersNew, offersUpdated });
+  if (runId) {
+    try {
+      await finishRun(db, runId, { status, offersNew, offersUpdated });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      log('error', 'clôture du run en échec', { source, runId, message });
+    }
+  }
 
   return {
     runId,
