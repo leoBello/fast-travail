@@ -105,7 +105,7 @@ Expected : `deno 2.9.6` (ou supérieur).
 L'état du shell ne persiste pas entre deux appels : **répète cet `export` dans chaque commande utilisant `deno`**, y compris `npm test`. Exemple type, utilisé partout dans ce plan :
 
 ```bash
-export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --allow-read supabase/functions/
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/
 ```
 
 - [ ] **Step 2: Vérifier le Supabase CLI (déjà installé)**
@@ -134,8 +134,7 @@ Le fichier existe mais ne contient que `devDependencies`. Remplace-le intégrale
     "fn:deploy:ft": "supabase functions deploy collect-france-travail",
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
     "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",
-    "fmt": "deno fmt supabase/functions/",
-    "check": "deno check --config supabase/functions/deno.json supabase/functions/**/*.ts"
+    "fmt": "deno fmt supabase/functions/"
   },
   "devDependencies": {
     "supabase": "^2.117.0"
@@ -872,7 +871,7 @@ Deno.test('la fenêtre de collecte vaut 3 jours en delta et 31 en backfill', () 
 - [ ] **Step 3: Lancer les tests pour vérifier qu'ils passent**
 
 ```bash
-deno test --allow-read supabase/functions/_shared/__tests__/types_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/types_test.ts
 ```
 
 Expected : `ok | 3 passed`. Si le second test échoue sur le compte de clés, corrige le nombre attendu **après** avoir vérifié qu'aucun champ ne manque dans `emptyOffer`.
@@ -921,7 +920,7 @@ export function log(level: LogLevel, message: string, data?: unknown): void {
 - [ ] **Step 6: Vérifier que tout typecheck**
 
 ```bash
-deno check --config supabase/functions/deno.json supabase/functions/_shared/db.ts supabase/functions/_shared/logger.ts supabase/functions/_shared/types.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/_shared/db.ts supabase/functions/_shared/logger.ts supabase/functions/_shared/types.ts
 ```
 
 Expected : `Check file:///...` sans erreur.
@@ -1050,7 +1049,7 @@ Deno.test('upsertOffers dédoublonne les external_id en doublon dans le même lo
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
 
 ```bash
-deno test --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
 ```
 
 Expected : FAIL — `Module not found "./upsert.ts"`.
@@ -1120,7 +1119,7 @@ export async function upsertOffers(
 - [ ] **Step 4: Lancer le test pour vérifier qu'il passe**
 
 ```bash
-deno test --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
 ```
 
 Expected : `ok | 4 passed`.
@@ -1204,7 +1203,7 @@ export async function recordQueryResult(
 - [ ] **Step 6: Typecheck**
 
 ```bash
-deno check --config supabase/functions/deno.json supabase/functions/_shared/upsert.ts supabase/functions/_shared/run-tracker.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/_shared/upsert.ts supabase/functions/_shared/run-tracker.ts
 ```
 
 Expected : aucune erreur.
@@ -1318,7 +1317,7 @@ Deno.test('getAccessToken remonte une erreur explicite sur réponse non-2xx', as
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
 ```
 
 Expected : FAIL — `Module not found "../auth.ts"`.
@@ -1390,7 +1389,7 @@ export async function getAccessToken(
 - [ ] **Step 4: Lancer le test pour vérifier qu'il passe**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
 ```
 
 Expected : `ok | 4 passed`.
@@ -1651,7 +1650,7 @@ Deno.test('fetchAllPages abandonne sur 403 sans réessayer', async () => {
 - [ ] **Step 3: Lancer les tests pour vérifier qu'ils échouent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
 ```
 
 Expected : FAIL — `Module not found "../client.ts"`.
@@ -1828,7 +1827,7 @@ export async function fetchAllPages(args: {
 - [ ] **Step 5: Lancer les tests pour vérifier qu'ils passent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
 ```
 
 Expected : `ok | 12 passed`.
@@ -2033,7 +2032,7 @@ Deno.test('la fixture réelle se mappe sans exception', async () => {
 - [ ] **Step 4: Lancer les tests pour vérifier qu'ils échouent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
 ```
 
 Expected : FAIL — `Module not found "../mapper.ts"`.
@@ -2128,7 +2127,7 @@ export function mapFtOffer(raw: unknown, provenance: FtProvenance): NormalizedOf
 - [ ] **Step 6: Lancer les tests pour vérifier qu'ils passent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
 ```
 
 Expected : `ok | 10 passed`. Si le dernier test échoue, un nom de champ diffère dans la fixture réelle : corrige `FtRawOffer` et le mapper.
@@ -2423,7 +2422,7 @@ Deno.test('runCollection distingue les offres déjà connues', async () => {
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
 
 ```bash
-export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --allow-read supabase/functions/_shared/__tests__/run-collection_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/run-collection_test.ts
 ```
 
 Expected : FAIL — `Module not found "../run-collection.ts"`.
@@ -2593,7 +2592,7 @@ export async function runCollection(opts: RunCollectionOptions): Promise<Collect
 - [ ] **Step 4: Lancer le test pour vérifier qu'il passe**
 
 ```bash
-export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --allow-read supabase/functions/_shared/__tests__/run-collection_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/run-collection_test.ts
 ```
 
 Expected : `ok | 7 passed`.
@@ -2718,7 +2717,7 @@ verify_jwt = true
 - [ ] **Step 3: Typecheck l'ensemble**
 
 ```bash
-deno check --config supabase/functions/deno.json supabase/functions/collect-france-travail/index.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/collect-france-travail/index.ts
 ```
 
 Expected : aucune erreur.
@@ -2726,7 +2725,7 @@ Expected : aucune erreur.
 - [ ] **Step 4: Lancer toute la suite de tests**
 
 ```bash
-npm test
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm test
 ```
 
 Expected : tous les tests passent (types, upsert, auth, client, mapper).
@@ -3148,7 +3147,7 @@ Deno.test('fetchAllAdzunaPages réessaie après un 429', async () => {
 - [ ] **Step 3: Lancer le test pour vérifier qu'il échoue**
 
 ```bash
-deno test --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
 ```
 
 Expected : FAIL — `Module not found "../client.ts"`.
@@ -3272,7 +3271,7 @@ export async function fetchAllAdzunaPages(args: {
 - [ ] **Step 5: Lancer le test pour vérifier qu'il passe**
 
 ```bash
-deno test --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
 ```
 
 Expected : `ok | 7 passed`.
@@ -3477,7 +3476,7 @@ export function mapAdzunaOffer(
 - [ ] **Step 9: Lancer les tests du mapper**
 
 ```bash
-deno test --allow-read supabase/functions/collect-adzuna/__tests__/mapper_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-adzuna/__tests__/mapper_test.ts
 ```
 
 Expected : `ok | 7 passed`.
@@ -3571,8 +3570,8 @@ verify_jwt = true
 - [ ] **Step 12: Lancer toute la suite et typechecker**
 
 ```bash
-npm test
-deno check --config supabase/functions/deno.json supabase/functions/collect-adzuna/index.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm test
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/collect-adzuna/index.ts
 ```
 
 Expected : tous les tests passent, aucune erreur de type.
