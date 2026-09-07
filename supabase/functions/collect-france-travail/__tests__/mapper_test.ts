@@ -95,6 +95,81 @@ Deno.test('mapFtOffer renvoie null sur un payload inutilisable', () => {
   assertEquals(mapFtOffer(null, provenance), null);
 });
 
+Deno.test('mapFtOffer classe le télétravail hybride via classifyRemote', () => {
+  const hybride = {
+    ...sample,
+    description: 'Poste avec 2 jours de télétravail par semaine.',
+  };
+  const offer = mapFtOffer(hybride, provenance)!;
+  assertEquals(offer.remote_label, 'hybride');
+  assertEquals(offer.is_remote, true);
+});
+
+Deno.test('mapFtOffer classe le télétravail full via classifyRemote', () => {
+  const full = { ...sample, description: 'Poste en télétravail complet, sans venue au bureau.' };
+  const offer = mapFtOffer(full, provenance)!;
+  assertEquals(offer.remote_label, 'full');
+  assertEquals(offer.is_remote, true);
+});
+
+Deno.test('mapFtOffer marque le télétravail ponctuel comme non organisé (is_remote=false)', () => {
+  const ponctuel = { ...sample, description: 'Télétravail possible selon les missions.' };
+  const offer = mapFtOffer(ponctuel, provenance)!;
+  assertEquals(offer.remote_label, 'ponctuel');
+  assertEquals(offer.is_remote, false);
+});
+
+Deno.test('mapFtOffer marque une mention vague de télétravail comme non organisée (is_remote=false)', () => {
+  const mention = {
+    ...sample,
+    description: 'Avantages : charte télétravail, CSE, épargne salariale.',
+  };
+  const offer = mapFtOffer(mention, provenance)!;
+  assertEquals(offer.remote_label, 'mention');
+  assertEquals(offer.is_remote, false);
+});
+
+Deno.test('mapFtOffer renvoie remote_label et is_remote à null/false sans aucune mention', () => {
+  const offer = mapFtOffer(sample, provenance)!;
+  assertEquals(offer.remote_label, null);
+  assertEquals(offer.is_remote, false);
+});
+
+Deno.test('mapFtOffer combine contexteTravail.conditionsExercice pour classer le télétravail', () => {
+  const withContext = {
+    ...sample,
+    description: 'Poste de développeur au sein de notre agence.',
+    contexteTravail: { conditionsExercice: ['Possibilité de télétravail'] },
+  };
+  const offer = mapFtOffer(withContext, provenance)!;
+  assertEquals(offer.remote_label, 'ponctuel');
+  assertEquals(offer.is_remote, false);
+});
+
+Deno.test('mapFtOffer déduit le département du libellé de lieu quand codePostal est absent', () => {
+  const noPostal = {
+    ...sample,
+    lieuTravail: { libelle: '75 - Paris 9e Arrondissement' },
+  };
+  const offer = mapFtOffer(noPostal, provenance)!;
+  assertEquals(offer.department, '75');
+});
+
+Deno.test('mapFtOffer ne déduit pas de département depuis un libellé de région sans préfixe numérique', () => {
+  const region = { ...sample, lieuTravail: { libelle: 'Ile-de-France' } };
+  const offer = mapFtOffer(region, provenance)!;
+  assertEquals(offer.department, null);
+});
+
+Deno.test('mapFtOffer privilégie codePostal au libellé quand les deux sont présents', () => {
+  const both = {
+    ...sample,
+    lieuTravail: { libelle: '75 - Paris 9e Arrondissement', codePostal: '13001' },
+  };
+  const offer = mapFtOffer(both, provenance)!;
+  assertEquals(offer.department, '13');
+});
+
 Deno.test('provenanceOf lit la commune et le rayon de la requête', () => {
   const query: SearchQueryRow = {
     id: 1,

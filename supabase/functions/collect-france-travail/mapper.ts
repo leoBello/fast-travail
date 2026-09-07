@@ -1,11 +1,13 @@
 import { emptyOffer, type NormalizedOffer, type SearchQueryRow } from '../_shared/types.ts';
+import { classifyRemote } from '../_shared/remote.ts';
 
 export interface FtProvenance {
   searchOriginInsee: string | null;
   searchRadiusKm: number | null;
 }
 
-const REMOTE_HINTS = ['télétravail', 'teletravail', 'remote', 'à distance', 'full remote'];
+/** Préfixe département d'un libellé de lieu France Travail, ex. "13 - Marseille 8e Arrondissement". */
+const DEPARTMENT_PREFIX = /^(\d{2,3})\s*-/;
 
 interface FtRawOffer {
   id?: string;
@@ -27,6 +29,7 @@ interface FtRawOffer {
   salaire?: { libelle?: string };
   origineOffre?: { urlOrigine?: string };
   dureeTravailLibelle?: string;
+  contexteTravail?: { conditionsExercice?: string[] };
 }
 
 export function provenanceOf(query: SearchQueryRow): FtProvenance {
@@ -65,12 +68,19 @@ export function mapFtOffer(raw: unknown, provenance: FtProvenance): NormalizedOf
   offer.commune_insee = ft.lieuTravail?.commune ?? null;
   offer.latitude = ft.lieuTravail?.latitude ?? null;
   offer.longitude = ft.lieuTravail?.longitude ?? null;
-  // Le département se déduit du code postal : l'API ne l'expose pas en clair.
-  offer.department = ft.lieuTravail?.codePostal?.slice(0, 2) ?? null;
+  // Le département se déduit d'abord du code postal ; à défaut (fréquent, l'API ne le
+  // renvoie que par intermittence), on retombe sur le préfixe du libellé de lieu
+  // ("13 - Marseille 8e Arrondissement"). Un libellé de région ("Ile-de-France") n'en a pas.
+  const libelleDepartment = ft.lieuTravail?.libelle?.match(DEPARTMENT_PREFIX)?.[1] ?? null;
+  offer.department = ft.lieuTravail?.codePostal?.slice(0, 2) ?? libelleDepartment;
 
-  // L'API n'a pas de filtre télétravail fiable : on le déduit du texte.
-  const haystack = `${ft.intitule} ${ft.description ?? ''}`.toLowerCase();
-  offer.is_remote = REMOTE_HINTS.some((hint) => haystack.includes(hint));
+  // L'API n'a pas de filtre télétravail fiable : on le déduit du texte via le
+  // classifieur partagé, précis pour l'exploitabilité (full/hybride = organisé).
+  const text = `${ft.intitule} ${ft.description ?? ''}`;
+  const extraConditions = ft.contexteTravail?.conditionsExercice?.join(' ');
+  const mode = classifyRemote(text, extraConditions);
+  offer.remote_label = mode;
+  offer.is_remote = mode === 'full' || mode === 'hybride';
 
   offer.search_origin_insee = provenance.searchOriginInsee;
   offer.search_radius_km = provenance.searchRadiusKm;
