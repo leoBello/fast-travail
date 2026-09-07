@@ -776,6 +776,25 @@ export interface NormalizedOffer {
   raw: unknown;
 }
 
+/**
+ * Forme canonique d'une ligne de `collection_query_results`.
+ * Source de vérité unique : run-tracker.ts (écriture) et run-collection.ts
+ * (construction pendant la boucle de collecte) importent ce type d'ici,
+ * pour n'avoir qu'un seul endroit à corriger si la table évolue.
+ */
+export interface QueryReportLine {
+  query_id: number | null;
+  unit_label: string;
+  http_status: number | null;
+  total_available: number | null;
+  fetched: number;
+  new_offers: number;
+  updated_offers: number;
+  truncated: boolean;
+  duration_ms: number;
+  error: string | null;
+}
+
 export interface SearchQueryRow {
   id: number;
   source: string;
@@ -948,7 +967,7 @@ git commit -m "feat(shared): NormalizedOffer, client DB à config injectée et l
   - `upsertOffers(db: DbClient, offers: NormalizedOffer[]): Promise<UpsertResult>`
   - `startRun(db, args: { source: SourceKey; trigger: RunTrigger; mode: CollectionMode }): Promise<string>` — renvoie l'id du run
   - `finishRun(db, runId: string, args: { status: RunStatus; offersNew: number; offersUpdated: number; error?: string | null }): Promise<void>`
-  - `interface QueryResultRow` et `recordQueryResult(db, runId: string, row: QueryResultRow): Promise<void>`
+  - `recordQueryResult(db, runId: string, row: QueryReportLine): Promise<void>` — `QueryReportLine` est la forme canonique d'une ligne de `collection_query_results`, définie dans `types.ts` (Task 3) et partagée avec `run-collection.ts` (Task 8) pour qu'une colonne ajoutée à la table ne soit à répercuter qu'à un seul endroit
 
 - [ ] **Step 1: Écrire le test de `upsertOffers` avec un faux client**
 
@@ -1130,7 +1149,7 @@ Create `supabase/functions/_shared/run-tracker.ts` :
 
 ```ts
 import type { DbClient } from './db.ts';
-import type { CollectionMode, RunStatus, RunTrigger, SourceKey } from './types.ts';
+import type { CollectionMode, QueryReportLine, RunStatus, RunTrigger, SourceKey } from './types.ts';
 
 export async function startRun(
   db: DbClient,
@@ -1170,19 +1189,6 @@ export async function finishRun(
   if (error) throw new Error(`clôture du run : ${error.message}`);
 }
 
-export interface QueryResultRow {
-  query_id?: number | null;
-  unit_label: string;
-  http_status?: number | null;
-  total_available?: number | null;
-  fetched?: number | null;
-  new_offers?: number | null;
-  updated_offers?: number | null;
-  truncated?: boolean | null;
-  duration_ms?: number | null;
-  error?: string | null;
-}
-
 /**
  * Écrit une ligne de télémétrie. N'échoue jamais bruyamment : perdre une ligne
  * de télémétrie ne doit pas faire échouer une collecte réussie.
@@ -1190,7 +1196,7 @@ export interface QueryResultRow {
 export async function recordQueryResult(
   db: DbClient,
   runId: string,
-  row: QueryResultRow,
+  row: QueryReportLine,
 ): Promise<void> {
   const { error } = await db
     .from('collection_query_results')
@@ -1199,6 +1205,11 @@ export async function recordQueryResult(
   if (error) console.error(`télémétrie non enregistrée : ${error.message}`);
 }
 ```
+
+> **Ajout après revue** — un fichier `supabase/functions/_shared/__tests__/run-tracker_test.ts`
+> couvre `recordQueryResult` : il vérifie que la fonction n'échoue jamais bruyamment quand
+> l'écriture de télémétrie est refusée par la base. Perdre une ligne de télémétrie ne doit pas
+> faire échouer une collecte par ailleurs réussie.
 
 - [ ] **Step 6: Typecheck**
 
@@ -2163,7 +2174,7 @@ Les deux sources API, puis les quatre scrapers du plan B, partagent exactement l
 - Consumes: `upsertOffers` (Task 4), `startRun` / `finishRun` / `recordQueryResult` (Task 4), `NormalizedOffer` / `SearchQueryRow` / `SourceKey` / `CollectionMode` / `RunTrigger` / `RunStatus` (Task 3), `log` (Task 3).
 - Produces:
   - `interface FetchResult { offers: unknown[]; totalAvailable: number | null; truncated?: boolean; httpStatus: number }`
-  - `interface QueryReportLine` — la ligne de télémétrie, aussi renvoyée dans la réponse HTTP
+  - `QueryReportLine` est importé de `types.ts` et ré-exporté ici pour les consommateurs de ce module — il n'est pas redéfini
   - `interface CollectionSummary { runId: string | null; mode: CollectionMode; dryRun: boolean; status: RunStatus; offersNew: number; offersUpdated: number; queries: QueryReportLine[]; preview?: NormalizedOffer[] }`
   - `runCollection(opts: RunCollectionOptions): Promise<CollectionSummary>` où `RunCollectionOptions = { db, source, mode, trigger, dryRun, queries, fetchAll, map }`, `fetchAll: (query: SearchQueryRow) => Promise<FetchResult>` et `map: (raw: unknown, query: SearchQueryRow) => NormalizedOffer | null`
 
@@ -2202,7 +2213,10 @@ interface Recorded {
 }
 
 /** Faux client couvrant les seules chaînes d'appels que runCollection déclenche. */
-function fakeDb(knownExternalIds: string[] = []): { db: DbClient; rec: Recorded } {
+function fakeDb(
+  knownExternalIds: string[] = [],
+  opts: { failFinishRun?: boolean } = {},
+): { db: DbClient; rec: Recorded } {
   const rec: Recorded = { runsOpened: 0, runsFinished: [], telemetry: [], upserts: [] };
 
   const db = {
@@ -2219,7 +2233,12 @@ function fakeDb(knownExternalIds: string[] = []): { db: DbClient; rec: Recorded 
           },
           update(row: Record<string, unknown>) {
             rec.runsFinished.push(row);
-            return { eq: () => Promise.resolve({ error: null }) };
+            return {
+              eq: () =>
+                opts.failFinishRun
+                  ? Promise.reject(new Error('base indisponible'))
+                  : Promise.resolve({ error: null }),
+            };
           },
         };
       }
@@ -2293,7 +2312,7 @@ Deno.test('runCollection agrège les compteurs sur toutes les requêtes', async 
   assertEquals(rec.runsFinished[0].status, 'success');
 });
 
-Deno.test('runCollection en dryRun n\'ouvre aucun run et n\'écrit rien', async () => {
+Deno.test("runCollection en dryRun n'ouvre aucun run et n'écrit rien", async () => {
   const { db, rec } = fakeDb();
 
   const summary = await runCollection({
@@ -2427,6 +2446,29 @@ Deno.test('runCollection distingue les offres déjà connues', async () => {
   assertEquals(summary.offersNew, 1);
   assertEquals(summary.offersUpdated, 2);
 });
+
+Deno.test(
+  'runCollection renvoie le résumé complet même si la clôture du run échoue',
+  async () => {
+    const { db } = fakeDb([], { failFinishRun: true });
+
+    const summary = await runCollection({
+      db,
+      source: 'france_travail',
+      mode: 'delta',
+      trigger: 'manual',
+      dryRun: false,
+      queries: [query(1, 'a'), query(2, 'b')],
+      fetchAll: okFetch(3),
+      map: mapAll,
+    });
+
+    assertEquals(summary.status, 'success');
+    assertEquals(summary.offersNew, 6);
+    assertEquals(summary.offersUpdated, 0);
+    assertEquals(summary.queries.length, 2);
+  },
+);
 ```
 
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
@@ -2449,11 +2491,16 @@ import { upsertOffers } from './upsert.ts';
 import type {
   CollectionMode,
   NormalizedOffer,
+  QueryReportLine,
   RunStatus,
   RunTrigger,
   SearchQueryRow,
   SourceKey,
 } from './types.ts';
+
+// Ré-exporté pour ne pas casser un importateur qui prenait ce type d'ici.
+// La forme canonique vit maintenant dans types.ts.
+export type { QueryReportLine } from './types.ts';
 
 /** Nombre d'offres renvoyées en exemple dans une réponse dryRun. */
 const PREVIEW_PER_QUERY = 3;
@@ -2464,19 +2511,6 @@ export interface FetchResult {
   totalAvailable: number | null;
   truncated?: boolean;
   httpStatus: number;
-}
-
-export interface QueryReportLine {
-  query_id: number | null;
-  unit_label: string;
-  http_status: number | null;
-  total_available: number | null;
-  fetched: number;
-  new_offers: number;
-  updated_offers: number;
-  truncated: boolean;
-  duration_ms: number;
-  error: string | null;
 }
 
 export interface CollectionSummary {
@@ -2584,7 +2618,14 @@ export async function runCollection(opts: RunCollectionOptions): Promise<Collect
     ? 'failed'
     : 'partial';
 
-  if (runId) await finishRun(db, runId, { status, offersNew, offersUpdated });
+  if (runId) {
+    try {
+      await finishRun(db, runId, { status, offersNew, offersUpdated });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      log('error', 'clôture du run en échec', { source, runId, message });
+    }
+  }
 
   return {
     runId,
@@ -2606,6 +2647,12 @@ export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno t
 ```
 
 Expected : `ok | 7 passed`.
+
+> **Correctif après revue** — l'appel final à `finishRun` est encapsulé dans un `try/catch` qui
+> journalise l'échec sans le relancer. Sans cette protection, une base momentanément indisponible
+> faisait perdre à l'appelant un `CollectionSummary` déjà entièrement calculé, et laissait la ligne
+> `collection_runs` bloquée sur `running` sans `finished_at` — un run pourtant terminé apparaissait
+> indéfiniment comme en cours. C'est le même parti que `recordQueryResult`.
 
 - [ ] **Step 5: Vérifier la neutralité runtime de `_shared/`**
 
