@@ -121,10 +121,41 @@ avec le vocabulaire réel du marché (`informatique`, `ingénieur d'études`, co
 ROME), et **le lexique de compétences est devenu le filtre principal** — c'est
 lui qui trouve « React » dans les descriptions, là où l'API en est incapable.
 
-**Adzuna, et non France Travail, est la source principale pour ce profil** :
-React y rend 36 offres à Marseille et 1481 au national, contre 0 et 27. Le brief
-misait sur France Travail et ses 500 000 offres ; elles existent, mais son index
-ne permet pas d'y trouver un développeur React.
+**Adzuna indexe les technologies, mais n'en restitue que 500 caractères.**
+C'est la mesure la plus structurante de la phase 1, et elle a démenti une
+affirmation que ce document portait lui-même.
+
+Adzuna tronque **toute** description à 500 caractères — mesuré sur 50 offres :
+min 500, médiane 500, max 500, et 50 sur 50 terminées par « … ». Le lexique de
+compétences, qui est le filtre principal pour France Travail, ne voit donc que
+ce début de texte, alors que la stack technique et les conditions de
+télétravail figurent presque toujours plus loin. Une offre sur 50 mentionne
+« react » dans ce qu'on reçoit. Mais l'index d'Adzuna, lui, voit tout : sur 19
+offres rendues par `what_phrase=full remote`, 13 ne portent pas la locution
+dans les 500 caractères reçus.
+
+**Les deux sources appellent donc des stratégies opposées.** France Travail :
+index inutilisable, texte intégral disponible, donc requêtes larges et filtrage
+par le lexique. Adzuna : index puissant, texte tronqué, donc **la requête est
+le filtre**.
+
+**Ce que ce document affirmait à tort** : « Adzuna, et non France Travail, est
+la source principale pour ce profil — React y rend 36 offres à Marseille ». Ce
+36 était un `count`, et le lemmatiseur français d'Adzuna confond « React » avec
+« réacteur » : sur ces 60 offres, 8 titres sont des réacteurs nucléaires et une
+seule contient « react » comme mot. `what_exclude=réacteur` les ramène toutes à
+zéro, vraies offres React comprises — les deux termes sont indissociables. Le
+signal React local réel sur Adzuna est de **5 offres sur 31 jours**.
+
+**Où Adzuna gagne réellement** : le full remote national. 63 offres sur 31
+jours par `what_phrase='full remote'` ancré sur « développeur », 19 sur
+TypeScript, et l'échantillon est exactement le profil visé. France Travail n'en
+avait rendu que 9 sur 699. Sur le marché local, les deux sources concordent en
+revanche : Marseille est un marché Angular / Java, pas React.
+
+**Le marché local est mince, et ce n'est pas un défaut d'outillage.** Les deux
+sources indépendamment le disent. Ce constat pèse sur la phase 2 : le gisement
+exploitable est national et full remote.
 
 **Le full remote est rare : 1,3 % des offres.** Sur 699 offres collectées, 9
 seulement sont en full remote, contre 190 en hybride. La passe nationale ramène

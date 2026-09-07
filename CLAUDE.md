@@ -171,11 +171,40 @@ donc large avec le vocabulaire réel du marché (`informatique`,
 `ingénieur d'études`, codes ROME), et **le lexique de compétences est le filtre
 principal** — c'est lui qui trouve « React » dans les descriptions.
 
-**Adzuna, et non France Travail, est la source principale pour ce profil** :
-React y rend 36 offres à Marseille et 1481 au national, contre 0 et 27. Deux
-pièges y sont vérifiés : `what` n'est pas un ET logique (utiliser `what_and`),
-et `category=it-jobs` rate 52 des 60 offres React de Marseille — catégorie et
-mots-clés sont deux requêtes séparées, jamais combinées.
+**Sur Adzuna, la requête est le filtre — l'inverse de France Travail.** Adzuna
+tronque **toute** description à 500 caractères : mesuré sur 50 offres, longueur
+min 500, médiane 500, max 500, et 50 sur 50 finissent par « … ». Le lexique ne
+voit donc que ce début de texte, là où la stack technique figure presque
+toujours plus loin — 1 offre sur 50 mentionne « react » dans ce qu'on reçoit.
+Mais l'index d'Adzuna voit le texte intégral : sur 19 offres rendues par
+`what_phrase=full remote`, 13 ne portent pas la locution dans les 500
+caractères reçus. D'où des requêtes **précises** sur Adzuna, et un ratissage
+large sur France Travail. Ne jamais tenter de compenser la troncature par du
+code : c'est impossible.
+
+**`React` est inutilisable comme mot-clé Adzuna** : le lemmatiseur français y
+confond « React » et « réacteur ». `what_and=React` à Marseille rend 60 offres
+dont 8 titres de réacteurs nucléaires et 1 seule contenant « react » comme mot ;
+`what_exclude=réacteur` les rend **toutes** à zéro, vraies offres React
+comprises. Le terme ne s'emploie qu'ancré à un second (`React TypeScript`) ou à
+une locution exacte. Le lexique n'est pas menacé : `react` y est en `fts`, et la
+recherche plein texte française ne confond pas les deux radicaux.
+
+**Le full remote national vient de la requête, pas du texte.** `what_phrase`
+impose une locution dans le texte intégral, et `extra_params.implies_remote`
+comble le silence des 500 caractères reçus ; le texte garde le dernier mot
+quand il dit quelque chose. Seule « full remote » se combine à `what_and` : les
+locutions accentuées ou porteuses de `%` rendent 0 en combinaison.
+
+Deux autres pièges Adzuna vérifiés : `what` n'est pas un ET logique (utiliser
+`what_and`), et `category=it-jobs` est un filet à part, jamais combiné aux
+mots-clés — catégorie et mots-clés sont deux requêtes séparées.
+
+**Corrigé le 2026-09-08** : « Adzuna est la source principale, React y rend 36
+offres à Marseille » était faux. Ce 36 était un `count`, gonflé par la collision
+« réacteur ». Le signal React local réel est de 5 offres sur 31 jours
+(`React TypeScript`). Adzuna gagne en revanche nettement sur le **full remote
+national** — 63 offres sur 31 jours contre 9 pour France Travail sur 699.
 
 ## Consulter les offres
 
