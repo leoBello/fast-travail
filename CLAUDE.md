@@ -115,17 +115,36 @@ sauf avec le flag expérimental `--use-api`.
 - **RLS activé sur toutes les tables, sans aucune policy.** Seule la clé
   `service_role` accède aux données. Une table sans RLS rendrait la base
   lisible depuis Internet via la clé `anon`, qui est publique par nature.
+- **Pour interroger ou modifier la base distante, utiliser
+  `npx supabase db query --linked "<SQL>"`.** C'est le chemin direct : il
+  exécute du SQL arbitraire sur le projet distant, sans Docker ni script
+  intermédiaire. **Le drapeau `--linked` est obligatoire** — sans lui, la
+  commande cible une base *locale* qui n'existe pas ici et échoue sur un refus
+  de connexion trompeur.
 - **`db diff` ne fonctionne pas sur cette machine** : il exige un démon Docker
-  pour sa base fantôme. Vérifier le schéma fonctionnellement à la place, en
-  interrogeant la base avec `@supabase/supabase-js` et la clé `service_role`.
+  pour sa base fantôme, et Docker Desktop n'est pas démarré. Vérifier le schéma
+  par `db query --linked` à la place, ou fonctionnellement en écrivant puis en
+  relisant une ligne de sonde.
 
 ## Secrets
 
 - `.env.local` est gitignoré et ne doit **jamais** être commité, ni son contenu
   recopié dans un rapport, un commentaire ou un message.
+- **Ce qui est secret, et ce qui ne l'est pas.** Sont sensibles : la clé
+  `service_role`, le mot de passe de la base, les identifiants France Travail et
+  Adzuna. Ne le sont pas : la **référence du projet** (`zbpbuzoukldbzfbbikhw`),
+  qui est le nom d'hôte public de toutes les requêtes du projet et apparaît dans
+  n'importe quel onglet réseau. Elle peut donc figurer dans une migration. La clé
+  `anon` est publique par conception, mais reste hors du dépôt par hygiène : elle
+  passe par Vault.
 - Les secrets des Edge Functions passent par `npx supabase secrets set`.
-- La clé de service utilisée par les jobs `pg_cron` passe par **Vault**
-  (`vault.decrypted_secrets`), jamais en clair dans la définition du job.
+- Le jeton utilisé par les jobs `pg_cron` passe par **Vault**
+  (`vault.decrypted_secrets`, secret nommé `cron_auth_key`), jamais en clair dans
+  la définition du job. **C'est la clé `anon`, pas `service_role`** : le job n'a
+  besoin que de franchir `verify_jwt`, tandis que l'Edge Function reçoit sa propre
+  clé `service_role` injectée par Supabase pour écrire en base. Moindre privilège :
+  une fuite de ce jeton ne permettrait rien de plus qu'appeler la fonction, RLS
+  étant actif sans aucune policy.
 - `verify_jwt` reste à `true` sur toutes les fonctions : une Edge Function
   déployée est une URL publique sur Internet. « Pas d'authentification » signifie
   pas d'auth *utilisateur* dans l'application, pas un endpoint ouvert à tous.

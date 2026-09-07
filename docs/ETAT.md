@@ -9,9 +9,10 @@ Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUD
 
 ## Où en est-on
 
-**Le système collecte et fonctionne.** 699 offres en base, 6 retenues par la vue
-`offers_shortlist`. Le cron n'est pas encore posé : la collecte se lance
-manuellement.
+**Le système tourne tout seul.** 700 offres en base, 6 retenues par la vue
+`offers_shortlist`. La fonction France Travail est déployée et le cron
+`ft-daily` s'exécute **chaque jour à 6 h, PC éteint** — chaîne vérifiée de bout
+en bout : Vault, `pg_net`, fonction déployée, écriture en base.
 
 ```sql
 select * from offers_shortlist order by score desc, published_at desc;
@@ -19,7 +20,7 @@ select * from offers_shortlist order by score desc, published_at desc;
 
 | Indicateur | Valeur |
 |---|---:|
-| Offres collectées | 699 |
+| Offres collectées | 700 |
 | Offres retenues (`offers_shortlist`) | 6 |
 | Mentionnant React / TypeScript / Next.js | 47 |
 | Mentionnant LLM / IA / agents | 67 |
@@ -46,7 +47,7 @@ select * from offers_shortlist order by score desc, published_at desc;
 | 9 | Point d'entrée France Travail + **première collecte réelle** | ✅ |
 | — | Classification du télétravail + repli département | ✅ |
 | — | Vue `offers_shortlist` | ✅ |
-| **10** | **Déploiement France Travail + cron quotidien** | **à faire** |
+| 10 | Déploiement France Travail + cron quotidien | ✅ |
 | **11** | **Adzuna : client, mapper, orchestration** | **à faire** |
 | **12** | **Déploiement Adzuna + cron** | **à faire** |
 
@@ -77,7 +78,7 @@ génération de CV et lettres, suivi des candidatures.
 
 `distance_marseille_km` est `null` pour une bonne part des offres : l'API ne
 renvoie les coordonnées que par intermittence. Le filtre géographique repose donc
-sur le **département** (13, 83, 84), renseigné pour 695 offres sur 699. Ça marche,
+sur le **département** (13, 83, 84), renseigné pour 695 offres sur 700. Ça marche,
 mais « rayon de 40 km » n'est plus réglable au kilomètre — et le département 13
 va jusqu'à Arles.
 
@@ -101,20 +102,21 @@ courte sans que le total soit atteint, des offres seraient perdues **en
 silence**.
 
 Non déclenché sur la première collecte réelle — `fetched` égalait
-`total_available` sur les 24 requêtes — mais le défaut reste dans le code.
+`total_available` sur les 24 requêtes, et de nouveau sur le run du cron — mais le défaut reste dans le code.
 
-### P4 — `supabase functions serve` écrase les variables `SUPABASE_*`
+### P4 — `supabase functions serve` écrase les variables `SUPABASE_*` *(contourné, à documenter)*
 
 La commande **réserve** ces noms et ignore silencieusement les valeurs de
 `.env.local`. Une collecte lancée ainsi écrit dans une Postgres locale éphémère
-et vide, en croyant écrire sur le projet distant. Contournement retenu :
-`deno run --env-file=.env.local` directement sur le point d'entrée.
+et vide, en croyant écrire sur le projet distant. Deux contournements :
+`deno run --env-file=.env.local` directement sur le point d'entrée pour un test
+local, ou `npx supabase db query --linked` pour toute vérification en base.
 
-À documenter dans le plan avant la tâche 11, qui contient la même étape.
+Reste à documenter dans le plan avant la tâche 11, qui porte la même étape.
 
 ### P5 — Signal local mince
 
-6 offres retenues sur 699. France Travail seul ne suffit pas pour ce profil :
+6 offres retenues sur 700. France Travail seul ne suffit pas pour ce profil :
 zéro offre React dans son index sur Marseille. Adzuna devrait changer l'échelle
 (36 offres React à Marseille, 1481 au national) — c'est l'enjeu de la tâche 11.
 
