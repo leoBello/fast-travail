@@ -185,6 +185,9 @@ Create `.env.local.example` :
 # Projet Supabase (Settings -> API)
 SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=
+# La cle anon est publique par nature ; elle sert aux appels curl des Edge
+# Functions (verify_jwt) et a verifier que RLS bloque bien les lectures.
+SUPABASE_ANON_KEY=
 
 # France Travail (francetravail.io -> ton application)
 FT_CLIENT_ID=
