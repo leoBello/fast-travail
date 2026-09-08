@@ -124,7 +124,16 @@ export function mapFreeWorkOffer(raw: unknown): NormalizedOffer | null {
   offer.postal_code = asText(address?.postalCode);
   // Le code postal prime ; le nom de commune n'est qu'un repli, et il est
   // souvent le seul disponible (les deux fixtures n'ont aucun code postal).
-  offer.department = offer.postal_code?.slice(0, 2) ??
+  // Free-Work liste aussi des offres hors de France : un code postal qui n'a
+  // pas le format français à cinq chiffres (« BS1 2HP », ou même un code
+  // belge purement numérique comme « 1300 ») ne doit jamais être tranché en
+  // département — un « 1300 » belge deviendrait « 13 », le département de
+  // Marseille, et l'offre entrerait dans la sélection locale comme si elle
+  // était commutable. Mesuré en base : cinq lignes déjà polluées ainsi.
+  const frenchPostalCode = offer.postal_code && /^\d{5}$/.test(offer.postal_code)
+    ? offer.postal_code
+    : null;
+  offer.department = frenchPostalCode?.slice(0, 2) ??
     departmentCodeFromCityName(offer.city);
 
   if (typeof posting.datePosted === 'string') {

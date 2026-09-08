@@ -138,3 +138,51 @@ Deno.test('une charge utile inexploitable rend null plutôt qu’une offre creus
   assertEquals(mapFreeWorkOffer({ path: '', url: 'u', jobPosting: { title: 'T' } }), null);
   assertEquals(mapFreeWorkOffer({ path: 'x/y', url: 'u', jobPosting: {} }), null);
 });
+
+Deno.test('un code postal à cinq chiffres reste tranché en département', () => {
+  const offer = mapFreeWorkOffer({
+    path: 'x/y',
+    url: 'u',
+    jobPosting: {
+      '@type': 'JobPosting',
+      title: 'T',
+      jobLocation: { address: { addressLocality: 'Marseille', postalCode: '13008' } },
+    },
+  });
+
+  assertEquals(offer?.postal_code, '13008');
+  assertEquals(offer?.department, '13');
+});
+
+Deno.test('un code postal étranger alphanumérique ne devient pas un département', () => {
+  // Mesuré en base : Bristol « BS1 2HP » tranché en « BS », inerte mais faux.
+  const offer = mapFreeWorkOffer({
+    path: 'x/y',
+    url: 'u',
+    jobPosting: {
+      '@type': 'JobPosting',
+      title: 'T',
+      jobLocation: { address: { addressLocality: 'Bristol', postalCode: 'BS1 2HP' } },
+    },
+  });
+
+  assertEquals(offer?.postal_code, 'BS1 2HP');
+  assertEquals(offer?.department, null);
+});
+
+Deno.test('un code postal étranger à quatre chiffres ne devient pas un département français', () => {
+  // Wavre (Belgique) « 1300 » ne doit jamais devenir « 13 » : le département
+  // français attend cinq chiffres, pas quatre.
+  const offer = mapFreeWorkOffer({
+    path: 'x/y',
+    url: 'u',
+    jobPosting: {
+      '@type': 'JobPosting',
+      title: 'T',
+      jobLocation: { address: { addressLocality: 'Wavre', postalCode: '1300' } },
+    },
+  });
+
+  assertEquals(offer?.postal_code, '1300');
+  assertEquals(offer?.department, null);
+});
