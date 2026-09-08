@@ -256,13 +256,17 @@ republications (`dup_count` élevé, `dup_first_seen_at` ancien) est un signal
 **L'annonce affichée n'est pas toujours la plus récente**, et c'est le piège
 à connaître avant de cliquer sur un lien. L'ordre d'élection est : d'abord
 celle qui porte un **TJM**, puis la **description la plus longue**, puis la
-plus récemment publiée, puis la plus récemment vue, puis l'`id` pour que
-l'ordre soit total. La fraîcheur ne vient donc qu'en troisième position :
-mesuré le 2026-09-08, **15 groupes intra-source sur 129** affichent une ligne
-qui n'est pas la plus récente, et le groupe KLANIK « Ingénieur IA » montre
-une annonce du 21 août en masquant une du 3 septembre. Si un lien est mort,
-c'est `offers_hidden_duplicates` qu'il faut regarder : une republication plus
-fraîche y attend peut-être.
+plus récemment publiée, puis celle vue en premier (`first_seen_at`), puis
+l'`id` pour que l'ordre soit total. La fraîcheur ne vient donc qu'en
+troisième position.
+
+En pratique le piège est **rare** : mesuré le 2026-09-08, sur les 87 lignes de
+la sélection, **3 groupes seulement** ont plus d'un candidat éligible, et
+**2 lignes** affichent autre chose que la plus fraîche. L'une est le groupe
+KLANIK « Ingénieur IA », qui montre l'annonce France Travail du 21 août — sa
+description complète l'emporte — en masquant une annonce Adzuna du
+3 septembre. Si un lien est mort, c'est `offers_hidden_duplicates` qu'il faut
+regarder : une republication plus fraîche y attend peut-être.
 
 **Interroger `offers_shortlist`, jamais `offers_ranked` avec une clause écrite
 à la main.** La vue encode la règle complète — signal rouge éliminatoire, puis
@@ -312,8 +316,11 @@ Les coûts ne sont pas du même ordre et ne se lisent pas ensemble :
 `offers_shortlist` met environ **3,7 s**, dont 3,3 s dans
 `offer_lexical_score` — un coût **linéaire** en offres × termes du lexique,
 qui grandira avec le corpus. `offers_hidden_duplicates` met environ
-**0,5 s**, après correction : elle était quadratique et coûtait 3,8 s pour
-un produit cartésien complet.
+**0,27 s** : elle formait un produit cartesien complet et coûtait 3,8 s, en
+deux temps corrigés — d'abord une CTE `materialized`, qui l'a rendue bon
+marché sans la rendre linéaire, puis la suppression de l'auto-jointure au
+profit d'une fonction de fenêtrage, qui a fait tomber le produit de
+719 879 lignes filtrées à 703.
 
 Les axes réglables sont des **lignes en base**, jamais du code :
 
