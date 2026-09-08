@@ -126,7 +126,21 @@ export async function fetchFreeWorkOffers(
     if (page === 1) totalAvailable = parseTotal(listing.body);
 
     const pagePaths = harvestPaths(listing.body);
-    if (pagePaths.length === 0) break;
+    if (pagePaths.length === 0) {
+      // Zéro chemin en page 1 n'est jamais ambigu : les chemins sont récoltés
+      // AVANT le filtre des identifiants connus, donc une facette saine en
+      // rend toujours une seizaine. Zéro veut dire que le balisage a bougé,
+      // pas qu'il n'y a rien à collecter — sans quoi le run se dirait un
+      // succès avec fetched: 0 et aucune erreur. Une page ultérieure vide
+      // reste, elle, une fin de parcours légitime : on a dépassé la dernière
+      // page de résultats.
+      if (page === 1) {
+        throw new Error(
+          `aucun chemin d'offre en page 1 de la facette « ${facet} » : le balisage a-t-il changé ? ${url}`,
+        );
+      }
+      break;
+    }
 
     // Règle unique, et elle vaut pour les deux scrapers : on ne paie jamais une
     // requête pour une offre qu'on sait déjà hors fenêtre, et on ne jette jamais

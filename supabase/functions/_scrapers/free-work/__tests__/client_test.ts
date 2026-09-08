@@ -207,3 +207,58 @@ Deno.test('une page de listing absente remonte l’erreur', async () => {
     '404',
   );
 });
+
+Deno.test('page 1 sans aucun chemin d’offre est un changement de balisage, pas un résultat vide', async () => {
+  // Une facette saine rend toujours une seizaine de chemins en page 1 : zéro
+  // n'est jamais un « pas de résultat », c'est le balisage qui a bougé.
+  const noOffers = '<html><body><p>Aucun résultat.</p></body></html>';
+  const err = await assertRejects(
+    () =>
+      fetchFreeWorkOffers({
+        fetcher: fetcherFor(new Map([[LISTING_1, noOffers]])),
+        baseUrl: BASE,
+        maxListingPages: 1,
+        windowDays: 3,
+        knownExternalIds: new Set(),
+        refetchKnown: false,
+        now: () => new Date('2026-09-08T12:00:00Z'),
+      }, queryRow({ facet: 'react' })),
+    Error,
+  );
+  assert(err.message.includes('react'), `le message doit nommer la facette : ${err.message}`);
+  assert(err.message.includes(LISTING_1), `le message doit nommer l’URL : ${err.message}`);
+});
+
+Deno.test('une page suivante sans chemin d’offre arrête le parcours en silence', async () => {
+  // Contrairement à la page 1, une page ultérieure vide est une fin de
+  // parcours légitime (on a dépassé la dernière page de résultats) : pas
+  // d’erreur, juste l’arrêt de la boucle avec ce qui a déjà été récolté.
+  const noOffers = '<html><body><p>Aucun résultat.</p></body></html>';
+  const seen: string[] = [];
+  const pages = new Map([
+    [LISTING_1, listing],
+    [`${BASE}/fr/tech-it/jobs/react?sort=date&page=2`, noOffers],
+    [`${BASE}${DETAIL_PATH}`, detail],
+  ]);
+  const known = new Set(
+    [...listing.matchAll(/href="\/fr\/tech-it\/job-mission\/([^"]+)"/g)].map((m) => m[1]),
+  );
+  known.delete(externalIdFromPath(DETAIL_PATH));
+
+  const result = await fetchFreeWorkOffers({
+    fetcher: fetcherFor(pages, seen),
+    baseUrl: BASE,
+    maxListingPages: 5,
+    windowDays: 3,
+    knownExternalIds: known,
+    refetchKnown: false,
+    now: () => new Date('2026-09-08T12:00:00Z'),
+  }, queryRow({ facet: 'react' }));
+
+  assertEquals(result.offers.length, 1);
+  assertEquals(result.truncated, false);
+  assertEquals(
+    seen.filter((url) => url === `${BASE}/fr/tech-it/jobs/react?sort=date&page=2`).length,
+    1,
+  );
+});
