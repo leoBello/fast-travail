@@ -808,6 +808,38 @@ Deno.test('les jokers et la règle du motif le plus long sont respectés', () =>
   assertEquals(rules.allows('/projects?q=react'), false);
 });
 
+Deno.test('une ancre $ n’autorise que la correspondance exacte', () => {
+  // Motif réel courant (`Disallow: /*.pdf$`). Sans traitement du `$` sur le
+  // motif BRUT, l'échappement en fait un dollar littéral et la règle devient
+  // inapplicable : le site serait ignoré au lieu d'être respecté.
+  const rules = parseRobots(['User-agent: *', 'Disallow: /prive$'].join('\n'), UA);
+  assertEquals(rules.allows('/prive'), false);
+  assert(rules.allows('/prive/sous-page'));
+});
+
+Deno.test('à longueur de motif égale, Allow l’emporte', () => {
+  const rules = parseRobots(['User-agent: *', 'Disallow: /abc', 'Allow: /a*c'].join('\n'), UA);
+  assert(rules.allows('/abc'));
+});
+
+Deno.test('plusieurs User-agent empilés forment un seul groupe', () => {
+  const rules = parseRobots(
+    ['User-agent: AutreBot', 'User-agent: fast-travail', 'Disallow: /prive'].join('\n'),
+    UA,
+  );
+  assertEquals(rules.allows('/prive'), false);
+});
+
+Deno.test('une directive étrangère ferme la liste d’agents', () => {
+  // Sans cette règle, le groupe d'AutreBot fusionnerait avec le nôtre.
+  const rules = parseRobots(
+    ['User-agent: fast-travail', 'Crawl-delay: 5', 'User-agent: AutreBot', 'Disallow: /prive']
+      .join('\n'),
+    UA,
+  );
+  assert(rules.allows('/prive'));
+});
+
 Deno.test('un fichier vide autorise tout', () => {
   assert(parseRobots('', UA).allows('/quoi-que-ce-soit'));
 });
@@ -833,11 +865,16 @@ interface Rule {
 }
 
 function toRegExp(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // Le `$` de fin d'ancrage doit être détecté sur le motif BRUT, avant tout
+  // échappement : une fois échappé il vaut les deux caractères `\$` et n'est
+  // plus reconnaissable comme ancre. Le `?` est échappé comme les autres
+  // métacaractères — dans un robots.txt c'est un caractère littéral de query
+  // string, jamais un quantificateur.
+  const endAnchored = pattern.endsWith('$');
+  const body = endAnchored ? pattern.slice(0, -1) : pattern;
+  const escaped = body.replace(/[.+^${}()|[\]\\?]/g, '\\$&');
   const withWildcards = escaped.replace(/\*/g, '.*');
-  const anchored = withWildcards.endsWith('$')
-    ? `^${withWildcards.slice(0, -1)}$`
-    : `^${withWildcards}`;
+  const anchored = endAnchored ? `^${withWildcards}$` : `^${withWildcards}`;
   return new RegExp(anchored);
 }
 
@@ -871,8 +908,11 @@ export function parseRobots(text: string, userAgent: string): RobotsRules {
       continue;
     }
 
-    if (field !== 'allow' && field !== 'disallow') continue;
+    // Toute directive autre qu'un user-agent ferme la liste d'agents : un
+    // `Sitemap:` ou un `Crawl-delay:` glissé entre deux `User-agent:` ne doit
+    // pas faire fusionner deux groupes.
     expectingAgents = false;
+    if (field !== 'allow' && field !== 'disallow') continue;
     if (currentTargets === null) continue;
     // « Disallow: » vide veut dire « rien n'est interdit » : on ignore la ligne.
     if (field === 'disallow' && value === '') continue;
@@ -904,7 +944,7 @@ export function parseRobots(text: string, userAgent: string): RobotsRules {
 export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/_scrapers/
 ```
 
-Expected : 11 tests verts (5 pour `http.ts`, 6 pour `robots.ts`).
+Expected : 15 tests verts (5 pour `http.ts`, 10 pour `robots.ts`).
 
 - [ ] **Step 8: Porte complète et commit**
 
