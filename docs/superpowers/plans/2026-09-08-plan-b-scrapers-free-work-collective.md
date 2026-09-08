@@ -1096,6 +1096,20 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
 const ENTITY = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
 
 /**
+ * Point de code -> caractère, ou `undefined` hors de la plage Unicode.
+ *
+ * `String.fromCodePoint` lève une `RangeError` au-delà de `0x10FFFF`, et la
+ * regex ci-dessus accepte n'importe quelle suite de chiffres : une description
+ * contenant `&#1114112;` ferait donc échouer la collecte ENTIÈRE, alors qu'un
+ * bloc JSON-LD mal formé, lui, dégrade proprement. Une entité hors plage est
+ * laissée telle quelle, comme une entité nommée inconnue.
+ */
+function codePointToChar(codePoint: number): string | undefined {
+  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return undefined;
+  return String.fromCodePoint(codePoint);
+}
+
+/**
  * HTML -> texte brut, pour une description destinée à `offers.description`.
  *
  * La colonne alimente `description_tsv` et le lexique de compétences : y
@@ -1112,12 +1126,12 @@ export function htmlToText(html: string): string {
     .replace(TAG, ' ')
     .replace(ENTITY, (whole, name: string) => {
       if (name.startsWith('#x') || name.startsWith('#X')) {
-        return String.fromCodePoint(parseInt(name.slice(2), 16));
+        return codePointToChar(parseInt(name.slice(2), 16)) ?? whole;
       }
-      if (name.startsWith('#')) return String.fromCodePoint(parseInt(name.slice(1), 10));
+      if (name.startsWith('#')) return codePointToChar(parseInt(name.slice(1), 10)) ?? whole;
       return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
     })
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ 	 ]+/g, ' ')
     .replace(/ *\n *(?:\n *)*/g, '\n')
     .trim();
 }
