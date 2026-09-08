@@ -207,3 +207,119 @@ Deno.test('fetchAllPages abandonne sur 403 sans réessayer', async () => {
   assertEquals(seen, 1);
   assertEquals(message.includes('403'), true);
 });
+
+/**
+ * Simule une page intermédiaire plus courte que FT_PAGE_SIZE alors que le
+ * total annoncé n'est pas encore atteint — le cas que le pas fixe manquait.
+ */
+function shortFirstPageFetch(
+  total: number,
+  calls: { count: number; ranges: string[] },
+): typeof fetch {
+  return ((url: string | URL) => {
+    calls.count += 1;
+    const range = new URL(String(url)).searchParams.get('range') ?? '';
+    calls.ranges.push(range);
+
+    const [startStr, endStr] = range.split('-');
+    const start = Number(startStr);
+    const end = Number(endStr);
+    // Seule la première page est écourtée : 100 offres au lieu des 150
+    // demandées, bien que le total (370) ne soit pas atteint.
+    const pageLen = calls.count === 1 ? 100 : end - start + 1;
+    const count = Math.max(0, Math.min(start + pageLen, total) - start);
+    const offers = Array.from({ length: count }, (_, i) => ({ id: `OFFER-${start + i}` }));
+
+    if (count === 0) return Promise.resolve(new Response(null, { status: 204 }));
+
+    return Promise.resolve(
+      new Response(JSON.stringify({ resultats: offers }), {
+        status: 206,
+        headers: {
+          'content-type': 'application/json',
+          'content-range': `offres ${start}-${start + count - 1}/${total}`,
+        },
+      }),
+    );
+  }) as unknown as typeof fetch;
+}
+
+Deno.test(
+  'fetchAllPages ne perd aucune offre quand une page intermédiaire est plus courte que prévu',
+  async () => {
+    const calls = { count: 0, ranges: [] as string[] };
+    const result = await fetchAllPages({
+      query: localQuery,
+      mode: 'delta',
+      token: 'tok',
+      fetchImpl: shortFirstPageFetch(370, calls),
+      sleepImpl: noSleep,
+    });
+
+    // Un pas fixe redemanderait 150-299 après une page 0-99 : les offres
+    // 100-149 ne seraient jamais requêtées et disparaîtraient en silence.
+    assertEquals(result.offers.length, 370);
+    const ids = (result.offers as Array<{ id: string }>)
+      .map((o) => Number(o.id.replace('OFFER-', '')))
+      .sort((a, b) => a - b);
+    assertEquals(ids, Array.from({ length: 370 }, (_, i) => i));
+  },
+);
+
+/**
+ * Première page anormalement grande (bien au-delà de FT_PAGE_SIZE), qui fait
+ * franchir d'un coup le plafond recadré (1000). La seconde page, forcément
+ * recadrée à 1000-1149, ne renvoie que des offres déjà couvertes par le
+ * recouvrement : aucune offre neuve n'en ressort.
+ */
+function stuckPaginationFetch(calls: { count: number; ranges: string[] }): typeof fetch {
+  return ((url: string | URL) => {
+    calls.count += 1;
+    const range = new URL(String(url)).searchParams.get('range') ?? '';
+    calls.ranges.push(range);
+
+    if (calls.count === 1) {
+      const offers = Array.from({ length: 1100 }, (_, i) => ({ id: `OFFER-${i}` }));
+      return Promise.resolve(
+        new Response(JSON.stringify({ resultats: offers }), {
+          status: 206,
+          headers: { 'content-range': 'offres 0-1099/5000' },
+        }),
+      );
+    }
+
+    const offers = Array.from({ length: 10 }, (_, i) => ({ id: `OFFER-${1000 + i}` }));
+    return Promise.resolve(
+      new Response(JSON.stringify({ resultats: offers }), {
+        status: 206,
+        headers: { 'content-range': 'offres 1000-1009/5000' },
+      }),
+    );
+  }) as unknown as typeof fetch;
+}
+
+Deno.test(
+  "fetchAllPages échoue plutôt que de boucler indéfiniment quand une page ne renvoie plus d'offre neuve",
+  async () => {
+    const calls = { count: 0, ranges: [] as string[] };
+
+    let message = '';
+    try {
+      await fetchAllPages({
+        query: localQuery,
+        mode: 'delta',
+        token: 'tok',
+        fetchImpl: stuckPaginationFetch(calls),
+        sleepImpl: noSleep,
+      });
+    } catch (e) {
+      message = (e as Error).message;
+    }
+
+    // La garde doit arrêter la boucle dès la page sans offre neuve, pas après
+    // un nombre indéterminé d'itérations : la preuve de terminaison est que
+    // seuls deux appels ont eu lieu.
+    assertEquals(calls.count, 2);
+    assertEquals(message.length > 0, true);
+  },
+);

@@ -138,7 +138,13 @@ export async function fetchAllPages(args: {
   let totalAvailable: number | null = null;
   let httpStatus = 200;
 
-  for (let start = 0; start < FT_MAX_RESULTS; start += FT_PAGE_SIZE) {
+  // La position suivante à demander est `collected.length`, pas un pas fixe :
+  // le range de l'API est positionnel, donc le nombre d'offres réellement
+  // reçues jusqu'ici *est* la position absolue suivante. Un pas fixe de
+  // FT_PAGE_SIZE perdrait en silence les offres situées entre la fin réelle
+  // d'une page plus courte que prévu et la position qu'il aurait redemandée.
+  let start = 0;
+  while (start < FT_MAX_RESULTS) {
     // FT_MAX_RESULTS n'est pas un multiple de FT_PAGE_SIZE (1150 / 150) : la
     // dernière page est ramenée à 1000-1149 pour ne jamais demander au-delà
     // du plafond dur de l'API (range max 1000-1149).
@@ -152,11 +158,26 @@ export async function fetchAllPages(args: {
     // Ce recadrage peut faire chevaucher la dernière page avec la précédente
     // (ex. 900-1049 puis 1000-1149) : on ne réinjecte que les offres neuves.
     const overlap = Math.max(0, collected.length - rangeStart);
+    const collectedBefore = collected.length;
     collected.push(...page.offers.slice(overlap));
 
     if (page.offers.length === 0) break;
     if (totalAvailable !== null && collected.length >= totalAvailable) break;
+
+    // Garde anti-boucle-infinie : avec le pas fixe d'origine, `start`
+    // avançait de FT_PAGE_SIZE à chaque itération quel que soit le contenu
+    // reçu, ce qui bornait la boucle par construction. Ce n'est plus vrai
+    // maintenant que la position suivante dépend de `collected.length` — si
+    // une page ne renvoie que du recouvrement (aucune offre neuve), cette
+    // position n'avance plus et la même requête se répéterait indéfiniment.
+    if (collected.length === collectedBefore) {
+      throw new Error(
+        `France Travail : pagination bloquée, aucune offre neuve reçue — ${args.query.label}`,
+      );
+    }
+
     if (rangeStart !== start) break;
+    start = collected.length;
   }
 
   return {
