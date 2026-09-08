@@ -111,23 +111,12 @@ Deno.test('buildAdzunaUrl combine what_and, category et what_phrase sur une mêm
   assertEquals(url.searchParams.get('what_phrase'), 'full remote');
 });
 
-// --- Liste blanche des clés d'extra_params transmises à l'URL Adzuna ---
+// --- Liste blanche des clés d'extra_params, à trois catégories ---
 //
 // Mesuré contre l'API réelle : un paramètre inconnu ne dégrade pas la
 // requête Adzuna, il la fait échouer en HTTP 400. `implies_remote` est une
 // métadonnée pour provenanceOf (mapper.ts), jamais un paramètre d'URL — la
 // transmettre a produit ce 400 en pratique.
-
-Deno.test("buildAdzunaUrl transmet category depuis extra_params vers l'URL", () => {
-  const catOnly: SearchQueryRow = {
-    ...remoteQuery,
-    id: 106,
-    keywords: null,
-    extra_params: { category: 'it-jobs' },
-  };
-  const url = new URL(buildAdzunaUrl(cfg, catOnly, 'delta', 1));
-  assertEquals(url.searchParams.get('category'), 'it-jobs');
-});
 
 Deno.test("buildAdzunaUrl transmet what_phrase depuis extra_params vers l'URL, encodé", () => {
   const phraseOnly: SearchQueryRow = {
@@ -160,6 +149,42 @@ Deno.test(
     assertEquals(url.searchParams.get('what_phrase'), 'full remote');
     assertEquals(url.searchParams.get('what_and'), 'TypeScript');
     assertEquals(url.searchParams.has('implies_remote'), false);
+  },
+);
+
+Deno.test(
+  'buildAdzunaUrl transmet un nouveau paramètre transmissible (what_exclude) depuis extra_params',
+  () => {
+    // Catégorie 1 : paramètre d'URL Adzuna, réglable en base sans toucher au code.
+    const excludeQuery: SearchQueryRow = {
+      ...remoteQuery,
+      id: 110,
+      keywords: 'React',
+      extra_params: { what_exclude: 'réacteur' },
+    };
+    const url = new URL(buildAdzunaUrl(cfg, excludeQuery, 'delta', 1));
+    assertEquals(url.searchParams.get('what_exclude'), 'réacteur');
+  },
+);
+
+Deno.test(
+  'buildAdzunaUrl refuse une clé possédée par une colonne (where) et nomme la colonne dans le message',
+  () => {
+    // Catégorie 2 : `where` est possédé par la colonne search_queries.commune_insee
+    // (traduite en localité par buildAdzunaUrl lui-même) — l'admettre depuis
+    // extra_params créerait une seconde source de vérité pour la même valeur. Le
+    // message doit nommer la colonne à utiliser, pas seulement rejeter la clé.
+    const ownedQuery: SearchQueryRow = {
+      ...remoteQuery,
+      id: 111,
+      keywords: null,
+      extra_params: { where: 'Lyon' },
+    };
+    assertThrows(
+      () => buildAdzunaUrl(cfg, ownedQuery, 'delta', 1),
+      Error,
+      'commune_insee',
+    );
   },
 );
 
@@ -216,6 +241,7 @@ Deno.test("fetchAllAdzunaPages pagine jusqu'à épuisement de count", async () =
   assertEquals(result.offers.length, 120);
   assertEquals(result.totalAvailable, 120);
   assertEquals(calls.pages, [1, 2, 3]);
+  assertEquals(result.truncated, false);
 });
 
 Deno.test('fetchAllAdzunaPages gère un résultat vide', async () => {
@@ -230,7 +256,30 @@ Deno.test('fetchAllAdzunaPages gère un résultat vide', async () => {
 
   assertEquals(result.offers.length, 0);
   assertEquals(result.totalAvailable, 0);
+  assertEquals(result.truncated, false);
 });
+
+Deno.test(
+  "fetchAllAdzunaPages s'arrête au plafond MAX_PAGES et signale la troncature",
+  async () => {
+    // Aucun test avant celui-ci ne dépassait 3 pages : le plafond (10 pages × 50 =
+    // 500 offres) n'était jamais atteint, donc jamais couvert.
+    const calls = { pages: [] as number[] };
+    const result = await fetchAllAdzunaPages({
+      cfg,
+      query: localQuery,
+      mode: 'delta',
+      fetchImpl: pagedFetch(50_000, calls),
+      sleepImpl: noSleep,
+    });
+
+    assertEquals(result.offers.length, 500);
+    assertEquals(result.totalAvailable, 50_000);
+    assertEquals(result.truncated, true);
+    assertEquals(calls.pages.length, 10);
+    assertEquals(calls.pages.at(-1), 10);
+  },
+);
 
 Deno.test('fetchAllAdzunaPages réessaie après un 429', async () => {
   let seen = 0;

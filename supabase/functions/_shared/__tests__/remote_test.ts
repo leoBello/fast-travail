@@ -1,5 +1,5 @@
 import { assertEquals } from '@std/assert';
-import { classifyRemote } from '../remote.ts';
+import { classifyRemote, hasRemoteNegation } from '../remote.ts';
 
 // --- full ---
 
@@ -94,5 +94,25 @@ Deno.test("classifyRemote renvoie null quand rien n'évoque le télétravail", (
   assertEquals(
     classifyRemote('Développeur front-end React/TypeScript, poste sur site à Marseille.'),
     null,
+  );
+});
+
+// --- hasRemoteNegation ---
+
+Deno.test('hasRemoteNegation détecte "pas de télétravail"', () => {
+  assertEquals(hasRemoteNegation('Pas de télétravail sur ce poste'), true);
+});
+
+Deno.test('hasRemoteNegation détecte "sans télétravail"', () => {
+  assertEquals(
+    hasRemoteNegation('Poste sans télétravail, présence requise 5 jours sur 5.'),
+    true,
+  );
+});
+
+Deno.test('hasRemoteNegation renvoie false sur un texte muet quant au télétravail', () => {
+  assertEquals(
+    hasRemoteNegation('Développeur front-end React/TypeScript, poste sur site à Marseille.'),
+    false,
   );
 });

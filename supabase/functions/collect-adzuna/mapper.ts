@@ -1,9 +1,18 @@
 import { emptyOffer, type NormalizedOffer, type SearchQueryRow } from '../_shared/types.ts';
 import { departmentCodeFromArea } from '../_shared/departments.ts';
-import { classifyRemote, type RemoteMode } from '../_shared/remote.ts';
+import { classifyRemote, hasRemoteNegation, type RemoteMode } from '../_shared/remote.ts';
 
-/** Valeurs acceptées pour extra_params.implies_remote — le reste est ignoré. */
-const REMOTE_MODES: readonly RemoteMode[] = ['full', 'hybride', 'ponctuel', 'mention'];
+/**
+ * Clé de extra_params portant la garantie de télétravail de la requête. Une seule
+ * constante, importée par client.ts (qui doit ne JAMAIS la transmettre à l'URL Adzuna)
+ * et par ce fichier (qui la lit) : un renommage des deux côtés ne peut pas diverger.
+ */
+export const IMPLIES_REMOTE_KEY = 'implies_remote';
+
+/** Valeurs acceptées pour extra_params.implies_remote — le reste est ignoré. RemoteMode
+ * inclut déjà `null`, donc le tuple couvre tout le type sans qu'il faille répéter `| null`
+ * dans AdzunaProvenance ci-dessous. */
+const REMOTE_MODE_VALUES = ['full', 'hybride', 'ponctuel', 'mention'] as const;
 
 export interface AdzunaProvenance {
   searchOriginInsee: string | null;
@@ -13,10 +22,11 @@ export interface AdzunaProvenance {
    * Adzuna indexe le texte intégral, mais ne renvoie que les 500 premiers
    * caractères de la description (Fait 1). Une offre trouvée par une requête
    * de télétravail EST en télétravail même si ces 500 caractères sont muets
-   * à ce sujet ; à l'inverse un texte qui parle explicitement de télétravail
-   * l'emporte toujours sur cette garantie (voir mapAdzunaOffer).
+   * à ce sujet ; à l'inverse un texte qui parle explicitement de télétravail —
+   * y compris pour le refuser — l'emporte toujours sur cette garantie (voir
+   * mapAdzunaOffer) : elle ne comble qu'un silence, jamais une négation.
    */
-  impliesRemote: RemoteMode | null;
+  impliesRemote: RemoteMode;
 }
 
 /** Adzuna a son propre vocabulaire de contrat : on le ramène à celui de France Travail. */
@@ -41,11 +51,24 @@ interface AdzunaRawOffer {
   salary_max?: number;
 }
 
+/**
+ * Garde de type sur le tuple `as const` : un seul `as` (élargissement du tuple littéral
+ * vers `readonly string[]` pour que `.includes` accepte un `string` quelconque), au lieu
+ * des deux conversions de l'ancienne version (`REMOTE_MODES as readonly string[]` en
+ * entrée ET `raw as RemoteMode` en sortie). Grâce à ce prédicat, TypeScript restreint
+ * automatiquement le type de `raw` dans le ternaire de `asRemoteMode` : la valeur de
+ * retour n'a plus besoin d'aucune conversion.
+ */
+function isRemoteModeValue(value: string): value is (typeof REMOTE_MODE_VALUES)[number] {
+  return (REMOTE_MODE_VALUES as readonly string[]).includes(value);
+}
+
+function asRemoteMode(raw: unknown): RemoteMode {
+  return typeof raw === 'string' && isRemoteModeValue(raw) ? raw : null;
+}
+
 export function provenanceOf(query: SearchQueryRow): AdzunaProvenance {
-  const raw = query.extra_params?.['implies_remote'];
-  const impliesRemote = typeof raw === 'string' && (REMOTE_MODES as readonly string[]).includes(raw)
-    ? (raw as RemoteMode)
-    : null;
+  const impliesRemote = asRemoteMode(query.extra_params?.[IMPLIES_REMOTE_KEY]);
 
   return {
     searchOriginInsee: query.commune_insee,
@@ -55,9 +78,11 @@ export function provenanceOf(query: SearchQueryRow): AdzunaProvenance {
 }
 
 function salaryLabel(min: number | undefined, max: number | undefined): string | null {
-  if (min && max) return `${min} - ${max} EUR/an`;
-  if (min) return `${min} EUR/an`;
-  if (max) return `jusqu'à ${max} EUR/an`;
+  // Comparaison à `null` (présence), pas à la véracité : un salaire de 0 est une valeur
+  // reçue, pas une absence — `if (min && max)` l'aurait traitée comme absente.
+  if (min != null && max != null) return `${min} - ${max} EUR/an`;
+  if (min != null) return `${min} EUR/an`;
+  if (max != null) return `jusqu'à ${max} EUR/an`;
   return null;
 }
 
@@ -91,11 +116,15 @@ export function mapAdzunaOffer(
   }
 
   // Résolution C : classifieur partagé, jamais un heuristique par sous-chaîne local.
-  // Repli sur la garantie de la requête seulement quand le texte ne dit rien (Fait 1 :
+  // Repli sur la garantie de la requête seulement quand le texte est MUET (Fait 1 :
   // Adzuna tronque la description à 500 caractères, la stack et le télétravail sont
   // souvent plus loin) — d'où le `??` et non `||` : un texte explicite l'emporte toujours.
+  // classifyRemote rend `null` aussi bien sur un texte muet que sur une négation
+  // explicite ("pas de télétravail") : ces deux cas ne doivent PAS être traités pareil,
+  // sous peine de ressusciter en 'full' une offre qui refuse le télétravail. hasRemoteNegation
+  // distingue les deux : le repli ne s'applique qu'à un vrai silence.
   const text = `${ad.title} ${ad.description ?? ''}`;
-  const mode = classifyRemote(text) ?? provenance.impliesRemote;
+  const mode = classifyRemote(text) ?? (hasRemoteNegation(text) ? null : provenance.impliesRemote);
   offer.remote_label = mode;
   offer.is_remote = mode === 'full' || mode === 'hybride';
 

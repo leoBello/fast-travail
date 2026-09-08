@@ -40,6 +40,18 @@ function matchesAny(patterns: RegExp[], text: string): boolean {
 }
 
 /**
+ * Vrai si le texte porte une négation explicite du télétravail (« pas de télétravail »,
+ * « sans télétravail »). Réutilise les motifs de `classifyRemote` : `classifyRemote` rend
+ * `null` aussi bien pour un texte muet que pour un texte négatif, ce qui les rend
+ * indistinguables pour un appelant qui n'a que ce résultat. Un appelant qui doit traiter
+ * ces deux cas différemment (ex. un repli sur une garantie externe, qui ne doit combler
+ * qu'un silence, jamais contredire une négation) doit tester ce prédicat séparément.
+ */
+export function hasRemoteNegation(text: string): boolean {
+  return matchesAny(NEGATION_PATTERNS, text);
+}
+
+/**
  * Classe le mode de télétravail d'une offre à partir de son texte.
  * `text` : concaténation du titre et de la description.
  * `extraConditions` : champ annexe optionnel (ex. contexteTravail.conditionsExercice de

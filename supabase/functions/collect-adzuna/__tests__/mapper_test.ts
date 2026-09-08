@@ -125,6 +125,20 @@ Deno.test('mapAdzunaOffer sans texte ni garantie reste null', () => {
   assertEquals(mapAdzunaOffer(mute, provenance)!.is_remote, false);
 });
 
+Deno.test(
+  "mapAdzunaOffer ne ressuscite PAS en 'full' une offre qui refuse explicitement le télétravail, malgré la garantie de requête",
+  () => {
+    // classifyRemote rend null à la fois pour un texte muet et pour une négation
+    // ("pas de télétravail") : la garantie de requête ne doit combler que le premier cas.
+    const denies = { ...sample, description: 'Poste sur site, pas de télétravail possible.' };
+    const remoteProvenance = { ...provenance, impliesRemote: 'full' as const };
+
+    assertNotEquals(mapAdzunaOffer(denies, remoteProvenance)!.remote_label, 'full');
+    assertEquals(mapAdzunaOffer(denies, remoteProvenance)!.remote_label, null);
+    assertEquals(mapAdzunaOffer(denies, remoteProvenance)!.is_remote, false);
+  },
+);
+
 Deno.test('mapAdzunaOffer : un texte explicite mais partiel (hybride) prime toujours sur la garantie', () => {
   const partial = {
     ...sample,
@@ -171,17 +185,77 @@ Deno.test('provenanceOf renvoie null sans implies_remote', () => {
   assertEquals(provenanceOf(baseQuery).impliesRemote, null);
 });
 
-Deno.test('la fixture Adzuna réelle se mappe sans exception', async () => {
+// Valeurs attendues écrites en dur d'après le contenu réel de la fixture (vérifiées en
+// exécutant mapAdzunaOffer dessus), pas relues dynamiquement depuis elle : le test doit
+// prouver la justesse du mapping (Résolutions B et C), pas seulement l'absence
+// d'exception. L'ordre suit celui de la fixture (verbatim de l'échantillon source).
+const FIXTURE_EXPECTATIONS = [
+  {
+    external_id: '5856347976',
+    title: 'Développeur Java / JavaFX (H/F/X)',
+    department: '13', // Bouches-du-Rhône, via Aix-en-Provence dans location.area
+    contract_type: null, // contract_type absent de cette offre
+    contract_label: 'full_time',
+    salary_raw: '35000 - 45000 EUR/an',
+    remote_label: null, // aucune mention de télétravail dans titre + description
+  },
+  {
+    external_id: '5831898463',
+    title: 'Administrateur système Confirmé F/H',
+    department: '13', // Bouches-du-Rhône, via Marseille/Allauch
+    contract_type: 'CDI', // contract_type: 'permanent'
+    contract_label: null, // contract_time absent de cette offre
+    salary_raw: '45000 - 55000 EUR/an',
+    remote_label: null,
+  },
+  {
+    external_id: '5859603653',
+    title: 'Consultant Sage 100 - CDI (H/F) - Full remote',
+    department: '13', // Bouches-du-Rhône, via Marseille/Allauch
+    contract_type: 'CDI',
+    contract_label: 'full_time',
+    salary_raw: '35000 - 50000 EUR/an',
+    remote_label: 'full', // "Full remote" dans le titre ET la description
+  },
+] as const;
+
+Deno.test('la fixture Adzuna réelle se mappe conformément aux Résolutions B et C', async () => {
   const text = await Deno.readTextFile(
     new URL('./fixtures/adzuna-search-response.json', import.meta.url),
   );
   const payload = JSON.parse(text) as { results: unknown[] };
 
+  assertEquals(payload.results.length, FIXTURE_EXPECTATIONS.length);
   const mapped = payload.results.map((r) => mapAdzunaOffer(r, provenance));
 
-  assertNotEquals(mapped.length, 0);
-  for (const offer of mapped) {
+  for (const [offer, expected] of mapped.map((o, i) => [o, FIXTURE_EXPECTATIONS[i]] as const)) {
     assertNotEquals(offer, null);
-    assertNotEquals(offer!.external_id, '');
+    assertEquals(offer!.external_id, expected.external_id);
+    assertEquals(offer!.title, expected.title);
+    // Résolution B : le département est un code INSEE dérivé de location.area, pas le
+    // nom brut d'Adzuna.
+    assertEquals(offer!.department, expected.department, `department pour ${expected.title}`);
+    // Résolution C : remote_label via classifyRemote (+ repli sur la garantie, muette ici).
+    assertEquals(
+      offer!.remote_label,
+      expected.remote_label,
+      `remote_label pour ${expected.title}`,
+    );
+    assertEquals(
+      offer!.is_remote,
+      expected.remote_label === 'full' || expected.remote_label === 'hybride',
+      `is_remote pour ${expected.title}`,
+    );
+    assertEquals(
+      offer!.contract_type,
+      expected.contract_type,
+      `contract_type pour ${expected.title}`,
+    );
+    assertEquals(
+      offer!.contract_label,
+      expected.contract_label,
+      `contract_label pour ${expected.title}`,
+    );
+    assertEquals(offer!.salary_raw, expected.salary_raw, `salary_raw pour ${expected.title}`);
   }
 });

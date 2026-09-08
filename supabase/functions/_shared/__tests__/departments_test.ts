@@ -26,14 +26,71 @@ Deno.test('departmentCodeFromName renvoie null pour un nom inconnu', () => {
   assertEquals(departmentCodeFromName(undefined), null);
 });
 
-Deno.test('la table des départements compte 101 entrées sans doublon de code', () => {
+Deno.test('la table des départements compte exactement 101 entrées', () => {
   const codes = Object.keys(DEPARTMENTS);
   assertEquals(codes.length, 101);
   assertEquals(new Set(codes).size, 101, 'code en doublon détecté dans la table');
+});
 
-  // Chaque nom doit se retrouver via departmentCodeFromName, sinon la normalisation
-  // ou la transcription d'un nom est en cause.
-  for (const [code, name] of Object.entries(DEPARTMENTS)) {
+/**
+ * Normalisation indépendante de celle de departments.ts (NFD + suppression des marques
+ * diacritiques + minuscules + séparateurs ramenés à un espace) : ne réutilise
+ * délibérément aucune fonction du module testé. L'ancienne version de ce test appelait
+ * `departmentCodeFromName` sur les noms de `DEPARTMENTS` elle-même — une boucle
+ * aller-retour qui ne peut structurellement pas échouer, y compris sur une entrée mal
+ * transcrite comme `'84': 'Vaucluze'` (le nom fautif se retrouverait quand même via sa
+ * propre normalisation).
+ */
+function independentNormalize(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/['’\-\s]+/g, ' ')
+    .trim();
+}
+
+Deno.test('aucun nom de la table ne partage sa forme normalisée avec un autre', () => {
+  const names = Object.values(DEPARTMENTS);
+  const normalized = names.map(independentNormalize);
+  assertEquals(
+    new Set(normalized).size,
+    names.length,
+    'deux noms de départements distincts normalisent vers la même clé',
+  );
+});
+
+// Échantillon écrit en dur, indépendant de DEPARTMENTS, réparti sur toute la table :
+// métropole, Corse (2A/2B), DOM. S'ajoute aux trois du filtre local (13, 83, 84) déjà
+// couverts plus haut. Une entrée mal transcrite dans la table (ex. `'84': 'Vaucluze'`)
+// ferait échouer l'une de ces assertions, puisque le nom attendu est écrit ici, pas lu
+// depuis la table testée.
+Deno.test('un échantillon de noms écrits en dur retrouve le bon code, sur toute la table', () => {
+  const samples: ReadonlyArray<[string, string]> = [
+    ['Ain', '01'],
+    ['Alpes-Maritimes', '06'],
+    ["Côte-d'Or", '21'],
+    ['Finistère', '29'],
+    ['Haute-Garonne', '31'],
+    ['Gironde', '33'],
+    ['Hérault', '34'],
+    ['Ille-et-Vilaine', '35'],
+    ['Isère', '38'],
+    ['Loire-Atlantique', '44'],
+    ['Marne', '51'],
+    ['Nord', '59'],
+    ['Pas-de-Calais', '62'],
+    ['Bas-Rhin', '67'],
+    ['Rhône', '69'],
+    ['Paris', '75'],
+    ['Seine-Maritime', '76'],
+    ['Territoire de Belfort', '90'],
+    ['Guadeloupe', '971'],
+    ['Martinique', '972'],
+    ['Guyane', '973'],
+    ['Mayotte', '976'],
+  ];
+  for (const [name, code] of samples) {
     assertEquals(departmentCodeFromName(name), code, `échec pour ${name}`);
   }
 });
