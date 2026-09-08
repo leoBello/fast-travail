@@ -1,7 +1,7 @@
 # État d'avancement et reste à faire
 
 **Dernière mise à jour** : 2026-09-08
-**Branche de travail** : `plan-b-scrapers`, partie de `confiance-par-requete`
+**Branche de travail** : `dedoublonnage`
 
 Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUDE.md`](../CLAUDE.md)
 
@@ -401,6 +401,16 @@ depuis la clôture du plan confiance-par-requête, Free-Work n'ayant plus aucune
 facette `anchored` depuis sa propre mesure (voir plus haut, migration
 `20260908090000`).
 
+**Mis à jour le 2026-09-08, à la clôture du plan de dédoublonnage** : ce 82
+ne compte ni la croissance du corpus depuis (les crons ont continué de
+tourner) ni le masquage des doublons. Recompté après coup, `offers_
+shortlist` rend **87** offres (46 adzuna, 24 collective, 14 france_travail, 3
+free_work), 47 par la zone locale et 40 par le full remote, 29 restant des
+entrées par la seule confiance de requête. Ce nombre agrège les deux effets
+— la croissance du corpus l'a fait monter à 92 avant tout dédoublonnage, puis
+le masquage des doublons l'a ramené à 87 (5 masquées). Voir « Phase 1 — Plan
+de dédoublonnage » plus bas pour le détail et la méthode.
+
 **L'écart Free-Work / Adzuna, chiffré** — c'est la mesure qui a décidé du
 classement `net` de Free-Work et qui reste la meilleure illustration de « la
 description entière rend au lexique son rôle de filtre » :
@@ -426,8 +436,18 @@ from (select lower(title), company_name from offers group by 1, 2 having count(d
 **19 groupes** de titre (normalisé en minuscules) et d'entreprise partagés par
 deux sources ou plus, sur les 3 184 offres — quatre sources désormais, contre
 deux au moment où P6 a été ouvert. Beaucoup d'annonces d'ESN paraissent
-simultanément sur Free-Work et sur France Travail ; c'est la première dette de
-la phase 2 (détail dans « Problèmes ouverts », P6).
+simultanément sur Free-Work et sur France Travail ; c'était la première dette
+de la phase 2.
+
+**P6 résolu le 2026-09-08** par le plan de dédoublonnage (détail dans
+« Phase 1 — Plan de dédoublonnage » plus bas et dans « Problèmes ouverts »).
+Cette mesure naïve (titre en minuscules et entreprise, sans normalisation du
+suffixe H/F ni garde-fou de ville) est dépassée par la mécanique réelle :
+`offer_duplicate_groups`, mesurée aujourd'hui, forme **46 groupes de fusion
+inter-sources** (97 offres, 51 excédentaires) et en **bloque 2** (LTd,
+SYNANTO) dont la fusion aurait été ambiguë — une même source y porte
+plusieurs villes pour le même couple entreprise/intitulé, signe de missions
+distinctes plutôt que d'une même annonce vue deux fois.
 
 **Sémantique de `seen_count` sur les sources scrapées — une différence à ne
 pas manquer.** Sur Free-Work, en mode delta, `needsKnownExternalIds = true` :
@@ -480,6 +500,161 @@ pages n'a **pas été relancé** depuis cette migration, et les offres en base
 couvrent donc toujours 11 jours, pas 31 (voir la note sous le tableau des
 quatre sources ci-dessus) — relancer ce backfill est une collecte réelle de
 l'ordre de 5 minutes, laissée au choix de l'utilisateur.
+
+## Phase 1 — Plan de dédoublonnage
+
+**Terminé le 2026-09-08, 4 tâches.** Répond à P6 et P10 (tous deux résolus,
+voir plus bas), nés du même constat : `unique (source, external_id)` ne
+protège contre aucune des deux formes de doublon que quatre sources
+produisent — la même annonce republiée sous un nouvel `external_id` par une
+seule source, ou la même annonce vue par plusieurs sources à la fois.
+
+| # | Tâche | État |
+|---|---|---|
+| 1 | `offer_dedup_keys` — normalisation entreprise/intitulé/ville | ✅ |
+| 2 | `offer_duplicate_groups` — regroupement et élection d'un représentant | ✅ |
+| 3 | `offers_shortlist` masque les doublons ; correctif du défaut critique trouvé en revue | ✅ |
+| 4 | Documentation, correction de P10, recette de surveillance | ✅ |
+
+### Décision de conception : une clé asymétrique, mesurée et non supposée
+
+**Intra-source** : `(source, entreprise, intitulé, ville)` — la ville est
+indispensable. Chez **Achil**, republié via Collective, l'intitulé
+« Collaborateur Comptable Confirmé » paraît sur **9 villes distinctes**
+(Manosque, Aubière, Bourg-Saint-Maurice, Claye-Souilly, Aix-en-Provence,
+Annecy, Cagnes-sur-Mer, Dunkerque, La Valette-du-Var) — mesuré à nouveau dans
+cette tâche, chaque ville formant son propre groupe de taille 1. Sans la
+ville dans la clé, ces 9 postes distincts fusionneraient en un seul,
+masquant Aix-en-Provence derrière Dunkerque.
+
+**Inter-sources** : `(entreprise, intitulé)`, **sans géographie**. Les quatre
+sources décrivent le lieu à des granularités incompatibles (France Travail
+« 74 - Annecy », Collective « 13100 Aix-en-Provence », Free-Work
+« Marseille », Adzuna « Bouches-du-Rhône, Provence-Alpes-Côte d'Azur ») :
+mettre la ville dans la clé inter avait fait tomber un essai de mesure de 48
+groupes à 11, en confondant des postes réels sous des libellés de ville trop
+fins pour se recouper eux-mêmes.
+
+### Deux garde-fous, ajoutés en construisant et vérifiés en revue
+
+1. **La fusion inter-sources n'est autorisée que si chaque source impliquée
+   ne porte qu'une seule ville** pour ce couple entreprise/intitulé. Sans ce
+   garde-fou, un cabinet de recrutement publiant plusieurs missions
+   distinctes sous le même intitulé (mesuré sur LTd et SYNANTO) aurait
+   fusionné des postes réellement différents via un pont ambigu.
+2. **Une ville nulle ne sert jamais de base de fusion** (`coalesce(norm_city,
+   offer_id)`) : deux offres d'une même entreprise/intitulé sans ville
+   renseignée ne fusionnent que si l'`id`, unique par construction, les
+   distingue. Sans ce garde-fou, deux missions distinctes de Propulse IT ou
+   de Sharebound, toutes deux sans ville, auraient fusionné à tort.
+
+**Interaction résiduelle entre les deux garde-fous, sans effet aujourd'hui**
+mais notée par honnêteté : l'éligibilité inter-sources compte les villes
+d'une source via ce même `coalesce(norm_city, offer_id)`, donc deux offres à
+ville nulle d'une même source compteraient comme deux villes distinctes et
+bloqueraient une fusion par ailleurs légitime. Sans effet mesuré à ce jour
+(aucun candidat inter-sources actuel n'a de ville nulle), et l'erreur va dans
+le sens conservateur — une paire visible en double plutôt qu'une offre
+invisible à tort.
+
+### Principe retenu : le dédoublonnage se fait DANS la sélection, pas avant elle
+
+Élire le représentant sur toute la base, indépendamment des critères de
+`offers_shortlist`, faisait **disparaître entièrement** deux postes (Akanea,
+CN Amirault) : leur représentant élu était la ligne `france_travail`, qui
+porte le texte intégral et donc un terme du signal rouge que les 500
+caractères tronqués d'Adzuna ne montraient jamais — la ligne Adzuna, elle,
+était visible avant le dédoublonnage. Corrigé : l'élection se fait désormais
+**parmi les seules offres déjà éligibles** à `offers_shortlist`. Principe à
+retenir pour toute évolution future de ce mécanisme : **seules des lignes
+visibles se disputent la place.**
+
+**Deux notions d'élection coexistent depuis ce correctif, et ne coïncident
+plus.** `is_primary` (exposée par `offers_ranked`) élit un représentant sur
+**tout** le corpus ; la sélection quotidienne élit un représentant **parmi
+les offres éligibles**. `offers_hidden_duplicates` répond à la première
+question (« quels doublons existent dans la base, et quel exemplaire fait
+référence pour tout le corpus ») et non à la seconde (« qu'est-ce qui a
+disparu de ma liste du jour »).
+
+### Résultat mesuré le 2026-09-08
+
+```sql
+select count(distinct dup_group_id), count(*) filter (where not is_primary), count(*) from offer_duplicate_groups;
+```
+
+**3 770 groupes, 191 offres masquées sur 3 961** couvertes par la clé (les
+151 offres sans `company_name` restent hors champ, délibérément). Par
+source :
+
+| Source | Masquées | Total |
+|---|---:|---:|
+| adzuna | 48 | 556 |
+| collective | 115 | 2 711 |
+| france_travail | 20 | 589 |
+| free_work | 8 | 105 |
+
+`offers_shortlist` passe de **92 à 87** offres (46 adzuna, 24 collective, 14
+france_travail, 3 free_work) — 5 masquées, aucune disparue en silence :
+`offers_hidden_duplicates` liste les 191 doublons du corpus et leur
+exemplaire de référence, `dup_count`/`dup_sources`/`dup_first_seen_at`
+restent portés par le représentant affiché. Sur ces 87 : **47 par la zone
+locale et 40 par le full remote national**, et **29 restent des entrées par
+la seule confiance de requête** (`core_hits = 0 and ai_hits = 0`).
+
+### Problème ouvert — le cas Malt, mesuré plutôt que supposé
+
+Deux annonces Malt « Senior Fullstack Engineer H/F » ont été fusionnées alors
+que leurs textes n'ont **aucun recouvrement** — l'une décrit des
+responsabilités concrètes, l'autre est de la communication de plateforme
+générique. Le garde-fou « une seule ville par source » ne couvre pas ce cas :
+Malt est une place de marché de freelances qui publie plusieurs missions
+distinctes sous un même intitulé et une même ville de rattachement, un
+employeur intermédiaire plutôt qu'un poste unique.
+
+**Mesure demandée avant de trancher** : sur les 191 paires masquée/
+représentant, un recouvrement lexical (mots de 6 lettres ou plus partagés
+entre les deux descriptions) donne :
+
+```sql
+-- (requête complète dans le rapport de tâche 4 ; principe : mots de 6
+-- lettres ou plus, comparés entre la description du représentant et celle
+-- de chaque offre masquée de son groupe)
+```
+
+| Recouvrement | Paires |
+|---|---:|
+| 0 mot commun | **1** (Malt, « Senior Fullstack Engineer H/F ») |
+| 1 à 3 mots communs | 6 (dont Akanea, AMILTONE, Boond, Experis France, Société Française de Garantie) |
+| Total des paires masquées | 191 |
+
+**Le signal n'est pas fiable tel quel** : parmi les 6 paires à faible
+recouvrement, au moins deux sont des doublons déjà **prouvés** par lecture
+intégrale en tâche 3 — AMILTONE (texte de mission identique mot pour mot
+entre free_work et l'une des deux lignes Adzuna, la seconde ligne Adzuna
+n'affichant que l'intro société avant la troncature à 500 caractères) et
+Boond (la même annonce de marketing republiée 3 fois, quasi mot pour mot).
+Leur faible score vient de la troncature Adzuna qui coupe le texte à des
+endroits différents selon la longueur du titre — pas d'une différence de
+poste. Un signal automatique fondé sur le seul recouvrement lexical
+confondrait donc « vrai doublon tronqué différemment » et « faux positif
+Malt » : **construire un tel signal est laissé en dehors du périmètre de
+cette tâche** (aucune vue ni migration n'est touchée ici), mais la mesure — 1
+cas sur 191 à recouvrement nul, 6 à recouvrement quasi nul — dit que le
+problème est réel mais rare, et que Malt en est aujourd'hui l'unique
+exemplaire propre. Consigné comme problème ouvert (voir P14) plutôt que
+tranché en silence.
+
+### Coût, à connaître avant d'écrire une nouvelle recette sur ces vues
+
+`offers_shortlist` et `offers_hidden_duplicates` coûtent chacune de l'ordre
+de **3,8 secondes** (mesuré en tâche 3 : 3 733 et 3 787 ms). Toute recette
+qui les recombine — par exemple « qu'est-ce qui a disparu de ma liste
+aujourd'hui » — doit forcer les CTE en `materialized`, sans quoi le
+planificateur rejoue les vues coûteuses à chaque ligne au lieu de les
+calculer une fois : la première version de cette recette expirait après le
+délai serveur de deux minutes. La version qui fonctionne est en tête de la
+migration `20260908190000_fix_hidden_duplicates_recipe.sql`.
 
 ## Phases 2 à 5
 
@@ -593,34 +768,55 @@ concordent, le local est dominé par Angular et Java. **Le gisement exploitable
 est national et full remote** — 76 offres côté Adzuna contre 9 côté France
 Travail — ce qui pèse sur la phase 2 et rend P8 prioritaire.
 
-### P6 — Dédoublonnage inter-sources absent, et désormais chiffré à quatre sources
+### ~~P6 — Dédoublonnage inter-sources absent~~ *(résolu)*
 
-`unique (source, external_id)` empêche les doublons **dans** une source, pas
-entre sources. Quatre sources alimentent maintenant la base (France Travail,
-Adzuna, Free-Work, Collective.work) : le problème n'est plus théorique.
+`unique (source, external_id)` empêchait les doublons **dans** une source,
+pas entre sources. Résolu par le plan de dédoublonnage (voir « Phase 1 —
+Plan de dédoublonnage ») : `offer_duplicate_groups` fusionne deux sources sur
+`(entreprise, intitulé)` **sans géographie**, sous deux garde-fous — une
+seule ville par source impliquée, et une ville nulle qui ne fonde jamais une
+fusion.
 
-Chiffré en base le 2026-09-08, à la clôture du plan B :
+Mesuré en base le 2026-09-08, après le déploiement des quatre migrations :
+**46 groupes de fusion inter-sources** (97 offres, 51 excédentaires), et
+**2 candidats bloqués** (LTd, SYNANTO) où une même source porte plusieurs
+villes pour le couple entreprise/intitulé — signe de missions distinctes
+plutôt que d'une annonce vue deux fois. Le chiffre naïf de 19 groupes cité
+plus haut (titre en minuscules et entreprise, sans normalisation ni ville)
+reste dans ce document par transparence méthodologique, mais n'est plus
+l'état de l'art : il datait d'avant la construction de la clé asymétrique.
 
-```sql
-select count(*) as doublons_inter_sources
-from (select lower(title), company_name from offers group by 1, 2 having count(distinct source) > 1) t;
-```
+*Reste ouvert, à surveiller* : le cas Malt (annonces fusionnées sans
+recouvrement textuel) montre que le garde-fou « une seule ville par source »
+ne couvre pas les employeurs intermédiaires publiant plusieurs missions sous
+un même intitulé — voir P14.
 
-**19 groupes** de titre normalisé et d'entreprise partagés par deux sources ou
-plus, sur 3 184 offres. Beaucoup d'annonces d'ESN paraissent simultanément sur
-Free-Work et sur France Travail — hypothèse plausible à vérifier nommément
-quand ce chantier s'ouvrira, pas encore fait ici. Première dette de la phase
-2, désormais avec un nombre de départ.
+### ~~P10 — Doublons intra-source~~ *(résolu, et le chiffre corrigé)*
 
-### P10 — Doublons intra-source, découverts en classant les 38 offres de la tâche 4
+`unique (source, external_id)` n'empêchait pas non plus les doublons dans une
+même source quand celle-ci republie la même annonce sous un nouvel
+`external_id` — constant sur Adzuna. Résolu par la même migration que P6.
 
-`unique (source, external_id)` **n'empêche pas non plus** les doublons dans
-une même source quand celle-ci republie la même annonce sous un nouvel
-`external_id` — ce qui arrive constamment sur Adzuna. Distinct de P6, qui vise
-les doublons **entre** sources.
+**Le chiffre ci-dessous, laissé pour mémoire, était gonflé : la clé qui l'a
+produit ignorait la ville.** Chez **Achil**, republié via Collective,
+l'intitulé « Collaborateur Comptable Confirmé » paraît sur **9 villes
+distinctes** (mesuré à nouveau en tâche 4 : Manosque, Aubière,
+Bourg-Saint-Maurice, Claye-Souilly, Aix-en-Provence, Annecy, Cagnes-sur-Mer,
+Dunkerque, La Valette-du-Var) — 9 postes réels, pas une seule annonce
+republiée 9 fois. Une clé `(source, company_name, titre normalisé)` sans
+ville les aurait fusionnés en **un seul groupe de 9**, comptant 8 doublons
+excédentaires là où il y en a 0. Mesuré sur l'ensemble du corpus actuel
+(4 112 offres) pour chiffrer l'écart : la clé sans ville forme **213
+groupes, 529 offres, 316 excédentaires** ; la clé correcte, avec ville et le
+garde-fou `coalesce(norm_city, offer_id)` pour les villes nulles, n'en forme
+que **129, pour 269 offres et 140 excédentaires** — l'excès retombe de
+**316 à 140, soit environ 56 % de moins**, du même ordre que le « environ
+60 % » pressenti avant de mesurer. Achil, pris isolément, illustre l'écart au
+maximum : 8 des 8 doublons qu'une clé sans ville lui aurait attribués sont
+des faux positifs.
 
-Mesuré en base (regroupement par `source`, `company_name`, et titre normalisé
-— suffixe `H/F`/`F/H`, avec ou sans parenthèses, retiré) :
+Mesures historiques laissées en l'état ci-dessous, datées et non recomptées
+(la base a grossi depuis, et la méthode a changé) :
 
 - Sur l'ensemble des 1 253 offres collectées : **57 groupes, 126 offres,
   69 doublons excédentaires** (`company_name` non nul, pour éviter les faux
@@ -649,18 +845,11 @@ Mesuré en base (regroupement par `source`, `company_name`, et titre normalisé
   publie la même mission deux fois sous « Senior Java - Kotlin Developer H/F »
   et « Senior Java/Kotlin Developer » — ponctuation et ordre des mots
   diffèrent, pas seulement un suffixe. Un `group by (title, company_name)`
-  strict, même après avoir retiré les suffixes `H/F`, ne le voit pas. Preuve
-  que le problème dépasse la normalisation de chaîne et demande soit une
-  clef métier plus stable côté Adzuna (aucune n'est documentée), soit un
-  rapprochement approximatif (distance d'édition sur le titre, fenêtre
-  temporelle, même entreprise).
-
-Priorité : sous P6 (le dédoublonnage inter-sources reste la dette la plus
-dure — deux schémas de champs différents à réconcilier), mais au-dessus de P7
-et P3 : il dégrade **directement** la liste que l'utilisateur consulte tous
-les jours, pas une hypothèse latente. Effet du déclassement de `fr-react`
-(ci-dessus) : la quadruplication Boond est sortie de la sélection au passage,
-ce qui a réduit d'autant ce problème sans action dédiée.
+  strict, même après avoir retiré les suffixes `H/F`, ne le voit pas. Ce cas
+  précis n'est pas couvert par `offer_dedup_keys` (qui ne normalise que le
+  suffixe de genre, pas l'ordre des mots ni la ponctuation) : il resterait
+  visible deux fois dans `offers_shortlist` aujourd'hui si les deux lignes
+  passaient par ailleurs ses critères.
 
 ### P11 — Pages Free-Work sans `JobPosting` : seulement journalisées, jamais comptées
 
@@ -789,6 +978,34 @@ Même cause, même effet sur `last_seen_at`, qui ne se rafraîchit pas pour
 Free-Work : cette colonne ne peut donc pas servir à distinguer une annonce
 encore en ligne d'une annonce retirée, sur cette source. Personne ne s'en sert
 aujourd'hui.
+
+### P14 — Des fusions de doublons sans aucun recouvrement de texte, mesurées à 1 cas sur 191
+
+Le garde-fou « une seule ville par source » (voir « Phase 1 — Plan de
+dédoublonnage ») ne protège pas contre un employeur intermédiaire — place de
+marché, ESN — qui publie plusieurs missions distinctes sous un même
+intitulé et une même ville. Cas trouvé en tâche 3 : deux annonces Malt
+« Senior Fullstack Engineer H/F » fusionnées à tort, l'une décrivant des
+responsabilités concrètes, l'autre de la communication de plateforme
+générique — aucune phrase commune.
+
+Mesuré en tâche 4 sur les 191 paires masquée/représentante, par recouvrement
+lexical (mots de 6 lettres ou plus partagés entre les deux descriptions) :
+**1 paire à recouvrement nul (Malt)**, **6 à recouvrement quasi nul (1 à 3
+mots)**. Mais ce signal n'est pas fiable en l'état : deux des six autres
+paires à faible recouvrement (AMILTONE, Boond) sont des doublons **prouvés**
+par lecture intégrale en tâche 3 — leur faible score vient de la troncature
+Adzuna, qui coupe le texte à 500 caractères et à des endroits différents
+selon la longueur du titre, pas d'une différence de poste. Un signal
+automatique fondé sur le seul recouvrement lexical confondrait donc « vrai
+doublon tronqué différemment » et « faux positif Malt ».
+
+**Décision** : rien codé ici (aucune vue ni migration n'est touchée dans
+cette tâche), le problème est réel mais rare — 1 cas propre sur 191, 0,5 %.
+À revisiter si la proportion grossit, ou si une source publie
+massivement au nom d'employeurs intermédiaires. En attendant, la recette de
+surveillance ci-dessous (plus gros groupes de doublons) reste le meilleur
+signal disponible sans coder de nouveau critère.
 
 ---
 
@@ -921,6 +1138,40 @@ select distinct unit_label, total_available
 from collection_query_results where truncated
 order by total_available desc;
 ```
+
+### Surveiller le dédoublonnage — repérer une source qui republierait massivement
+
+`offer_duplicate_groups` ne dit rien tout seul si une source se met un jour à
+republier la même annonce en boucle (un bug de scraper, une pagination qui
+tourne en rond) : un tel emballement se verrait d'abord dans la taille des
+plus gros groupes. Exécutée le 2026-09-08 :
+
+```sql
+select o.company_name, o.title, g.dup_count, g.dup_sources
+from offer_duplicate_groups g
+join offers o on o.id = g.offer_id
+where g.is_primary
+order by g.dup_count desc
+limit 15;
+```
+
+```
+company_name                | title                                                       | dup_count | dup_sources
+Celad                       | Data Scientist – secteur bancaire (F/H)                    | 4         | {collective}
+Achil                       | Chef de Mission - Equilibre Pro / Perso H/F                | 4         | {collective}
+KLANIK                      | Développeur Java (H/F)                                     | 4         | {adzuna,france_travail}
+NEW NET 3D                  | Développeur d'Applications C# .NET ... (H/F)               | 4         | {france_travail}
+NEW NET 3D                  | Ingénieur Développement Full Stack Java / Angular (H/F)    | 3         | {france_travail}
+KLANIK                      | Ingénieur IA (H/F)                                         | 3         | {adzuna,france_travail}
+Amiltone                    | Développeur Java/Angular (H/F)                             | 3         | {adzuna,free_work}
+...                                                                                       | ...       | ...
+```
+
+Rien d'anormal aujourd'hui : le plus gros groupe compte 4 offres, jamais plus,
+et aucune source n'y domine systématiquement. Un groupe qui grimperait
+soudain à 10 ou 20 pour une seule source, ou une même entreprise apparaissant
+en boucle dans le haut de ce classement, serait le signal à suivre — à relire
+de temps en temps, pas seulement quand la sélection paraît étrange.
 
 ### Surveiller la confiance par requête — la seule chose qui remesure
 

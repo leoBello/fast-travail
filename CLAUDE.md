@@ -242,10 +242,18 @@ national** — 63 offres sur 31 jours contre 9 pour France Travail sur 699.
 select source, title, company_name, city, acces,
        coalesce(rate_raw, salary_raw) as remu,
        score, matched_terms, found_by_labels, trusted_query,
-       distance_marseille_km
+       distance_marseille_km, dup_count, dup_first_seen_at
 from offers_shortlist
 order by score desc, published_at desc;
 ```
+
+`dup_count` dit en combien d'exemplaires ce poste a été vu (1 s'il est seul).
+`dup_first_seen_at` est la date de la **première** offre du groupe, pas celle
+de la ligne affichée : la sélection garde la ligne la plus récente (URL qui a
+le plus de chances de fonctionner encore), ce qui perd l'ancienneté réelle du
+poste si on ne regarde que `first_seen_at`. Un poste vu depuis longtemps sous
+plusieurs republications (`dup_count` élevé, `dup_first_seen_at` ancien) est
+un signal — dur à pourvoir, ou très demandé.
 
 **Interroger `offers_shortlist`, jamais `offers_ranked` avec une clause écrite
 à la main.** La vue encode la règle complète — signal rouge éliminatoire, puis
@@ -261,6 +269,21 @@ offre y est retenue par la requête qui l'a trouvée, pas par son texte.
 si l'une d'elles est ancrée à une technologie. Sur les 65 offres retenues, 34
 n'entrent **que** par ce chemin : elles n'ont ni `core_hits` ni `ai_hits`, et
 sans lui elles seraient invisibles.
+
+**`offers_shortlist` ne montre qu'un représentant par groupe de doublons.**
+`offers_hidden_duplicates` liste la contrepartie — les offres masquées et
+l'exemplaire qui les remplace — pour que rien ne se perde vraiment. Piège à
+connaître : cette vue répond à « qui est le représentant sur **tout** le
+corpus » (`is_primary`), pas à « qu'est-ce qui a disparu de **ma** sélection
+du jour » — depuis que le dédoublonnage se fait dans la sélection elle-même,
+les deux questions n'ont plus toujours la même réponse. La recette exacte
+pour la seconde question est en tête de la migration
+`20260908190000_fix_hidden_duplicates_recipe.sql`, avec les CTE
+`materialized` qui lui sont indispensables : `offers_shortlist` et
+`offers_hidden_duplicates` coûtent chacune environ 3,8 secondes, et sans
+`materialized` une requête qui recombine les deux rejoue ce coût à chaque
+ligne — testé, elle expire après le délai serveur au lieu de répondre en
+quelques secondes.
 
 Les axes réglables sont des **lignes en base**, jamais du code :
 
