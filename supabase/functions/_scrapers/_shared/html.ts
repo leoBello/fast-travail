@@ -37,14 +37,18 @@ export function extractNextData(html: string): unknown {
 const BLOCK_END = /<\/(?:p|div|li|ul|ol|h[1-6]|tr|table|section)>|<br\s*\/?>/gi;
 const TAG = /<[^>]*>/g;
 
-const NAMED_ENTITIES: Readonly<Record<string, string>> = {
-  amp: '&',
-  lt: '<',
-  gt: '>',
-  quot: '"',
-  apos: "'",
-  nbsp: ' ',
-};
+// Une Map, jamais un objet littéral : `NAMED_ENTITIES[name]` sur un objet
+// remonterait la chaîne de prototypes pour un nom comme `constructor`, et
+// rendrait le texte de la fonction `Object` au lieu de l'entité littérale.
+// Même garde que `departments.ts` pour la même raison.
+const NAMED_ENTITIES: ReadonlyMap<string, string> = new Map([
+  ['amp', '&'],
+  ['lt', '<'],
+  ['gt', '>'],
+  ['quot', '"'],
+  ['apos', "'"],
+  ['nbsp', ' '],
+]);
 
 const ENTITY = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
 
@@ -80,7 +84,7 @@ export function htmlToText(html: string): string {
         return codePointToChar(parseInt(name.slice(2), 16)) ?? whole;
       }
       if (name.startsWith('#')) return codePointToChar(parseInt(name.slice(1), 10)) ?? whole;
-      return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
+      return NAMED_ENTITIES.get(name.toLowerCase()) ?? whole;
     })
     .replace(/[ \t\u00a0]+/g, ' ')
     .replace(/ *\n *(?:\n *)*/g, '\n')
