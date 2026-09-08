@@ -1293,19 +1293,24 @@ deux index), la vue `offer_display_groups` (clé de regroupement d'affichage) et
 la vue `offer_application_state` (propagation de l'état à tout le groupe,
 colonne `heritee`). SQL repris verbatim du brief de tâche.
 
-**Coût mesuré, `explain analyze` × 3** :
+**Coût mesuré, `explain analyze` × 3, le 2026-09-09 avant le correctif de
+clé ci-dessous** — la clé simple d'alors (sans liste blanche de suffixes)
+n'est **plus reproductible** : la vue a été remplacée par la migration
+`20260910005000`. Chiffres cités comme mesure historique, datée, pas comme
+quelque chose qu'on peut refaire aujourd'hui :
 
-| Vue | État de la table | Temps d'exécution |
+| Vue | État de la table | Temps d'exécution (3 mesures) |
 |---|---|---:|
-| `offer_display_groups` | — (4 146 offres, `Seq Scan`) | 50,4 / 50,6 / 50,7 ms |
-| `offer_application_state` | `offer_applications` vide | 0,31 / 0,33 / 0,35 ms |
-| `offer_application_state` | `offer_applications` à 1 ligne | 60,0 / 60,1 / 61,7 ms |
+| `offer_display_groups` (clé simple) | — (4 146 offres, `Seq Scan`) | 50,385 / 50,318 / 50,079 ms |
+| `offer_application_state` | `offer_applications` vide | 0,145 / 0,109 / 0,109 ms |
+| `offer_application_state` | `offer_applications` à 1 ligne | 61,741 / 60,125 / 60,028 ms |
 
 Bien sous le seuil de 200 ms fixé par le brief : aucun index d'expression
 posé. `offer_application_state` scanne `offers` **deux fois** (les deux
 `offer_display_groups` du merge join), d'où un coût environ double de
 `offer_display_groups` seule une fois la table peuplée — cohérent avec le
-plan, pas juste avec l'intuition.
+plan, pas juste avec l'intuition. **Les mesures courantes, sur la clé
+réellement en place aujourd'hui, sont dans la section « Correctif » ci-dessous.**
 
 **Propagation vérifiée** sur une vraie paire cross-source (Experis France,
 « Data analyst (F/H) », vue par `adzuna` et `free_work`) : une ligne posée sur
@@ -1355,11 +1360,73 @@ Sonde de propagation refaite sur ALLEGIS (la paire citée par le brief) :
 `offer_id` dans `offer_application_state`, `heritee = true` côté Free-Work.
 Sonde supprimée, table revérifiée vide.
 
-`explain analyze` × 3 sur `offer_display_groups` après le correctif :
-69,464 / 69,675 / 71,074 ms d'exécution (contre ~50 ms avant — le second
-`regexp_replace` s'ajoute au coût), toujours un `Seq Scan` unique sur les
-4 146 offres, toujours largement sous le seuil de 200 ms. Aucun index
-d'expression nécessaire.
+#### Remesure du 2026-09-09 (soir) — les chiffres du rapport ne concordaient pas avec ceux consignés ici
+
+Une revue a relevé que les nombres cités juste au-dessus dans une version
+antérieure de cette section ne correspondaient pas à ceux du rapport de
+tâche — une retranscription à la main, pas la sortie brute. Remesuré dans
+l'état réel de la base (clé liste blanche déjà en place,
+`offer_applications` vide au départ), sortie brute collée telle quelle,
+identique à `.superpowers/sdd/task-1-report.md` :
+
+```
+=== offer_display_groups run 1 (anomalie de démarrage à froid, écartée — voir note) ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=1.524..632.049 rows=4146 loops=1)
+Planning Time: 13.018 ms
+Execution Time: 632.546 ms
+
+=== offer_display_groups run 2 ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=0.330..69.462 rows=4146 loops=1)
+Planning Time: 0.944 ms
+Execution Time: 69.842 ms
+
+=== offer_display_groups run 3 ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=0.314..69.466 rows=4146 loops=1)
+Planning Time: 0.942 ms
+Execution Time: 69.865 ms
+
+=== offer_display_groups run 4 (extra, pour confirmer que le run 1 est une anomalie) ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=0.279..69.527 rows=4146 loops=1)
+Planning Time: 0.968 ms
+Execution Time: 69.926 ms
+
+=== offer_application_state run 1 (offer_applications vide) ===
+Unique  (cost=2948.58..2993.15 rows=4146 width=169) (actual time=0.119..0.120 rows=0 loops=1)
+Planning Time: 4.395 ms
+Execution Time: 0.359 ms
+
+=== offer_application_state run 2 (vide) ===
+Planning Time: 2.204 ms
+Execution Time: 0.330 ms
+
+=== offer_application_state run 3 (vide) ===
+Planning Time: 2.165 ms
+Execution Time: 0.317 ms
+
+=== offer_application_state, avec 1 ligne réelle (probe Experis France) ===
+run 1 : Planning Time: 2.239 ms | Execution Time: 79.088 ms
+run 2 : Planning Time: 2.221 ms | Execution Time: 80.053 ms
+run 3 : Planning Time: 2.253 ms | Execution Time: 79.485 ms
+```
+
+Le premier run d'`offer_display_groups` (632 ms d'exécution, 13 ms de
+planification) est un artefact de démarrage à froid de la connexion —
+chaque appel `db query --linked` réinitialise le rôle de connexion, et le
+tout premier appel d'une série paie un coût que les suivants n'ont plus. Un
+quatrième run a été ajouté pour le confirmer : trois mesures consécutives
+convergent à 69,4–69,9 ms, le quatrième run les confirme. Retenu comme les
+« trois mesures » : **69,842 / 69,865 / 69,926 ms**, contre ~50 ms avant le
+correctif (le second `regexp_replace` s'ajoute au coût) — toujours un
+`Seq Scan` unique sur les 4 146 offres, toujours largement sous le seuil de
+200 ms.
+
+`offer_application_state` : **0,359 / 0,330 / 0,317 ms** sur table vide (le
+planificateur court-circuite les deux scans d'`offers`, marqués
+`never executed`, dès que `offer_applications` ne renvoie aucune ligne — pas
+une mesure représentative de l'usage réel), et **79,088 / 80,053 /
+79,485 ms** avec une ligne réelle en base — cohérent avec le double scan
+d'`offers` qu'implique la définition de la vue, et toujours sous 200 ms.
+Aucun index d'expression nécessaire.
 
 ---
 
