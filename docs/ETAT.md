@@ -1328,6 +1328,39 @@ verbatim, et élargir la clé sans mesure est exactement la mise en garde de P14
 que le brief rappelle lui-même. À consigner comme limite connue de la clé
 actuelle, pas comme un défaut de cette migration.
 
+### Correctif du 2026-09-09 — `20260910005000`, la clé ignore un suffixe d'annotation
+
+Le constat ci-dessus venait d'une affirmation fausse du coordinateur (« ces
+deux paires font partie des 64 mesurées ») : ce n'était pas vérifié, et la
+vérification a montré le contraire. Le remède a été mesuré et appliqué en
+migration séparée (`20260910000000` déjà appliquée n'a pas été retouchée) :
+le titre est débarrassé d'un suffixe d'annotation pris dans une **liste
+blanche** (`h/f`, `f/h`, `h-f`, `it`, `cdi`, `cdd`, `alternance`, `stage`)
+avant normalisation, jamais de « tout parenthétique final » — piège mesuré
+sur Digistrat consulting, dont le titre Free-Work se termine par un
+parenthétique porteur de sens (« *(orienté front React)* ») qu'un retrait
+aveugle aurait amputé, cassant la correspondance au lieu de la faire.
+
+Mesure sur les 1 269 offres jugées : clé simple → 65 groupes repliés
+(80 lignes, 23 inter-sources) ; clé liste blanche → **66 groupes**
+(**82 lignes**, **24 inter-sources**). Les 7 groupes que seul le retrait
+forme ont été lus un par un — Act Digital France, ALLEGIS GROUP, Boond,
+Digistrat consulting, Letsignit, Mon Consultant Indépendant, Synanto —
+aucune fusion abusive constatée (P14).
+
+Revérifié en base après application : ALLEGIS GROUP et Digistrat consulting
+rendent chacune une `display_key` unique et partagée par leurs deux offres.
+Sonde de propagation refaite sur ALLEGIS (la paire citée par le brief) :
+`status = 'retenue'` posé sur l'offre Adzuna apparaît sur les deux
+`offer_id` dans `offer_application_state`, `heritee = true` côté Free-Work.
+Sonde supprimée, table revérifiée vide.
+
+`explain analyze` × 3 sur `offer_display_groups` après le correctif :
+69,464 / 69,675 / 71,074 ms d'exécution (contre ~50 ms avant — le second
+`regexp_replace` s'ajoute au coût), toujours un `Seq Scan` unique sur les
+4 146 offres, toujours largement sous le seuil de 200 ms. Aucun index
+d'expression nécessaire.
+
 ---
 
 ## Ce que la mesure a établi sur Adzuna
