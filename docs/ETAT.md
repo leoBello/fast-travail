@@ -1137,6 +1137,15 @@ tâche 10.
 plaçait en phase 5, est **absorbé** par celle-ci — le tableau de bord en a
 besoin maintenant. Ce qui reste à la phase 5 sera dit en tâche 10.
 
+**L'import du CV ne rejuge rien** *(tranché le 2026-09-09)*. Le bouton met à
+jour `candidate_profile.cv_text` et s'arrête là : coût zéro, et les 1 269
+jugements payés restent valides. La contrepartie est que les scores reflètent
+le CV sous lequel ils ont été rendus, **et l'écran doit le dire** — en
+affichant combien d'offres portent un `profile_version` antérieur. Rejuger
+reste une opération délibérée en ligne de commande, à ~12 € le passage. Ce qui
+est interdit : un libellé ou une animation qui laisserait croire que l'import a
+mis les scores à jour.
+
 ### Les décisions déjà tranchées
 
 | Décision | Ce qui l'a tranchée |

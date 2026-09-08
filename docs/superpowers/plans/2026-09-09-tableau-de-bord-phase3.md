@@ -468,10 +468,22 @@ condition, pas comme une option.
 - [ ] Le fil du suivi et les actions de changement d'état, `heritee` signalé
       quand l'état vient d'une autre annonce du groupe.
 - [ ] Le bouton vers l'annonce d'origine, avec l'icône de sortie.
-- [ ] Le bouton d'import du CV. **Se limiter à ce que le code rend vrai** :
-      si l'import ne fait que remplacer `candidate_profile.cv_text`, le dire ;
-      **ne pas laisser croire qu'il rejuge les offres**, ce qui coûterait un
-      `profile_version` et repaierait 1 269 jugements.
+- [ ] Le bouton d'import du CV. **Tranché le 2026-09-09 : il met à jour
+      `candidate_profile.cv_text`, et il ne rejuge rien.** Coût zéro, les
+      1 269 jugements payés restent valides.
+
+      **La limite est assumée, donc elle doit être dite à l'écran** : les
+      scores continuent de refléter le CV sous lequel ils ont été rendus. Après
+      un import, afficher combien d'offres ont été jugées sous un
+      `profile_version` antérieur — c'est une simple requête — et **ne
+      proposer aucun bouton pour les rejuger**. Rejuger reste une opération
+      délibérée en ligne de commande (`npm run score:backfill`), à ~12 € le
+      passage.
+
+      Ce qui est **interdit** ici : laisser croire par un libellé, une
+      animation ou un état de chargement que l'import a mis les scores à jour.
+      C'est exactement l'affordance qui annonce un fait qu'aucun code ne rend
+      vrai (`GUIDELINES.md` §3.3).
 
 ---
 
