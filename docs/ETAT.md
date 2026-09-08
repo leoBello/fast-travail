@@ -22,13 +22,15 @@ de 6 à **12 offres**, moitié-moitié entre les deux sources.
 
 **Le plan A est terminé.** Les 13 tâches sont livrées.
 
-**Le plan « confiance par requête » (4 tâches) est terminé aussi.** Une
-requête Adzuna ancrée à une technologie (`search_queries.trust = 'anchored'`)
-ouvre désormais `offers_shortlist` même quand le lexique ne voit rien dans les
-500 caractères tronqués — c'est ce qui manquait pour exploiter les offres full
-remote qu'Adzuna indexe sans les rendre lisibles. Résultat mesuré : la
-sélection passe de 31 à 66 offres (voir la section dédiée plus bas). Chiffre
-qui suit dans ce document : **66**, pas les 12 ou 31 des étapes précédentes.
+**Le plan « confiance par requête » (4 tâches, plus les correctifs de sa
+revue) est terminé aussi.** Une requête Adzuna ancrée à une technologie
+(`search_queries.trust = 'anchored'`) ouvre désormais `offers_shortlist` même
+quand le lexique ne voit rien dans les 500 caractères tronqués — c'est ce qui
+manquait pour exploiter les offres full remote qu'Adzuna indexe sans les
+rendre lisibles. Résultat mesuré : la sélection passe de 31 à 66 puis, après
+correction de la revue (`adzuna:remote:fr-js` déclassée), à **64** offres
+(voir la section dédiée plus bas). Chiffre qui suit dans ce document : **64**,
+pas les 12, 31 ou 66 des étapes précédentes.
 
 ```sql
 select * from offers_shortlist order by score desc, published_at desc;
@@ -39,11 +41,13 @@ select * from offers_shortlist order by score desc, published_at desc;
 | Offres collectées | 1 253 |
 | — dont France Travail | 700 |
 | — dont Adzuna | 553 |
-| Offres retenues (`offers_shortlist`) | **66** |
+| Offres retenues (`offers_shortlist`) | **64** |
 | — dont locales (13, 83, 84) | 40 |
-| — dont full remote national | 26 |
-| Mentionnant React / TypeScript / Next.js | 54 |
-| Mentionnant LLM / IA / agents | 63 |
+| — dont full remote national | 24 |
+| Mentionnant React / TypeScript / Next.js, **sur les 1 253 collectées** | 54 |
+| — dont, **restreint aux 64 retenues** | 12 |
+| Mentionnant LLM / IA / agents, **sur les 1 253 collectées** | 63 |
+| — dont, **restreint aux 64 retenues** | 21 |
 | Requêtes France Travail actives | 24 sur 38 |
 | Requêtes Adzuna actives | 11 sur 11 |
 | Jobs cron actifs | 2 |
@@ -109,7 +113,7 @@ couplage : une offre reste `trusted_query` tant qu'**au moins une** des
 requêtes qui l'ont vue est `anchored`, quel que soit l'ordre dans lequel elles
 sont passées.
 
-### Résultat mesuré (tâche 4)
+### Résultat mesuré (tâche 4, corrigé par sa revue)
 
 `offers_shortlist` passe de **31 à 69** offres avec le pari initial (7
 requêtes `anchored`), sans aucune sortie (inclusion stricte prouvée par
@@ -121,7 +125,8 @@ logicielle sans lien front-end...).
 
 Compter par requête, restreint aux offres qui n'entrent **que** par
 `trusted_query` (`core_hits = 0 and ai_hits = 0`, donc les 38 ajoutées) donne,
-par étiquette :
+par étiquette — décompte **brut**, qui partage le mérite entre requêtes qui se
+recouvrent sur une même offre :
 
 | Requête | Offres | Pertinentes | Adjacentes | Hors sujet |
 |---|---:|---:|---:|---:|
@@ -137,55 +142,101 @@ par étiquette :
 ne se déclasse que si elle fait entrer une **majorité** de hors sujet — pas au
 premier faux positif, parce qu'une offre hors sujet en bas de liste triée par
 score coûte peu, alors qu'une offre pertinente jamais affichée coûte cher.
-Mesuré en comptant la contribution **marginale** de chaque requête (les cas où
-elle est la **seule** étiquette `anchored` à avoir ramené l'offre, donc la
-seule cause réelle de son entrée), pas le décompte brut qui partage à tort le
-mérite entre requêtes qui se recouvrent :
+Mesuré en comptant la contribution **marginale** de chaque requête (les
+offres où elle est la **seule** étiquette `anchored` restante parmi
+`found_by_labels`, donc la seule cause réelle de son entrée), pas le décompte
+brut ci-dessus. **La revue de la tâche 4 a montré que ce décompte marginal
+était incomplet pour `adzuna:local:javascript` (7 offres comptées au lieu de
+12, en omettant Collective.work et Easy Partner — Vue.js —, un second
+exemplaire « VIRTUALEXPO GROUP », et deux offres — W HUB « Data Ingénieur
+SKYWISE » et EASY PARTNER « PL/SQL Senior » — que ce document classait
+pourtant déjà hors sujet ailleurs, sans vérifier la cohérence entre les deux
+sections)**, et qu'il n'avait pas été refait pour les cinq autres requêtes.
+Refait au complet, requête par requête, sur les 66 offres (avant la
+correction `fr-js` ci-dessous) :
 
-- **`adzuna:remote:fr-react` se déclasse** (`anchored` → `net`, migration
-  `20260908050000_declassify_fr_react_query.sql`). Sur ses 6 offres, elle
-  n'est la seule cause d'entrée que 3 fois — les 3 doublons « Lead Product
-  Marketing Manager » (Boond), un poste de marketing sans aucun rapport avec
-  React : 3 offres isolées, 3 hors sujet, 100 %. Les 3 autres offres où elle
-  apparaît (Konecta, RECRUT-INFO, Galadrim) portent toutes aussi `fr-ts`
-  (restée `anchored`, 17 % de hors sujet sur sa propre mesure) : les déclasser
-  ne les aurait pas fait sortir. Coût mesuré du déclassement : **zéro** offre
-  pertinente ou adjacente perdue ; gain : les 3 hors sujet ne rentrent plus.
-  Le texte reçu (500 caractères) ne contient ni « react » ni rien
-  d'approchant ; cause probable, la même collision de lemmatisation française
-  déjà documentée dans `CLAUDE.md` pour React/réacteur, mais sur un radical
-  différent invisible sans le texte intégral qu'Adzuna indexe.
-- **`adzuna:local:javascript` reste `anchored`**, malgré le plus grand nombre
-  brut de hors sujet (5) : sur les 7 offres où elle est la seule étiquette
-  `anchored`, le partage est 3 hors sujet / 4 adjacentes — pas de majorité
-  dans un sens ou dans l'autre. Le pari initial (« JavaScript reste une
-  technologie, même si large ») se confirme : rien ne change.
+| Requête | Marginal | Hors sujet | Adjacentes |
+|---|---:|---:|---:|
+| `adzuna:local:react-ts` | 0 | — | — |
+| `adzuna:local:typescript` | 3 | 1 (33 %) | 2 |
+| `adzuna:local:nextjs` | 0 | — | — |
+| `adzuna:local:javascript` | 12 | 7 (58 %) | 5 |
+| `adzuna:remote:fr-ts` | 9 | 2 (22 %) | 7 |
+| `adzuna:remote:fr-js` | 2 | 2 (100 %) | 0 |
+
+Deux requêtes franchissent la majorité de hors sujet sur ce décompte
+corrigé : `javascript` et `fr-js`. Le coût du déclassement, mesuré offre par
+offre avant toute décision, diverge complètement entre les deux :
+
+- **`adzuna:remote:fr-js` se déclasse** (`anchored` → `net`, migration
+  `20260908070000_declassify_fr_js_query.sql`). Ses 2 offres marginales
+  (Diabolocom « Software Support Specialist LV2 », NEXTON « Consultant ECM /
+  GED F/H ») sont toutes les deux hors sujet — aucune pertinente ni
+  adjacente à perdre. Coût du déclassement : **zéro**. Vérifié en base par
+  inclusion : `offers_shortlist` passe de 66 à **64**, exactement ces deux
+  offres en moins (`company_name in ('Diabolocom','NEXTON')` ne rend plus que
+  « NEXTON — AI Developer F/H », entrée par `fr-dev` et `ai_hits = 2`, sans
+  rapport avec `fr-js`).
+- **`adzuna:local:javascript` reste `anchored`**, malgré la même majorité de
+  hors sujet (58 % par ligne, **55 % par annonce distincte** une fois fusionné
+  le doublon de casse « Virtualexpo Group » / « VIRTUALEXPO GROUP », 6 hors
+  sujet sur 11 annonces — voir P10). Contrairement à `fr-react` et `fr-js`,
+  son coût de déclassement n'est **pas** nul : ses 5 offres adjacentes
+  marginales (DigDash, Dassault Systèmes, Capgemini, Collective.work,
+  Easy Partner — toutes Java/JS générique ou Vue.js) n'ont **aucune autre
+  voie d'entrée** (ni `core_hits`, ni `ai_hits`, ni autre étiquette
+  `anchored`) et disparaîtraient purement et simplement si la requête était
+  déclassée. Le critère du projet vaut dans les deux sens : une offre hors
+  sujet en bas de liste triée par score coûte peu, mais une offre adjacente
+  **jamais affichée** coûte cher. Ici le coût (5 offres adjacentes rendues
+  invisibles à l'avenir) l'emporte sur le bruit évité (7 offres hors sujet,
+  déjà reléguées en bas de liste par un score nul ou quasi nul). Décision :
+  rien ne change, aucune migration ne touche cette requête.
 - **`adzuna:local:nextjs`**, jugée à volume trop faible en tâche 3 (0/2), est
   maintenant mesurable : **2/2 pertinentes**. Pari confirmé.
-- **`react-ts`, `typescript` local, `fr-ts`, `fr-js`** restent propres (0 à
-  17 % de hors sujet). Rien ne change.
+- **`react-ts`, `typescript` local, `fr-ts`** restent propres (0 à 22 % de
+  hors sujet sur leur décompte marginal). Rien ne change.
 
-Effet du déclassement, vérifié en base : `offers_shortlist` passe de 69 à
-**66** (les 3 Boond sortent, `count(*) from offers_shortlist where
-company_name = 'Boond'` rend 0), et Konecta/RECRUT-INFO/Galadrim restent
-présentes (vérifié nommément). Aucune régression.
+**`adzuna:remote:fr-react`** a été déclassée par la tâche 4 elle-même
+(`anchored` → `net`, migration `20260908050000_declassify_fr_react_query.sql`)
+avant même cette revue, sur la base de 3 offres isolées, toutes hors sujet.
+**Précision apportée par la revue** : ces 3 occurrences sont en réalité **une
+seule et même annonce** — « Lead Product Marketing Manager - 100% remote »
+(Boond), publiée trois fois (deux exemplaires au suffixe « (H/F) » près, un
+troisième sans), un doublon intra-source du genre décrit en P10.
+L'échantillon de preuve vaut donc **n = 1**, pas n = 3 comme le rapport
+initial le laissait entendre en écrivant « 100 %, 3 cas sur 3 ». **La décision
+reste correcte** : le coût mesuré du déclassement est nul quelle que soit la
+taille de l'échantillon — les 3 autres offres où `fr-react` apparaît
+(Konecta, RECRUT-INFO, Galadrim) restent couvertes par `fr-ts`, restée
+`anchored` — ce qui rend la décision sûre malgré un échantillon de preuve
+mince. Mais l'affirmation de robustesse statistique du rapport initial était
+trompeuse et est corrigée ici.
+
+Effet cumulé des deux déclassements, vérifié en base : `offers_shortlist`
+passe de 69 (pari initial) à 66 (après `fr-react`, les 3 Boond sortent) puis à
+**64** (après `fr-js`, Diabolocom et le NEXTON « Consultant ECM / GED »
+sortent). Konecta/RECRUT-INFO/Galadrim et le NEXTON « AI Developer » restent
+présents (vérifié nommément à chaque étape). Aucune régression sur une offre
+pertinente ou adjacente.
 
 ### Nouvel axe réglable : `search_queries.trust`
 
 `'anchored'` ou `'net'`, réglable par **migration** (donnée de référence,
 jamais un `UPDATE` à la main) — voir `20260908033042_query_provenance_and_trust.sql`
-(pose et pari initial) et `20260908050000_declassify_fr_react_query.sql`
-(correction mesurée). Une requête `anchored` ouvre `offers_shortlist` par
-elle-même ; une requête `net` reste soumise à la confirmation lexicale
-(`core_hits >= 1 or ai_hits >= 1`). L'effet est immédiat sur les offres déjà
-collectées, `offers_shortlist` étant une vue.
+(pose et pari initial), `20260908050000_declassify_fr_react_query.sql` et
+`20260908070000_declassify_fr_js_query.sql` (corrections mesurées, la seconde
+issue de la revue de la tâche 4). Une requête `anchored` ouvre
+`offers_shortlist` par elle-même ; une requête `net` reste soumise à la
+confirmation lexicale (`core_hits >= 1 or ai_hits >= 1`). L'effet est
+immédiat sur les offres déjà collectées, `offers_shortlist` étant une vue.
 
 ## Phase 1 — Plan B : deux scrapers, et non quatre
 
 **Planifié le 2026-09-08, contre des pages réelles capturées d'abord. Pas
 encore implémenté.** Plan :
 [`plans/2026-09-08-plan-b-scrapers-free-work-collective.md`](superpowers/plans/2026-09-08-plan-b-scrapers-free-work-collective.md),
-onze tâches. Les fixtures — quatre pages Free-Work, une page Collective, deux
+douze tâches. Les fixtures — quatre pages Free-Work, une page Collective, deux
 `robots.txt` — sont commitées sous `supabase/functions/_scrapers/`.
 
 **La reconnaissance a démenti trois affirmations de ce document.**
@@ -362,13 +413,28 @@ les doublons **entre** sources.
 Mesuré en base (regroupement par `source`, `company_name`, et titre normalisé
 — suffixe `H/F`/`F/H`, avec ou sans parenthèses, retiré) :
 
-- Sur l'ensemble des 1 253 offres collectées : **47 groupes, 106 offres,
-  59 doublons excédentaires** (`company_name` non nul, pour éviter les faux
-  positifs des offres sans employeur identifié).
-- Sur les 66 offres actuellement dans `offers_shortlist` — ce qui compte pour
-  l'usage réel, une liste triée par score que le propriétaire relit à la
-  main : **5 paires détectées par regroupement** (AMILTONE, Capgemini, KLANIK,
-  Malt « Senior Fullstack Engineer », Pretto), soit 10 offres sur 66 (15 %).
+- Sur l'ensemble des 1 253 offres collectées : **57 groupes, 126 offres,
+  69 doublons excédentaires** (`company_name` non nul, pour éviter les faux
+  positifs des offres sans employeur identifié). Chiffre revérifié par la
+  revue de la tâche 4, trois façons indépendantes (`group by` classique,
+  `company_name <> ''`, et une reformulation par `count() over (partition
+  by ...)`), toutes stables à ce total — le rapport initial de la tâche 4
+  annonçait par erreur 47/106/59.
+- Sur les 64 offres actuellement dans `offers_shortlist` (après le
+  déclassement `fr-js` ci-dessus) — ce qui compte pour l'usage réel, une
+  liste triée par score que le propriétaire relit à la main : **5 paires
+  détectées par regroupement sensible à la casse** (AMILTONE, Capgemini,
+  KLANIK, Malt « Senior Fullstack Engineer », Pretto), soit 10 offres sur 64
+  (16 %).
+- **Angle mort du regroupement : il respecte la casse.** « Virtualexpo
+  Group » et « VIRTUALEXPO GROUP » — la même annonce « Ingénieur
+  qualification logiciel H/F » republiée deux fois — échappent au groupe
+  pour cette seule raison, alors que le titre normalisé est identique.
+  Regrouper insensible à la casse (`lower(company_name)`) fait passer le
+  compte de la sélection à **6 groupes, 12 offres, 6 excédentaires** : la
+  paire Virtualexpo s'ajoute aux 5 déjà détectées. Généralisation du cas Malt
+  déjà noté ci-dessous (ordre des mots et ponctuation) : la normalisation de
+  chaîne actuelle a plusieurs angles morts distincts, pas un seul.
 - **Un doublon de plus, invisible à toute normalisation de titre** : Malt
   publie la même mission deux fois sous « Senior Java - Kotlin Developer H/F »
   et « Senior Java/Kotlin Developer » — ponctuation et ordre des mots
@@ -544,8 +610,8 @@ Régler la confiance d'une requête (`search_queries.trust`, `'anchored'` ou
 `'net'`) : **par migration seulement**, à la différence des deux réglages
 ci-dessus — c'est ce que la tâche 4 du plan « confiance par requête » impose
 explicitement, pour garder une trace du pari et de sa correction (voir
-`20260908033042` et `20260908050000`). Effet immédiat aussi sur
-`offers_shortlist`, une fois la migration poussée.
+`20260908033042`, `20260908050000` et `20260908070000`). Effet immédiat aussi
+sur `offers_shortlist`, une fois la migration poussée.
 
 **Ordre d'écriture, à ne pas confondre avec un ordre d'importance** : `priority`
 croissante décide de l'ordre d'exécution, et comme l'upsert écrase, **la
