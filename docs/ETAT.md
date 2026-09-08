@@ -14,10 +14,13 @@ par la vue `offers_shortlist`. La fonction est déployée et le cron `ft-daily`
 s'exécute **chaque jour à 6 h UTC — 8 h à Marseille, PC éteint**. Chaîne
 vérifiée de bout en bout : Vault, `pg_net`, fonction déployée, écriture en base.
 
-**Adzuna collecte.** Backfill de 31 jours réussi : 476 offres, les 11 requêtes
-en HTTP 200, `fetched == total_available` partout et aucune tronquée. La
-sélection passe de 6 à **12 offres**, moitié-moitié entre les deux sources.
-Reste le déploiement et le cron (tâche 12).
+**Les deux sources tournent seules, PC éteint.** `ft-daily` à 6 h 00 et
+`adzuna-daily` à 6 h 30, tous deux actifs et prouvés par un run réel portant
+`trigger = cron`. Le backfill Adzuna de 31 jours a ramené 476 offres, les 11
+requêtes en HTTP 200, `fetched == total_available` partout. La sélection passe
+de 6 à **12 offres**, moitié-moitié entre les deux sources.
+
+**Le plan A est terminé.** Les 13 tâches sont livrées.
 
 ```sql
 select * from offers_shortlist order by score desc, published_at desc;
@@ -34,7 +37,8 @@ select * from offers_shortlist order by score desc, published_at desc;
 | Mentionnant LLM / IA / agents | 67 |
 | En full remote | 9 |
 | Requêtes France Travail actives | 24 sur 38 |
-| Requêtes Adzuna semées | 11 |
+| Requêtes Adzuna actives | 11 sur 11 |
+| Jobs cron actifs | 2 |
 | Termes au lexique | 66 |
 | Tests | 115 verts |
 
@@ -58,7 +62,7 @@ select * from offers_shortlist order by score desc, published_at desc;
 | — | Vue `offers_shortlist` | ✅ |
 | 10 | Déploiement France Travail + cron quotidien | ✅ |
 | 11 | Adzuna : client, mapper, orchestration + **collecte réelle** | ✅ *(re-revue à refaire, voir ci-dessous)* |
-| **12** | **Déploiement Adzuna + cron** | **à faire** (secrets déjà poussés) |
+| 12 | Déploiement Adzuna + cron `adzuna-daily` à 6 h 30 | ✅ |
 
 Chaque tâche a été relue par un agent distinct, sur conformité au cahier des
 charges **et** sur qualité.
