@@ -82,3 +82,37 @@ Deno.test('leve si la reponse ne porte aucun bloc de texte', async () => {
 
   await assertRejects(() => callClaudeStructured({ ...cfg, fetchImpl }, call), ClaudeApiError);
 });
+
+Deno.test('leve ClaudeApiError si le corps de la reponse HTTP 200 n est pas du JSON', async () => {
+  const fetchImpl = () => Promise.resolve(new Response('not json at all', { status: 200 }));
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.status, 200);
+});
+
+Deno.test('leve ClaudeApiError si content[0].text n est pas du JSON valide', async () => {
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({ content: [{ type: 'text', text: 'pas du json' }], usage: {} }),
+        { status: 200 },
+      ),
+    );
+
+  await assertRejects(() => callClaudeStructured({ ...cfg, fetchImpl }, call), ClaudeApiError);
+});
+
+Deno.test('leve ClaudeApiError si le bloc de texte est present mais vide', async () => {
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({ content: [{ type: 'text', text: '' }], usage: {} }),
+        { status: 200 },
+      ),
+    );
+
+  await assertRejects(() => callClaudeStructured({ ...cfg, fetchImpl }, call), ClaudeApiError);
+});

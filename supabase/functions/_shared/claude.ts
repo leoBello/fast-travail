@@ -105,10 +105,20 @@ export async function callClaudeStructured<T>(
     throw new ClaudeApiError(`Claude a repondu ${response.status} : ${detail}`, response.status);
   }
 
-  const payload = (await response.json()) as AnthropicResponse;
-  const text = payload.content?.find((block) => block.type === 'text')?.text;
-  if (!text) {
+  let payload: AnthropicResponse;
+  try {
+    payload = (await response.json()) as AnthropicResponse;
+  } catch (cause) {
+    throw new ClaudeApiError(`reponse Claude illisible : ${String(cause)}`, response.status);
+  }
+
+  const textBlock = payload.content?.find((block) => block.type === 'text');
+  if (textBlock === undefined) {
     throw new ClaudeApiError('reponse Claude sans bloc de texte', response.status);
+  }
+  const text = textBlock.text;
+  if (!text) {
+    throw new ClaudeApiError('reponse Claude avec un bloc de texte vide', response.status);
   }
 
   let value: T;
