@@ -67,9 +67,9 @@ Deno.test('htmlToText réduit une espace insécable brute à une espace ordinair
   assertEquals(htmlToText('a\u00A0b'), 'a b');
 });
 
-Deno.test("htmlToText ne remonte pas la chaîne de prototypes pour une entité nommée", () => {
+Deno.test('htmlToText ne remonte pas la chaîne de prototypes pour une entité nommée', () => {
   // `NAMED_ENTITIES[name]` sur un objet littéral trouve `constructor` sur
   // `Object.prototype` : sans garde, ce test échoue en rendant le texte de la
   // fonction `Object`. Une entité absente doit rester du texte littéral.
-  assertEquals(htmlToText("&constructor;"), "&constructor;");
+  assertEquals(htmlToText('&constructor;'), '&constructor;');
 });
