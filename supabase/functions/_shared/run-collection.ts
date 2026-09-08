@@ -78,7 +78,7 @@ export async function runCollection(opts: RunCollectionOptions): Promise<Collect
 
       let counts = { new: 0, updated: 0 };
       if (dryRun) preview.push(...mapped.slice(0, PREVIEW_PER_QUERY));
-      else counts = await upsertOffers(db, mapped);
+      else counts = await upsertOffers(db, mapped, { queryId: query.id });
 
       offersNew += counts.new;
       offersUpdated += counts.updated;
