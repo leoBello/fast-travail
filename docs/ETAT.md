@@ -66,13 +66,14 @@ La ligne qui compte est la quatrième depuis le bas du bloc de sélection :
 confiance par requête, elles seraient invisibles — c'est plus de la moitié de
 la liste quotidienne.
 
-**Ce tableau date d'avant le plan B et ne couvre que les deux API.** Depuis,
-Free-Work et Collective.work alimentent la base elles aussi, et les deux
-tournent seules par Planificateur Windows en plus des deux crons `pg_cron`.
-Le compte à quatre sources, recompté en base le 2026-09-08 en clôture du plan
-B, est dans « Phase 1 — Plan B » plus bas : **3 184 offres collectées, 82
-retenues**. Les deux rangées « Mentionnant React / TypeScript / Next.js » et
-« Mentionnant LLM / IA / agents » ci-dessus restent telles quelles : ce sont
+**Les compteurs d'offres et de sélection de ce tableau datent d'avant le plan
+B et ne couvrent que les deux API.** Depuis, Free-Work et Collective.work
+alimentent la base elles aussi, et les deux tournent seules par Planificateur
+Windows en plus des deux crons `pg_cron`. Le compte à quatre sources,
+recompté en base le 2026-09-08 en clôture du plan B, est dans « Phase 1 —
+Plan B » plus bas : **3 184 offres collectées, 82 retenues**. Les deux
+rangées « Mentionnant React / TypeScript / Next.js » et « Mentionnant LLM /
+IA / agents » ci-dessus restent telles quelles pour la même raison : ce sont
 des mesures datées de la clôture du plan confiance-par-requête, sur les 1 296
 offres API d'alors, et elles n'ont pas été refaites sur les 3 184 offres
 actuelles — les recompter serait une tâche à part, pas une simple mise à jour
