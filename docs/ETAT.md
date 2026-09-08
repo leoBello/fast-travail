@@ -1121,6 +1121,40 @@ Canvas : <https://claude.ai/code/artifact/be80ac9f-af1b-4490-b2ce-b7813a4ea393>
 | **Framer Motion, pas GSAP** | Le besoin est du réordonnancement de liste, que `layout` et `AnimatePresence` font en déclaratif. GSAP gagne sur les timelines et le canvas, dont il n'y a rien ici |
 | **Le kit vient de prospeo, tel quel** | Tokens, trois familles typographiques, anatomie du `Badge`. Le contraste y a déjà été mesuré — `--color-text-muted` y est passé de 3,60:1 à 4,5:1 |
 
+### Les quatre arbitrages du 2026-09-09, après validation des maquettes
+
+**Direction A — « les trois cartes ».** Portée par `Main.dc.html`. B et C
+restent au dépôt comme trace de l'arbitrage, pas comme options ouvertes. Ce qui
+a décidé : A est la seule des trois où **la fin de la tâche du jour est
+visible**, donc la seule où la boucle qui se vide a un support. Et les verdicts
+font 167 caractères de médiane : les trois lignes de la carte suffisent presque
+toujours.
+
+**Le suivi porte six étapes, une sortie et quatre issues.** Pipeline :
+`a_traiter` → `retenue` → `postulee` → `relancee` → `entretien` → `terminee`,
+avec `ecartee` en **sortie à tout moment** — pas la septième étape d'un
+parcours. Issues sur `terminee` : `offre_recue`, `refus`, `sans_reponse`,
+`desistement`. Deux axes orthogonaux, délibérément : « sans réponse » et
+« refus » se ressemblent à l'usage et ne disent pas la même chose sur une
+entreprise au moment de relancer.
+
+**L'accès à la base passe par une Edge Function `api-dashboard` + une SPA
+statique.** `verify_jwt` et clé `anon` côté navigateur, `service_role` injectée
+par la plateforme et jamais hors de Supabase — le motif déjà prouvé par les
+trois crons. La SPA est servie en local par Vite : **aucun hébergement à
+monter**. Écarté : un serveur Node, qui aurait ajouté un second outillage que
+`npm run verify` ne couvre pas, tué le tableau de bord PC éteint, et laissé le
+chemin d'écriture du suivi à sécuriser de zéro.
+
+**« Ce matin » ouvre au-dessus de 50** — 61 offres à l'amorçage, de l'ordre de
+3 à 8 par jour en régime. Le seuil ne s'applique **qu'au brief** : la liste
+complète continue de ne rien masquer, triée par rang. Le risque de masquage est
+borné par deux garde-fous — tout le reste est à un scroll, et le compteur
+anti-perte veille sur ce qui n'a jamais été ouvert. Écarté : un seuil à 40
+(126 offres, une tâche qu'on ne finit pas — et une boucle qu'on ne vide jamais
+cesse de motiver), et un top 6 sans seuil (un matin creux ferait examiner des
+offres à 20, ce qui apprend à se méfier du brief).
+
 ### Ce que les maquettes ont fait sortir, et qui n'était pas su
 
 Trois constats sont nés du dessin lui-même, en confrontant le vocabulaire aux
@@ -1947,16 +1981,21 @@ pour chaque entrée ce qu'elle coûte, ce qu'elle rapporte et quand la faire.
 
 ## Decisions en attente
 
-**Cinq, toutes ouvertes par la phase 3** *(2026-09-09)*. Les maquettes sont
-rendues ; le plan d'implémentation ne s'écrit pas avant ces réponses.
+**Une seule, et elle est hors du périmètre de la phase 3.**
 
-| # | À trancher | Recommandation |
-|---|---|---|
-| 1 | **La direction du moment de décision** — A « les trois cartes », B « une à la fois », C « la colonne » | **A**, portée aujourd'hui par `Main.dc.html` : la comparaison sans clic, la liste visible dessous, et une fin de tâche visible |
-| 2 | **Le jeu d'états du suivi** — six étapes + `écartée` en sortie, plus quatre issues sur `terminée` | Le garder tel quel : le pipeline et l'issue sont deux axes, les fondre perdrait « sans réponse » contre « refus » |
-| 3 | **Corriger la clé de dédoublonnage, ou seulement replier à l'affichage** (P23) | Replier d'abord, mesurer ensuite. Lire les 64 paires avant de toucher à la clé — c'est la réserve de P14 |
-| 4 | **L'accès à la base** — Edge Function + SPA statique, ou serveur Node local | Edge Function : zéro nouvelle famille de runtime, `service_role` jamais hors de Supabase, et le téléphone devient possible plus tard sans réécrire une ligne. *Question posée, réponse partielle reçue* |
-| 5 | **P21 — désactiver la réflexion du modèle** | Non tranché, et hors du périmètre de la phase 3. Demande une mesure de qualité avant/après sur un échantillon, pas une décision au fil de l'eau |
+**P21 — désactiver la réflexion du modèle.** Elle pèse 65 % de la facture du
+scoring ; la couper ramènerait le coût vers ~7 €/mois. Personne n'a mesuré ce
+que le jugement y perdrait sur du texte français ambigu, qui est précisément la
+tâche pour laquelle Sonnet a été préféré à Haiku. À trancher **avec une mesure
+de qualité avant/après sur un échantillon**, jamais au fil de l'eau.
+
+Les cinq questions ouvertes par les maquettes ont été tranchées le 2026-09-09.
+Quatre le sont dans « Les quatre arbitrages » plus haut : direction A, six
+étapes + sortie + quatre issues, Edge Function + SPA statique, seuil du brief à
+50. La cinquième est **P23** : le tableau de bord replie **à l'affichage**, et
+les 64 paires se lisent **avant** toute décision sur la clé — élargir la clé
+sans les avoir lues risquerait de fusionner deux missions réellement distinctes
+chez un même intermédiaire, qui est la réserve déjà consignée en P14.
 
 Les dernieres tranchees avant la phase 3 : matrice Adzuna en requetes precises
 avec full remote garanti par la requete, `category=it-jobs` conserve comme
