@@ -14,8 +14,10 @@ par la vue `offers_shortlist`. La fonction est déployée et le cron `ft-daily`
 s'exécute **chaque jour à 6 h UTC — 8 h à Marseille, PC éteint**. Chaîne
 vérifiée de bout en bout : Vault, `pg_net`, fonction déployée, écriture en base.
 
-**Adzuna est écrit et testé, pas encore collecté.** Le code est livré et relu ;
-restent la collecte réelle et le déploiement. C'est la tâche en cours.
+**Adzuna collecte.** Backfill de 31 jours réussi : 476 offres, les 11 requêtes
+en HTTP 200, `fetched == total_available` partout et aucune tronquée. La
+sélection passe de 6 à **12 offres**, moitié-moitié entre les deux sources.
+Reste le déploiement et le cron (tâche 12).
 
 ```sql
 select * from offers_shortlist order by score desc, published_at desc;
@@ -23,8 +25,11 @@ select * from offers_shortlist order by score desc, published_at desc;
 
 | Indicateur | Valeur |
 |---|---:|
-| Offres collectées | 700 |
-| Offres retenues (`offers_shortlist`) | 6 |
+| Offres collectées | 1 176 |
+| — dont France Travail | 700 |
+| — dont Adzuna | 476 |
+| Offres retenues (`offers_shortlist`) | **12** |
+| — dont full remote national | 5 |
 | Mentionnant React / TypeScript / Next.js | 47 |
 | Mentionnant LLM / IA / agents | 67 |
 | En full remote | 9 |
@@ -52,7 +57,7 @@ select * from offers_shortlist order by score desc, published_at desc;
 | — | Classification du télétravail + repli département | ✅ |
 | — | Vue `offers_shortlist` | ✅ |
 | 10 | Déploiement France Travail + cron quotidien | ✅ |
-| **11** | **Adzuna : client, mapper, orchestration** | **code livré et relu ; collecte réelle à faire** |
+| 11 | Adzuna : client, mapper, orchestration + **collecte réelle** | ✅ *(re-revue à refaire, voir ci-dessous)* |
 | **12** | **Déploiement Adzuna + cron** | **à faire** (secrets déjà poussés) |
 
 Chaque tâche a été relue par un agent distinct, sur conformité au cahier des
@@ -140,18 +145,51 @@ Non déclenché sur les collectes réelles — `fetched` égalait `total_availab
 sur les 24 requêtes, et de nouveau sur le run du cron — mais le défaut reste
 dans le code. Le client Adzuna, lui, renseigne désormais `truncated`.
 
+### P8 — La troncature bride la sélection : 76 full remote pour 3 retenues
+
+**C'est le problème le plus rentable à résoudre.** Adzuna rend 76 offres en full
+remote, mais 3 seulement entrent dans `offers_shortlist`. La cause n'est pas la
+collecte : elle est que la vue exige `core_hits >= 1`, donc que le lexique voie
+« React » dans un texte coupé à 500 caractères avant la stack. Sur 476 offres
+Adzuna, **7 seulement ont un `core_hits`**.
+
+Relâcher `core_hits` pour Adzuna a été mesuré et **ne marche pas** : les 15
+offres ainsi admises comprennent « Business Developer Assurance », « Sales »,
+« UX designer » et « Senior Data Engineer ». La requête `adzuna:remote:fr-dev`
+est trop large — le lemmatiseur d'Adzuna fait correspondre « développeur » à
+« Business Developer ».
+
+*Piste, à arbitrer* : la confiance doit être **par requête**, pas par source.
+`fr-react` et `fr-ts` sont précises et ancrées à une techno (13 et 17 offres sur
+31 jours) ; `it-jobs` et `fr-dev` sont des filets. Les distinguer exige de
+retenir **quelle requête a trouvé l'offre** — une colonne de plus sur `offers`,
+renseignée par la provenance, qui se peuplerait à la collecte suivante.
+
 ### P5 — Signal local mince, et ce n'est pas un défaut d'outillage
 
-6 offres retenues sur 700. Adzuna ne changera pas l'échelle localement, contre
-ce qu'on espérait : les deux sources concordent, le marché React marseillais est
-réellement petit et dominé par Angular et Java. **Le gisement exploitable est
-national et full remote**, ce qui pèse sur la phase 2.
+Le marché React marseillais est réellement petit : `React TypeScript` rend **5**
+offres sur 31 jours à Marseille, `Next.js` en rend 2. Les deux sources
+concordent, le local est dominé par Angular et Java. **Le gisement exploitable
+est national et full remote** — 76 offres côté Adzuna contre 9 côté France
+Travail — ce qui pèse sur la phase 2 et rend P8 prioritaire.
 
-### P6 — Dédoublonnage inter-sources absent
+### P6 — Dédoublonnage inter-sources absent, et désormais actif
 
 `unique (source, external_id)` empêche les doublons **dans** une source, pas
-entre sources. Dès que la collecte Adzuna tournera, une même offre pourra
-figurer deux fois. Première dette à payer en phase 2.
+entre sources. Les deux sources alimentent maintenant la base : le problème
+n'est plus théorique. Première dette à payer en phase 2.
+
+### P9 — La re-revue de la tâche 11 n'a pas eu lieu
+
+Les six constats de revue ont été corrigés (commit `2c678d5`) mais le relecteur
+a été coupé par une limite de session avant de rendre son verdict. Le diff
+l'attend dans `.superpowers/sdd/review-983e858..2c678d5.diff`.
+
+Ce qui a été vérifié à la place, par exécution : `verify` vert à 115 tests, et
+neuf contrôles de comportement sur le code réel, dont un appel HTTP véritable.
+Deux réserves du correcteur restent non arbitrées : une conversion
+`as readonly string[]` subsistant dans une garde de type, et l'ordre de la
+fixture reconstruite.
 
 ### P7 — La Corse s'encode de deux façons
 
