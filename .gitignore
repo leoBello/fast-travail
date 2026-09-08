@@ -8,4 +8,9 @@ dist/
 supabase/.branches/
 supabase/.temp/
 *.log
+
+# Exports de la selection : des donnees, regenerables par une requete SQL.
+# Ils portent des noms d'entreprises et des liens d'offres, ils n'ont rien a
+# faire dans l'historique.
+*.csv
 .superpowers/

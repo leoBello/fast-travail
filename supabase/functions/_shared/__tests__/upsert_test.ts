@@ -5,10 +5,16 @@ import type { DbClient } from '../db.ts';
 
 /**
  * Faux client : reproduit uniquement les deux chaînes d'appels que upsertOffers utilise.
- *  - select('external_id').eq('source', s).in('external_id', ids)
+ *  - select('external_id, seen_count').eq('source', s).in('external_id', ids)
  *  - upsert(rows, { onConflict })
+ *
+ * `seenCounts` permet de simuler une offre déjà vue plusieurs fois ; par défaut une
+ * offre connue a été vue une fois, ce qui est l'état d'une offre collectée hier.
  */
-function fakeDb(known: string[]): { db: DbClient; upserted: unknown[][] } {
+function fakeDb(
+  known: string[],
+  seenCounts: Record<string, number> = {},
+): { db: DbClient; upserted: unknown[][] } {
   const upserted: unknown[][] = [];
   const db = {
     from(_table: string) {
@@ -20,7 +26,7 @@ function fakeDb(known: string[]): { db: DbClient; upserted: unknown[][] } {
                 in(_col2: string, ids: string[]) {
                   const data = ids
                     .filter((id) => known.includes(id))
-                    .map((id) => ({ external_id: id }));
+                    .map((id) => ({ external_id: id, seen_count: seenCounts[id] ?? 1 }));
                   return Promise.resolve({ data, error: null });
                 },
               };
@@ -102,8 +108,48 @@ Deno.test('upsertOffers préserve un raw déjà renseigné', async () => {
   const offer = emptyOffer('france_travail', 'A2', 'Dev TS');
   offer.raw = { id: 'A2', intitule: 'Dev TS' };
 
-  await upsertOffers(db, offer ? [offer] : []);
+  await upsertOffers(db, [offer]);
 
   const row = (upserted[0] as Record<string, unknown>[])[0];
   assertEquals(row.raw, { id: 'A2', intitule: 'Dev TS' });
+});
+
+Deno.test('upsertOffers démarre seen_count à 1 pour une offre inconnue', async () => {
+  const { db, upserted } = fakeDb([]);
+
+  await upsertOffers(db, [emptyOffer('france_travail', 'N1', 'Dev React')]);
+
+  const row = (upserted[0] as Record<string, unknown>[])[0];
+  assertEquals(row.seen_count, 1);
+});
+
+Deno.test("upsertOffers incrémente seen_count d'une offre déjà vue", async () => {
+  // L'offre B1 a déjà été vue 4 fois : une collecte de plus doit la porter à 5.
+  // C'est ce compteur qui distingue une offre fraîche d'une annonce qui traîne
+  // depuis des semaines — un poste dur à pourvoir, ou republié en boucle.
+  const { db, upserted } = fakeDb(['B1'], { B1: 4 });
+
+  await upsertOffers(db, [emptyOffer('france_travail', 'B1', 'Dev React')]);
+
+  const row = (upserted[0] as Record<string, unknown>[])[0];
+  assertEquals(row.seen_count, 5);
+});
+
+Deno.test('upsertOffers compte séparément le seen_count de chaque offre du lot', async () => {
+  // Régression : un compteur global, ou celui de la première offre appliqué à
+  // tout le lot, passerait les deux tests précédents sans être correct.
+  const { db, upserted } = fakeDb(['B1', 'B2'], { B1: 4, B2: 11 });
+
+  await upsertOffers(db, [
+    emptyOffer('france_travail', 'B1', 'Dev React'),
+    emptyOffer('france_travail', 'B2', 'Dev TS'),
+    emptyOffer('france_travail', 'N9', 'Dev Next'),
+  ]);
+
+  const rows = upserted[0] as Record<string, unknown>[];
+  assertEquals(rows.map((r) => [r.external_id, r.seen_count]), [
+    ['B1', 5],
+    ['B2', 12],
+    ['N9', 1],
+  ]);
 });

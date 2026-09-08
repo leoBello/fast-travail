@@ -29,15 +29,24 @@ export async function upsertOffers(
   const source = rows[0].source;
   const ids = rows.map((r) => r.external_id);
 
+  // `seen_count` est lu ici, et pas seulement `external_id`, parce qu'un upsert
+  // supabase-js écrase les colonnes qu'on lui donne : il ne sait pas exprimer un
+  // `seen_count = seen_count + 1` côté SQL. On incrémente donc en JavaScript, à
+  // partir de la valeur qu'on vient de relire. Le SELECT existait déjà pour
+  // compter new/updated : la colonne supplémentaire ne coûte pas un aller-retour.
   const { data: existing, error: selectError } = await db
     .from('offers')
-    .select('external_id')
+    .select('external_id, seen_count')
     .eq('source', source)
     .in('external_id', ids);
 
   if (selectError) throw new Error(`lecture des offres connues : ${selectError.message}`);
 
-  const known = new Set((existing ?? []).map((r: { external_id: string }) => r.external_id));
+  const known = new Map(
+    (existing ?? []).map((
+      r: { external_id: string; seen_count: number | null },
+    ) => [r.external_id, r.seen_count ?? 1]),
+  );
 
   const payload = rows.map((offer) => ({
     ...offer,
@@ -45,6 +54,17 @@ export async function upsertOffers(
     // on garantit ici que le contrat SQL est respecté quel que soit le mapper.
     raw: offer.raw ?? {},
     last_seen_at: new Date().toISOString(),
+    // Combien de collectes ont vu cette offre. Une offre qui traîne depuis des
+    // semaines a un compte élevé : signe d'un poste difficile à pourvoir, ou
+    // d'une annonce republiée en boucle. Le design le promettait ; le code ne
+    // l'écrivait pas, et la colonne restait figée à 1 pour toutes les offres.
+    //
+    // Lecture puis écriture, donc non atomique : deux collectes simultanées sur
+    // la même offre n'incrémenteraient que d'un. Les deux crons sont espacés
+    // d'une demi-heure pour des exécutions de 11 et 17 secondes, et une source
+    // ne se collecte jamais en parallèle d'elle-même — le compte est donc juste
+    // en pratique, et une sous-estimation n'induit personne en erreur.
+    seen_count: (known.get(offer.external_id) ?? 0) + 1,
   }));
 
   const { error: upsertError } = await db

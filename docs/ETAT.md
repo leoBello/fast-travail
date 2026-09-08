@@ -34,8 +34,8 @@ select * from offers_shortlist order by score desc, published_at desc;
 | Offres retenues (`offers_shortlist`) | **31** |
 | — dont locales (13, 83, 84) | 19 |
 | — dont full remote national | 12 |
-| Mentionnant React / TypeScript / Next.js | 47 |
-| Mentionnant LLM / IA / agents | 67 |
+| Mentionnant React / TypeScript / Next.js | 54 |
+| Mentionnant LLM / IA / agents | 63 |
 | En full remote | 9 |
 | Requêtes France Travail actives | 24 sur 38 |
 | Requêtes Adzuna actives | 11 sur 11 |
@@ -223,6 +223,28 @@ qui aurait accepté « toString » comme mode de télétravail. Testé.
 Il jugeait la seconde réserve du correcteur non fondée : l'ordre de la fixture
 n'affaiblit pas le test, qui asserte aussi `external_id` et `title` — un
 décalage futur échouerait explicitement au lieu de passer en silence.
+
+### ~~`seen_count` ne s'incrémentait jamais~~ *(résolu)*
+
+Le design promettait un `seen_count = seen_count + 1` à chaque collecte, présenté
+comme un signal gratuit pour repérer les annonces qui traînent — poste dur à
+pourvoir, ou offre republiée en boucle. Le code ne l'écrivait pas : mesuré, les
+**1 176 offres avaient `seen_count = 1`** alors que les **1 176 avaient été
+revues** au moins une fois (`last_seen_at <> first_seen_at`). Colonne morte, et
+rien ne le consignait : un usage de phase 2 s'y serait fié en recevant un signal
+faux et silencieux.
+
+La cause : un upsert supabase-js écrase les colonnes qu'on lui passe, il ne sait
+pas exprimer un incrément SQL. L'incrément se fait donc en JavaScript, à partir
+de la valeur relue — et le `SELECT` existait déjà pour compter new/updated, donc
+la colonne supplémentaire ne coûte pas un aller-retour. Non atomique par nature,
+ce qui est sans effet ici : une source ne se collecte jamais en parallèle
+d'elle-même, et les deux crons sont espacés d'une demi-heure pour des
+exécutions de 11 et 17 secondes.
+
+Les offres déjà en base repartent de 1 : l'historique des passages passés est
+perdu, il n'avait jamais été écrit. Le comptage devient juste à partir de la
+prochaine collecte.
 
 ### P7 — La Corse s'encode de deux façons
 

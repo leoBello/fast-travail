@@ -1,9 +1,14 @@
 {
-  // Deno n'est activé QUE sur supabase/functions/. Le reste du dépôt reste en
-  // Node/TypeScript classique, pour que le futur dashboard Next.js à la racine
-  // ne soit pas analysé par le serveur Deno.
+  // Deno n'est activé QUE sur supabase/functions/ et scripts/. Le reste du dépôt
+  // reste en Node/TypeScript classique, pour que le futur dashboard Next.js à la
+  // racine ne soit pas analysé par le serveur Deno.
+  //
+  // scripts/ contient des scripts Deno qui importent le code partagé des Edge
+  // Functions (backfill-remap.ts lit _shared/db.ts et le mapper France Travail) :
+  // sans lui, l'éditeur signalerait sur ces fichiers des erreurs qui n'existent
+  // pas, et `npm run verify` les couvre désormais.
   "deno.enable": false,
-  "deno.enablePaths": ["supabase/functions"],
+  "deno.enablePaths": ["supabase/functions", "scripts"],
   "deno.config": "supabase/functions/deno.json",
   "deno.lint": true,
 
