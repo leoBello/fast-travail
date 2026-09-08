@@ -37,8 +37,8 @@
 -- France Travail — attendu, aucune requete France Travail n'est `anchored`).
 -- Aucune des 31 offres precedentes n'est sortie (verifie par intersection).
 -- Sur les 38 offres ajoutees, comptees a la main : 3 franchement pertinentes,
--- 23 adjacentes, 12 hors sujet. Le detail figure dans le rapport de tache 3
--- (.superpowers/sdd/task-3-report.md), qui sert de matiere a la tache 4 —
+-- 23 adjacentes, 12 hors sujet. Le detail figure dans docs/ETAT.md, section
+-- "Resultat mesure (tache 4, corrige par sa revue)". La tache 4 y a releve —
 -- notamment un doute concret sur `adzuna:remote:fr-react` et
 -- `adzuna:local:javascript`, dont plusieurs resultats n'ont aucun rapport
 -- avec le developpement (Lead Product Marketing Manager, Accompagnateur
