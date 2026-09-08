@@ -52,7 +52,25 @@ export interface ScoringSummary {
   writeFailures: number;
 }
 
-const MAX_TOKENS = 1024;
+// Mesure du 2026-09-08 sur 1 269 appels reels avec MAX_TOKENS = 1024 :
+// 75 offres (5,9 %) ont echoue, toutes avec un JSON coupe en plein milieu ou
+// (8 cas extremes) sans aucun bloc de texte. Releve en base sur les 1 194
+// appels reussis : sortie moyenne 411 tokens, MAIS maximum exactement 1 024 —
+// le plafond, atteint au token pres. La cause : `claude-sonnet-5` emet un
+// bloc `thinking` AVANT le bloc `text`, et les deux puisent dans le MEME
+// budget de sortie ; un appel qui reflechit beaucoup epuise les 1 024 tokens
+// avant d'avoir fini son JSON, y compris pour des offres a description
+// COURTE (923 caracteres en moyenne pour les echecs, contre 1 412 pour les
+// reussites — ce n'est donc pas une question de taille d'offre).
+//
+// 8192 (x8) laisse une marge large : ~20x la sortie utile moyenne, et une
+// reflexion qui epuiserait meme ce budget serait un cas tres different de
+// ceux mesures (le pire cas observe consommait exactement l'ancien plafond
+// de 1024, jamais plus). Un plafond plus haut que necessaire ne coute rien
+// tant qu'il n'est pas atteint : Claude facture les tokens PRODUITS, pas le
+// plafond declare — voir claude.ts pour la detection du cas ou meme ce
+// budget elargi serait insuffisant (`stop_reason: "max_tokens"`).
+const MAX_TOKENS = 8192;
 
 /** Taille d'une tranche d'ecriture. Une coupure ne coute alors au plus que
  * cette tranche, jamais le lot entier — voir le commentaire sur `flushChunk`

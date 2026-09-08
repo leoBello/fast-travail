@@ -116,3 +116,67 @@ Deno.test('leve ClaudeApiError si le bloc de texte est present mais vide', async
 
   await assertRejects(() => callClaudeStructured({ ...cfg, fetchImpl }, call), ClaudeApiError);
 });
+
+Deno.test('signale la troncature quand stop_reason vaut max_tokens et le JSON est coupe', async () => {
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          stop_reason: 'max_tokens',
+          content: [{ type: 'text', text: '{"fit_score": 80, "verdict": "bon profil' }],
+          usage: {},
+        }),
+        { status: 200 },
+      ),
+    );
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.message.includes('tronqu'), true);
+  assertEquals(error.message.includes('max_tokens'), true);
+});
+
+Deno.test(
+  'signale la troncature (pas « sans bloc de texte ») quand stop_reason vaut max_tokens sans aucun texte',
+  async () => {
+    const fetchImpl = () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ stop_reason: 'max_tokens', content: [], usage: {} }),
+          { status: 200 },
+        ),
+      );
+
+    const error = await assertRejects(
+      () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+      ClaudeApiError,
+    );
+    assertEquals(error.message.includes('tronqu'), true);
+    assertEquals(error.message.includes('sans bloc de texte'), false);
+  },
+);
+
+Deno.test(
+  'garde l erreur de serialisation existante quand stop_reason vaut end_turn et le JSON est malforme',
+  async () => {
+    const fetchImpl = () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            stop_reason: 'end_turn',
+            content: [{ type: 'text', text: 'pas du json' }],
+            usage: {},
+          }),
+          { status: 200 },
+        ),
+      );
+
+    const error = await assertRejects(
+      () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+      ClaudeApiError,
+    );
+    assertEquals(error.message.includes('sortie structuree illisible'), true);
+  },
+);

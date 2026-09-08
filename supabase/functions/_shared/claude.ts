@@ -67,6 +67,7 @@ interface AnthropicContentBlock {
 
 interface AnthropicResponse {
   content?: AnthropicContentBlock[];
+  stop_reason?: string;
   usage?: {
     input_tokens?: number;
     output_tokens?: number;
@@ -112,10 +113,22 @@ export async function callClaudeStructured<T>(
     throw new ClaudeApiError(`reponse Claude illisible : ${String(cause)}`, response.status);
   }
 
-  // Mesure du 2026-09-08 sur claude-sonnet-5 : la reponse peut porter un bloc
-  // `thinking` AVANT le bloc `text` dans `content`. On selectionne donc par
-  // son `type`, jamais par sa position (`content[0].text` casserait le
-  // scoring en silence des qu'un appel pense avant de repondre).
+  // Mesure du 2026-09-08 sur 1 269 appels reels : 75 (5,9 %) echouaient avec
+  // un JSON coupe en plein milieu, ou meme sans aucun bloc de texte. La cause
+  // est un plafond de sortie trop bas (voir MAX_TOKENS dans run-scoring.ts) :
+  // `claude-sonnet-5` emet un bloc `thinking` AVANT le bloc `text`, et les
+  // deux puisent dans le MEME budget de sortie — quand la reflexion en
+  // consomme trop, le JSON s'arrete au milieu, ou n'a jamais commence.
+  // L'API le dit sans ambiguite via `stop_reason: "max_tokens"` : verifier
+  // ce cas AVANT de chercher un bloc de texte ou de tenter le JSON.parse
+  // evite de faire passer une troncature de budget pour un JSON malforme.
+  if (payload.stop_reason === 'max_tokens') {
+    throw new ClaudeApiError(
+      'reponse tronquee : le plafond de max_tokens a ete atteint',
+      response.status,
+    );
+  }
+
   const textBlock = payload.content?.find((block) => block.type === 'text');
   if (textBlock === undefined) {
     throw new ClaudeApiError('reponse Claude sans bloc de texte', response.status);
