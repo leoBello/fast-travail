@@ -1988,7 +1988,7 @@ git add supabase/functions/_scrapers/free-work/
 git commit -m "feat(free-work): listing trie par date, details par JSON-LD"
 ```
 
-Expected : 9 tests de plus, `verify` vert.
+Expected : 14 tests de plus, `verify` vert.
 
 **Ce qu'il ne faut PAS faire :** ne pas extraire de titre, d'entreprise ou de
 salaire du listing. Ne pas paralléliser les requêtes de détail. Ne pas filtrer
@@ -2699,9 +2699,47 @@ function flag(args: string[], name: string): boolean {
   return args.includes(`--${name}`);
 }
 
+/**
+ * Valeur d'un `--flag`, ou `null` si le flag est absent. Un flag *présent*
+ * mais sans valeur — dernier argument, ou suivi immédiatement d'un autre
+ * `--flag` — est une faute de frappe, pas une demande de valeur par défaut :
+ * ça doit échouer bruyamment plutôt que de se comporter comme si le flag
+ * n'avait jamais été donné.
+ */
 function option(args: string[], name: string): string | null {
   const index = args.indexOf(`--${name}`);
-  return index >= 0 && index + 1 < args.length ? args[index + 1] : null;
+  if (index < 0) return null;
+  const value = index + 1 < args.length ? args[index + 1] : undefined;
+  if (value === undefined || value.startsWith('--')) {
+    throw new Error(`--${name} exige une valeur`);
+  }
+  return value;
+}
+
+/**
+ * Comme `option`, mais la valeur doit appartenir à `accepted` — sinon échec
+ * bruyant nommant la valeur fautive et les valeurs acceptées.
+ *
+ * Un `--mode` mal orthographié ne doit JAMAIS retomber silencieusement sur la
+ * valeur par défaut : `--mode backfil` lancerait une collecte de trois jours
+ * pendant que l'opérateur croit en faire une de trente et un, sans que rien
+ * dans la sortie ne le démente. C'est la forme exacte du faux succès que ce
+ * dépôt a déjà payée deux fois.
+ */
+function enumOption<T extends string>(
+  args: string[],
+  name: string,
+  accepted: readonly T[],
+  fallback: T,
+): T {
+  const value = option(args, name);
+  if (value === null) return fallback;
+  if (!accepted.includes(value as T)) {
+    throw new Error(
+      `--${name} invalide : « ${value} » n'est pas reconnu ; attendu ${accepted.join(' ou ')}`,
+    );
+  }
+  return value as T;
 }
 
 function requireEnv(host: ScraperEnvironment, name: string): string {
@@ -2715,8 +2753,8 @@ export async function runScraperMain(
   host: ScraperEnvironment,
   deps: ScraperDependencies = {},
 ): Promise<number> {
-  const mode: CollectionMode = option(host.args, 'mode') === 'backfill' ? 'backfill' : 'delta';
-  const trigger: RunTrigger = option(host.args, 'trigger') === 'cron' ? 'cron' : 'manual';
+  const mode: CollectionMode = enumOption(host.args, 'mode', ['delta', 'backfill'] as const, 'delta');
+  const trigger: RunTrigger = enumOption(host.args, 'trigger', ['manual', 'cron'] as const, 'manual');
   const dryRun = flag(host.args, 'dry-run');
   const onlyLabel = option(host.args, 'query');
 
@@ -2805,7 +2843,7 @@ git add supabase/functions/_scrapers/_shared/main-runner.ts supabase/functions/_
 git commit -m "feat(scrapers): lanceur commun, robots verifie a chaque execution"
 ```
 
-Expected : 9 tests de plus, `verify` vert.
+Expected : 14 tests de plus, `verify` vert.
 
 **Ce qu'il ne faut PAS faire :** aucun `Deno.*` dans ce fichier — c'est
 précisément ce que `ScraperEnvironment` évite. Ne pas ajouter d'option de ligne
