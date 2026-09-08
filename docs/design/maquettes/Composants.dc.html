@@ -1,0 +1,280 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --accent: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sect { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; margin-bottom: 13px; }
+    .note { margin: 12px 0 0; font-size: 11px; color: var(--faint); line-height: 1.55; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .badge.sm { height: 19px; padding: 0 7px; font-size: 10px; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-accent { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-dash { background: transparent; border-style: dashed; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; font-weight: 500; }
+    .btn-p { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+    .btn-d { border-color: rgba(255,122,133,0.35); color: #ffa8b0; }
+    .btn-sm { height: 28px; padding: 0 11px; font-size: 12px; border-radius: 8px; }
+    .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-family: var(--mono); border: 1px solid var(--border2); color: var(--muted); white-space: nowrap; }
+    .chip-pos { color: #86e3c1; border-color: rgba(79,209,165,0.28); background: rgba(79,209,165,0.08); }
+    .chip-neg { color: #ffa8b0; border-color: rgba(255,122,133,0.28); background: rgba(255,122,133,0.08); }
+    .chip-nil { color: var(--faint); border-style: dashed; }
+    .swatch { height: 44px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: flex-end; padding: 5px 7px; }
+    .swatchN { font-family: var(--mono); font-size: 9.5px; }
+    .absent { color: var(--faint); font-style: italic; font-size: 12.5px; }
+    .tip { position: relative; display: inline-flex; }
+    .tip > .tipBody {
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: #030509; border: 1px solid var(--border2); color: var(--text);
+      padding: 7px 10px; border-radius: 8px; font-size: 11.5px; line-height: 1.4; width: max-content; max-width: 210px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.55); z-index: 40;
+    }
+    .tipK { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; display: block; margin-bottom: 2px; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 1200px; background: var(--bg); overflow: hidden; padding: 24px 26px">
+
+  <div style="margin-bottom: 18px">
+    <h1 style="font-size: 22px">Vocabulaire d&rsquo;interface</h1>
+    <p style="margin: 5px 0 0; color: var(--muted); font-size: 12.5px">Chaque piece existe pour dire un etat. Aucune n&rsquo;est decorative, et rien ne se dessine hors de cette planche.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px">
+
+    <!-- fondations couleur -->
+    <div class="sect">
+      <div class="sectT">Fondations &mdash; couleur</div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px">
+        <div class="swatch" style="background: #0b0d12"><span class="swatchN" style="color: var(--muted)">#0b0d12</span></div>
+        <div class="swatch" style="background: #14171f"><span class="swatchN" style="color: var(--muted)">#14171f</span></div>
+        <div class="swatch" style="background: #232936"><span class="swatchN" style="color: var(--muted)">#232936</span></div>
+        <div class="swatch" style="background: #6d92ff"><span class="swatchN" style="color: #0b0d12">#6d92ff</span></div>
+        <div class="swatch" style="background: #4fd1a5"><span class="swatchN" style="color: #0b0d12">#4fd1a5</span></div>
+        <div class="swatch" style="background: #a78bfa"><span class="swatchN" style="color: #0b0d12">#a78bfa</span></div>
+        <div class="swatch" style="background: #f0b45c"><span class="swatchN" style="color: #0b0d12">#f0b45c</span></div>
+        <div class="swatch" style="background: #ff7a85"><span class="swatchN" style="color: #0b0d12">#ff7a85</span></div>
+        <div class="swatch" style="background: #98a1b4"><span class="swatchN" style="color: #0b0d12">#98a1b4</span></div>
+      </div>
+      <p class="note">Reprises telles quelles de <span class="num">theme.css</span>. Le gris de texte secondaire est a <span class="num">#98a1b4</span>&nbsp;: il mesure 4,5:1 sur la surface, la la ou l&rsquo;ancien <span class="num">#6b7280</span> tombait a 3,6:1.</p>
+    </div>
+
+    <!-- fondations typo -->
+    <div class="sect">
+      <div class="sectT">Fondations &mdash; typographie</div>
+      <div style="font-family: var(--display); font-size: 25px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15">Bricolage Grotesque</div>
+      <div style="font-size: 11px; color: var(--faint); margin-bottom: 11px">Titres et grands nombres &middot; 600 / 700</div>
+      <div style="font-size: 17px; font-weight: 500">Instrument Sans</div>
+      <div style="font-size: 11px; color: var(--faint); margin-bottom: 11px">Interface et copie &middot; 400 / 500 / 600</div>
+      <div class="num" style="font-size: 16px">100 &middot; 86,5 &middot; 450 &euro;/j</div>
+      <div style="font-size: 11px; color: var(--faint)">JetBrains Mono &middot; rangs, correspondances, TJM, durees</div>
+      <p class="note">Tout chiffre comparable d&rsquo;une ligne a l&rsquo;autre passe en chasse fixe&nbsp;: sans elle les deux colonnes de score ne s&rsquo;alignent pas.</p>
+    </div>
+
+    <!-- LES DEUX SCORES -->
+    <div class="sect" style="border-color: var(--border2)">
+      <div class="sectT">Le couple de scores</div>
+      <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 11px">
+        <div style="display: flex; align-items: baseline; gap: 7px">
+          <span class="num" style="font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: -0.03em; line-height: 1">79</span>
+          <span style="font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.07em">rang</span>
+        </div>
+        <div style="width: 1px; height: 26px; background: var(--border)"></div>
+        <div style="display: flex; align-items: baseline; gap: 6px">
+          <span class="num" style="font-size: 17px; font-weight: 600; color: var(--amber)">42</span>
+          <span style="font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.07em">corresp.</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 5px">
+        <span class="chip chip-pos">+15 remote</span>
+        <span class="chip chip-pos">+12 freelance</span>
+        <span class="chip chip-pos">+10 agentique</span>
+        <span class="chip chip-neg">&minus;15 technos</span>
+        <span class="chip chip-nil">0 fraicheur</span>
+      </div>
+      <p class="note"><strong style="color: var(--muted)">Les deux nombres vont toujours ensemble.</strong> Le rang est reglable et gratuit&nbsp;; la correspondance est figee et a ete payee. Une offre a <span class="num">42</span> de correspondance et <span class="num">79</span> de rang dit &laquo;&nbsp;stack moyenne, mais coche toutes tes preferences&nbsp;&raquo; &mdash; un seul nombre confondrait ce cas avec son inverse.</p>
+    </div>
+
+    <!-- statuts du suivi -->
+    <div class="sect">
+      <div class="sectT">Les six etapes du suivi, et la sortie</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <span class="badge b-mute"><span class="dot"></span>A traiter</span>
+        <span class="badge b-accent"><span class="dot"></span>Retenue</span>
+        <span class="badge b-violet"><span class="dot"></span>Postulee</span>
+        <span class="badge b-amber"><span class="dot"></span>Relancee</span>
+        <span class="badge b-mint"><span class="dot"></span>Entretien</span>
+        <span class="badge b-mute"><span class="dot"></span>Terminee</span>
+        <span class="badge b-rose b-dash">Ecartee</span>
+      </div>
+      <p class="note">Chaque pastille porte un point <strong style="color: var(--muted)">et</strong> un mot&nbsp;: la couleur n&rsquo;est jamais le seul indicateur. &laquo;&nbsp;Ecartee&nbsp;&raquo; est la seule en trait discontinu &mdash; c&rsquo;est une <strong style="color: var(--muted)">sortie</strong> possible a tout moment, pas la septieme etape d&rsquo;un parcours.</p>
+    </div>
+
+    <!-- issues -->
+    <div class="sect">
+      <div class="sectT">Les quatre issues d&rsquo;une candidature terminee</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <span class="badge b-mint"><span class="dot"></span>Offre recue</span>
+        <span class="badge b-rose"><span class="dot"></span>Refus</span>
+        <span class="badge b-mute"><span class="dot"></span>Sans reponse</span>
+        <span class="badge b-mute"><span class="dot"></span>Desistement</span>
+      </div>
+      <p class="note">L&rsquo;issue est un <strong style="color: var(--muted)">second axe</strong>, pas une etape de plus. &laquo;&nbsp;Sans reponse&nbsp;&raquo; et &laquo;&nbsp;Refus&nbsp;&raquo; se ressemblent a l&rsquo;usage mais ne disent pas la meme chose sur une entreprise&nbsp;: les confondre couterait l&rsquo;information au moment de relancer.</p>
+    </div>
+
+    <!-- badges de fait -->
+    <div class="sect">
+      <div class="sectT">Badges de fait</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px">
+        <span class="badge b-accent"><span class="dot"></span>Full remote</span>
+        <span class="badge b-mute"><span class="dot"></span>Hybride</span>
+        <span class="badge b-mute"><span class="dot"></span>Sur site</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px">
+        <span class="badge b-mint"><span class="dot"></span>Freelance</span>
+        <span class="badge b-mute"><span class="dot"></span>CDI</span>
+        <span class="badge b-mute"><span class="dot"></span>CDD</span>
+        <span class="badge b-violet"><span class="dot"></span>IA / agents</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+        <span class="badge b-mint"><span class="dot"></span>Confiance haute</span>
+        <span class="badge b-mute"><span class="dot"></span>Moyenne</span>
+        <span class="badge b-amber"><span class="dot"></span>Basse</span>
+      </div>
+      <p class="note">Un fait se rend par un badge, jamais par une phrase coloree. <strong style="color: var(--muted)">La confiance basse n&rsquo;est pas un doute sur l&rsquo;offre</strong>&nbsp;: elle dit que le modele a juge sur un texte coupe. Elle est donc en ambre, pas en rouge.</p>
+    </div>
+
+    <!-- LES ABSENCES -->
+    <div class="sect" style="grid-column: span 2; border-color: var(--border2)">
+      <div class="sectT">Sept absences, sept rendus &mdash; toutes mesurees en base</div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px 22px">
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="absent" style="width: 168px; flex: none">non publie par la source</span>
+          <span style="font-size: 11.5px; color: var(--muted)">employeur absent de l&rsquo;annonce &mdash; l&rsquo;annonce existe, le champ non</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="absent" style="width: 168px; flex: none">non precise</span>
+          <span style="font-size: 11.5px; color: var(--muted)">lieu ou seniorite que le modele n&rsquo;a pas degages du texte</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="badge sm b-amber b-dash" style="flex: none">Non detectable &mdash; texte coupe</span>
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num">295</span> offres&nbsp;: stack vide <strong style="color: var(--text)">parce que</strong> Adzuna coupe a 500 car.</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="badge sm b-mute b-dash" style="flex: none">Aucune techno reconnue</span>
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num">244</span> offres&nbsp;: texte <strong style="color: var(--text)">complet</strong>, et rien de technique dedans</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="chip chip-nil" style="flex: none">salaire non publie</span>
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num">568</span> offres sans montant &mdash; un zero de bonus, pas un zero d&rsquo;euros</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="badge sm b-amber b-dash" style="flex: none">unite incertaine</span>
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num">102</span> montants ne sont pas annuels &mdash; le nombre existe, son unite non</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="badge sm b-mute b-dash" style="flex: none">Hors perimetre &mdash; jamais lue</span>
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num">2 877</span> offres collectees que l&rsquo;IA n&rsquo;a pas lues&nbsp;: pas &laquo;&nbsp;mal notee&nbsp;&raquo;</span>
+        </div>
+
+        <div style="display: flex; align-items: baseline; gap: 10px">
+          <span class="badge sm b-rose b-dash" style="flex: none">Jugement en echec</span>
+          <span style="font-size: 11.5px; color: var(--muted)">l&rsquo;appel a echoue&nbsp;: aujourd&rsquo;hui <span class="num">0</span>, et il faut que ca se voie si ca change</span>
+        </div>
+      </div>
+
+      <p class="note"><strong style="color: var(--muted)">&laquo;&nbsp;Pas encore&nbsp;&raquo; n&rsquo;est pas &laquo;&nbsp;jamais&nbsp;&raquo;, et &laquo;&nbsp;vide&nbsp;&raquo; n&rsquo;est pas &laquo;&nbsp;zero&nbsp;&raquo;.</strong> Les deux premieres lignes se ressemblent et disent deux choses differentes&nbsp;; les deux suivantes ont exactement le meme rendu de donnee (<span class="num">stack = []</span>) pour deux causes opposees, et c&rsquo;est la seule raison pour laquelle elles ont deux badges. Une case vide les confondrait toutes les sept.</p>
+    </div>
+
+    <!-- actions -->
+    <div class="sect">
+      <div class="sectT">Actions</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px">
+        <button class="btn btn-p">Garder</button>
+        <button class="btn">Ecarter</button>
+        <button class="btn btn-d">Retirer</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <button class="btn btn-sm">Tri&nbsp;: rang</button>
+        <button class="btn btn-sm">Filtres</button>
+        <button class="btn" style="width: 34px; padding: 0" aria-label="Ouvrir l annonce d origine">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+        </button>
+      </div>
+      <p class="note">Une action primaire par ecran, les autres en contour. Le lien vers l&rsquo;annonce d&rsquo;origine porte toujours l&rsquo;icone de sortie&nbsp;: il quitte l&rsquo;application.</p>
+    </div>
+
+    <!-- infobulle -->
+    <div class="sect">
+      <div class="sectT">Infobulle</div>
+      <div style="display: flex; justify-content: center; padding: 46px 0 8px">
+        <span class="tip">
+          <span class="tipBody">
+            <span class="tipK">Confiance basse</span>
+            Adzuna ne restitue que les 500 premiers caracteres. Le modele a juge sur ce debut, et avait interdiction d&rsquo;en conclure un rejet.
+          </span>
+          <span class="badge b-amber"><span class="dot"></span>Confiance basse</span>
+        </span>
+      </div>
+      <p class="note">L&rsquo;infobulle porte le <strong style="color: var(--muted)">pourquoi</strong>, jamais ce dont la decision depend. Ce qui decide est sur la carte&nbsp;; ce qui explique peut attendre le survol.</p>
+    </div>
+
+    <!-- vides -->
+    <div class="sect">
+      <div class="sectT">Trois vides, trois causes</div>
+      <div style="display: flex; flex-direction: column; gap: 9px">
+        <div style="border: 1px dashed var(--border2); border-radius: 10px; padding: 11px">
+          <div style="font-size: 12.5px; font-weight: 600">Rien a decider ce matin</div>
+          <div style="font-size: 11.5px; color: var(--muted); margin-top: 2px">Les six offres du jour sont traitees. C&rsquo;est le resultat normal du travail fait.</div>
+        </div>
+        <div style="border: 1px dashed var(--border2); border-radius: 10px; padding: 11px">
+          <div style="font-size: 12.5px; font-weight: 600">Aucune candidature encore</div>
+          <div style="font-size: 11.5px; color: var(--muted); margin-top: 2px">La premiere que vous marquerez postulee demarrera la serie.</div>
+        </div>
+        <div style="border: 1px dashed rgba(255,122,133,0.4); border-radius: 10px; padding: 11px">
+          <div style="font-size: 12.5px; font-weight: 600; color: #ffa8b0">La collecte de ce matin n&rsquo;a pas tourne</div>
+          <div style="font-size: 11.5px; color: var(--muted); margin-top: 2px">Derniere reussite hier a 6 h 30. La liste ci-dessous date d&rsquo;hier.</div>
+        </div>
+      </div>
+      <p class="note">Un vide se nomme et dit <strong style="color: var(--muted)">pourquoi</strong>. Le premier est un succes, le deuxieme un debut, le troisieme une panne&nbsp;: trois rendus, jamais une zone blanche.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

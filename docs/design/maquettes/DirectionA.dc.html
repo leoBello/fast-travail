@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488; --accent: #6d92ff;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .ph { background: var(--surface3); border-radius: 3px; }
+    .box { border: 1px solid var(--border2); border-radius: 10px; }
+    .note { margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.55; }
+  </style>
+</helmet>
+
+<div style="width: 640px; height: 520px; background: var(--bg); overflow: hidden; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+
+  <div>
+    <h1 style="font-size: 17px">A &mdash; Les trois cartes</h1>
+    <p class="note" style="margin-top: 4px">La journee se voit d&rsquo;un coup. On compare avant de trancher.</p>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 9px">
+
+    <div style="display: flex; align-items: center; gap: 8px">
+      <span class="ph" style="width: 74px; height: 11px"></span>
+      <div style="flex-grow: 1"></div>
+      <span class="ph" style="width: 96px; height: 6px"></span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px">
+      <div class="box" style="padding: 10px; display: flex; flex-direction: column; gap: 7px; height: 176px">
+        <div style="display: flex; align-items: baseline; gap: 6px">
+          <span class="num" style="font-family: var(--display); font-size: 21px; font-weight: 700">100</span>
+          <span class="num" style="font-size: 12px; color: var(--muted)">90</span>
+        </div>
+        <span class="ph" style="width: 100%; height: 8px"></span>
+        <span class="ph" style="width: 66%; height: 8px"></span>
+        <div style="display: flex; gap: 4px">
+          <span class="ph" style="width: 42px; height: 13px; border-radius: 999px"></span>
+          <span class="ph" style="width: 34px; height: 13px; border-radius: 999px"></span>
+        </div>
+        <span class="ph" style="width: 100%; height: 5px"></span>
+        <span class="ph" style="width: 88%; height: 5px"></span>
+        <span class="ph" style="width: 54%; height: 5px"></span>
+        <div style="flex-grow: 1"></div>
+        <div style="display: flex; gap: 5px">
+          <span class="box" style="flex-grow: 1; height: 22px"></span>
+          <span style="flex-grow: 1; height: 22px; border-radius: 10px; background: var(--accent)"></span>
+        </div>
+      </div>
+
+      <div class="box" style="padding: 10px; display: flex; flex-direction: column; gap: 7px; height: 176px">
+        <div style="display: flex; align-items: baseline; gap: 6px">
+          <span class="num" style="font-family: var(--display); font-size: 21px; font-weight: 700">100</span>
+          <span class="num" style="font-size: 12px; color: var(--muted)">88</span>
+        </div>
+        <span class="ph" style="width: 92%; height: 8px"></span>
+        <span class="ph" style="width: 50%; height: 8px"></span>
+        <div style="display: flex; gap: 4px">
+          <span class="ph" style="width: 42px; height: 13px; border-radius: 999px"></span>
+          <span class="ph" style="width: 28px; height: 13px; border-radius: 999px"></span>
+        </div>
+        <span class="ph" style="width: 100%; height: 5px"></span>
+        <span class="ph" style="width: 76%; height: 5px"></span>
+        <span class="ph" style="width: 62%; height: 5px"></span>
+        <div style="flex-grow: 1"></div>
+        <div style="display: flex; gap: 5px">
+          <span class="box" style="flex-grow: 1; height: 22px"></span>
+          <span style="flex-grow: 1; height: 22px; border-radius: 10px; background: var(--accent)"></span>
+        </div>
+      </div>
+
+      <div class="box" style="padding: 10px; display: flex; flex-direction: column; gap: 7px; height: 176px">
+        <div style="display: flex; align-items: baseline; gap: 6px">
+          <span class="num" style="font-family: var(--display); font-size: 21px; font-weight: 700">95</span>
+          <span class="num" style="font-size: 12px; color: var(--muted)">85</span>
+        </div>
+        <span class="ph" style="width: 100%; height: 8px"></span>
+        <span class="ph" style="width: 44%; height: 8px"></span>
+        <div style="display: flex; gap: 4px">
+          <span class="ph" style="width: 42px; height: 13px; border-radius: 999px"></span>
+          <span class="ph" style="width: 30px; height: 13px; border-radius: 999px"></span>
+        </div>
+        <span class="ph" style="width: 96%; height: 5px"></span>
+        <span class="ph" style="width: 82%; height: 5px"></span>
+        <span class="ph" style="width: 40%; height: 5px"></span>
+        <div style="flex-grow: 1"></div>
+        <div style="display: flex; gap: 5px">
+          <span class="box" style="flex-grow: 1; height: 22px"></span>
+          <span style="flex-grow: 1; height: 22px; border-radius: 10px; background: var(--accent)"></span>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-top: 1px dashed var(--border2); padding-top: 9px; display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; align-items: center; gap: 9px"><span class="num" style="font-size: 11px; width: 24px">94</span><span class="ph" style="flex-grow: 1; height: 6px"></span></div>
+      <div style="display: flex; align-items: center; gap: 9px"><span class="num" style="font-size: 11px; width: 24px">90</span><span class="ph" style="flex-grow: 1; height: 6px"></span></div>
+      <div style="display: flex; align-items: center; gap: 9px"><span class="num" style="font-size: 11px; width: 24px">89</span><span class="ph" style="flex-grow: 1; height: 6px"></span></div>
+    </div>
+  </div>
+
+  <p class="note" style="border-top: 1px solid var(--border); padding-top: 11px">
+    <strong style="color: var(--muted)">Pour&nbsp;:</strong> les trois meilleures se comparent sans clic, et la liste reste visible dessous.
+    <strong style="color: var(--muted)">Contre&nbsp;:</strong> le verdict est tronque a trois lignes, et six offres demandent une pagination.
+  </p>
+</div>
+</x-dc>
+</body>
+</html>

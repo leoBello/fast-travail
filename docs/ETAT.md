@@ -1,11 +1,12 @@
 # État d'avancement et reste à faire
 
-**Dernière mise à jour** : 2026-09-08
-**Branche de travail** : `scoring-ia-phase2`
+**Dernière mise à jour** : 2026-09-09
+**Branche de travail** : `tableau-de-bord-phase3`
 
 Reste à faire, priorités et coûts : [`RESTE-A-FAIRE.md`](RESTE-A-FAIRE.md)
 
 Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUDE.md`](../CLAUDE.md)
+Règles de conception de l'interface : [`design/GUIDELINES.md`](design/GUIDELINES.md)
 
 ---
 
@@ -1096,10 +1097,113 @@ le seul inventaire versionné de la configuration, donc une réinstallation
 
 ---
 
-## Phases 3 à 5
+## Phase 3 — Tableau de bord *(en cours, maquettes rendues le 2026-09-09)*
 
-Pas commencées. Voir [`ROADMAP.md`](ROADMAP.md) : tableau de bord, génération
-de CV et lettres, suivi des candidatures.
+Première phase à avoir une interface. Tout ce qui précède se consulte en SQL.
+
+**Aucun code écrit à ce stade, et c'est délibéré** : le brainstorming et les
+maquettes précèdent le plan d'implémentation.
+
+Règles de conception : [`design/GUIDELINES.md`](design/GUIDELINES.md),
+contraignant. Maquettes et statut de leurs données :
+[`design/maquettes/README.md`](design/maquettes/README.md).
+Canvas : <https://claude.ai/code/artifact/be80ac9f-af1b-4490-b2ce-b7813a4ea393>
+
+### Les décisions déjà tranchées
+
+| Décision | Ce qui l'a tranchée |
+|---|---|
+| **Écran du matin = « le brief du jour »** | Une liste finie qu'on termine, puis toute la veille en dessous. La boucle qui se vide est la seule mécanique de motivation qui repose sur un fait |
+| **La liste ne masque rien par défaut** | 1 269 offres triées par rang, seuil réglable à la main. Un filtre par défaut est exactement ce qui fait disparaître une offre |
+| **Les deux scores s'affichent toujours ensemble** | `fit` figé et payé, `final` réglable et gratuit : deux natures. Une offre à `fit` 42 / `final` 79 dit l'inverse d'une offre à `fit` 90 / `final` 89 |
+| **Quatre mécaniques de gamification, toutes fondées sur un fait** | La boucle qui se vide, la série de jours avec candidature envoyée, l'entonnoir, le compteur anti-perte. Aucun XP, aucun niveau, aucun badge de palier |
+| **Le réglage des poids existe, mais pas sur l'écran du matin** | Action rare à effet global. À côté de la liste, elle inviterait à bricoler le classement au lieu de décider sur les offres |
+| **Framer Motion, pas GSAP** | Le besoin est du réordonnancement de liste, que `layout` et `AnimatePresence` font en déclaratif. GSAP gagne sur les timelines et le canvas, dont il n'y a rien ici |
+| **Le kit vient de prospeo, tel quel** | Tokens, trois familles typographiques, anatomie du `Badge`. Le contraste y a déjà été mesuré — `--color-text-muted` y est passé de 3,60:1 à 4,5:1 |
+
+### Ce que les maquettes ont fait sortir, et qui n'était pas su
+
+Trois constats sont nés du dessin lui-même, en confrontant le vocabulaire aux
+données réelles. C'est l'argument le plus concret en faveur de la règle « une
+maquette avant le code ».
+
+**1. `offers_scored` ne dédoublonne pas, et la clé rate des doublons
+évidents.** 1 269 lignes pour 1 211 groupes, mais **deux paires manifestes dans
+le top 14** — ALLEGIS GROUP et Digistrat consulting, chacune vue par Adzuna et
+Free-Work, chacune dans son propre groupe avec `dup_count = 1`. Mesuré sur tout
+le périmètre : **64 paires** portent un titre normalisé et une société
+identiques sans être groupées, soit **79 lignes en trop**. Consigné en P23.
+
+**2. Un doublon doit s'élire par confiance, pas par score.** La mission ALLEGIS
+est jugée **deux fois**, et le classement met en tête le jugement le **moins**
+informé :
+
+| Source | Texte | `fit` | Confiance | Rémunération extraite |
+|---|---|---:|---|---|
+| Adzuna | tronqué à 500 car. | **75** | basse | `salaire` 450–530 — faux |
+| Free-Work | intégral | **58** | haute | `tjm` 450 — juste |
+
+Celui qui n'a lu que 500 caractères a été **plus généreux** que celui qui a lu
+l'annonce entière, dont le verdict est nettement plus précis (« NestJS est
+explicitement indispensable et absent du CV »). D'où l'ordre d'élection retenu :
+confiance, puis longueur de description, puis `final_score`, puis `published_at`,
+puis `id`.
+
+**Effet de bord qui vaut mieux qu'un correctif** : le rapprochement des deux
+annonces **tranche l'unité de P22**. Adzuna étiquetait ces 450 € en `salaire`
+annuel, Free-Work en TJM. P22 se résout donc à l'affichage sur les offres
+vues deux fois, sans toucher au prompt ni repayer un jugement.
+
+**3. Deux totaux identiques, deux ensembles différents — le piège évité de
+justesse.** 539 offres ont une `stack` vide ; 539 offres sont en confiance
+basse. Écrire « `stack` vide = texte tronqué » était tentant et **faux** :
+
+| | Compté |
+|---|---:|
+| `stack` vide **et** confiance basse | 295 |
+| `stack` vide, confiance **haute** | 244 |
+| Confiance basse, `stack` renseignée | 244 |
+
+Ce sont donc **deux absences de causes opposées** — « non détectable, texte
+coupé » contre « aucune techno reconnue » — qui auraient reçu le même rendu.
+La requête de contrôle est dans `design/GUIDELINES.md` §3.1.
+
+### Les mesures qui gouvernent l'interface — 2026-09-09
+
+Recomptées en base. Elles bougent à chaque collecte : **les remesurer**.
+
+| Mesure | Valeur |
+|---|---:|
+| Offres jugées | 1 269 |
+| — à 70 ou plus | 17 |
+| — au-dessus de 50 | 61 |
+| — à 40 ou plus | 126 |
+| Score moyen | **14,1** |
+| `work_mode` **nul** | **863** (68 %) |
+| `domain` — valeurs distinctes | **960** sur 1 269 |
+| `stack` vide | 539 (295 + 244, voir plus haut) |
+| Sans montant de rémunération | 568 |
+| Montants d'unité douteuse (P22) | 102 sur 599 |
+| Hors périmètre, jamais lues par l'IA | 2 877 |
+| Longueur des verdicts | 86 à 327 car., médiane ~167 |
+| Historique de `first_seen_at` | **2 jours** — tout le reste est du backfill |
+
+**Deux de ces nombres interdisent un composant chacun.**
+
+`domain` à **960 valeurs distinctes** est du texte libre du modèle : il
+s'affiche, il ne se facette **jamais**. Une liste de filtres par domaine aurait
+960 entrées.
+
+`first_seen_at` à **deux jours** rend le compteur « N nouvelles aujourd'hui »
+inconstructible : 3 446 offres ont été vues pour la première fois le même jour.
+Il afficherait 833 aujourd'hui puis ~70 demain sans que rien n'ait changé. Le
+remplacement — « 6 offres à décider », comptées sans décision enregistrée — ne
+dépend d'aucun historique et sera encore vrai dans six mois. C'est le cas
+d'école du §3.3 des règles de conception.
+
+### Ce qui reste à trancher
+
+Voir « Décisions en attente » en bas de ce document.
 
 ---
 
@@ -1678,6 +1782,44 @@ fausse. C'est suffisant pour le classement, et faux comme donnée.
 `PROMPT_VERSION`, donc fait **repayer les 1 269 jugements**. À grouper avec la
 prochaine évolution du prompt qui les repaiera de toute façon — jamais seul.
 
+**Atténuation trouvée en phase 3, gratuite** : quand la même offre est vue par
+deux sources, le rapprochement tranche l'unité — voir P23 et la section
+« Phase 3 ». Ça ne couvre que les offres vues deux fois, mais ça ne coûte rien.
+
+### P23 — `offers_scored` ne dédoublonne pas, et la clé rate des paires évidentes
+
+**Trouvé le 2026-09-09**, en dessinant l'écran du matin : deux paires de
+doublons manifestes occupent quatre des quatorze premières lignes du
+classement.
+
+| Offre | Adzuna | Free-Work | Groupes |
+|---|---:|---:|---|
+| ALLEGIS GROUP — « Developpeur React/Node/NestJS » | 90,0 | 86,5 | **distincts**, `dup_count = 1` chacun |
+| Digistrat consulting — « Développeur Full stack REACT/C# » | 94,0 | 85,5 | **distincts**, `dup_count = 1` chacun |
+
+Mesure d'ensemble sur le périmètre jugé : **64 paires** portent un titre
+normalisé et une société identiques sans partager de groupe, soit **79 lignes
+en trop** sur 1 269. Six pour cent du corpus, mais bien davantage en tête de
+liste — et l'écran est la ressource rare.
+
+**Deux problèmes distincts, à ne pas confondre** :
+
+1. **La vue ne replie pas.** `offers_shortlist` dédoublonne dans la sélection ;
+   `offers_scored` ne le fait pas du tout. C'était sans conséquence tant que
+   personne ne regardait la vue autrement qu'avec un `limit 40` en SQL.
+2. **La clé rate ces paires.** Elles échappent au rapprochement existant alors
+   que titre et société sont identiques à la normalisation près.
+
+**Ce qui est décidé** : le tableau de bord replie **à l'affichage**, sur titre
+normalisé + société, et **élit par confiance** (voir « Phase 3 »). Ça ne demande
+aucune migration et ça règle le symptôme visible tout de suite.
+
+**Ce qui reste ouvert** : faut-il corriger la clé elle-même ? L'avantage serait
+que `offers_shortlist` et toute analyse future en profitent. Le risque est
+qu'une clé plus lâche fusionne deux missions réellement distinctes chez un même
+intermédiaire — c'est exactement la réserve de P14. À trancher sur mesure, pas
+sur intuition : lire les 64 paires avant de toucher à la clé.
+
 ---
 
 ## Mineurs consignés
@@ -1805,13 +1947,24 @@ pour chaque entrée ce qu'elle coûte, ce qu'elle rapporte et quand la faire.
 
 ## Decisions en attente
 
-Aucune. Les dernieres tranchees : matrice Adzuna en requetes precises avec full
-remote garanti par la requete, `category=it-jobs` conserve comme filet en
-premiere position d'ecriture, `angular` et `java` a +1 en contexte, `cobol` en
-signal rouge. Et pour ce chantier : un ensemble de requetes plutot qu'un
-scalaire, `adzuna:local:javascript` maintenue `anchored` malgre sa majorite de
-hors sujet, son declassement coutant 5 offres adjacentes sans autre voie
-d'entree.
+**Cinq, toutes ouvertes par la phase 3** *(2026-09-09)*. Les maquettes sont
+rendues ; le plan d'implémentation ne s'écrit pas avant ces réponses.
+
+| # | À trancher | Recommandation |
+|---|---|---|
+| 1 | **La direction du moment de décision** — A « les trois cartes », B « une à la fois », C « la colonne » | **A**, portée aujourd'hui par `Main.dc.html` : la comparaison sans clic, la liste visible dessous, et une fin de tâche visible |
+| 2 | **Le jeu d'états du suivi** — six étapes + `écartée` en sortie, plus quatre issues sur `terminée` | Le garder tel quel : le pipeline et l'issue sont deux axes, les fondre perdrait « sans réponse » contre « refus » |
+| 3 | **Corriger la clé de dédoublonnage, ou seulement replier à l'affichage** (P23) | Replier d'abord, mesurer ensuite. Lire les 64 paires avant de toucher à la clé — c'est la réserve de P14 |
+| 4 | **L'accès à la base** — Edge Function + SPA statique, ou serveur Node local | Edge Function : zéro nouvelle famille de runtime, `service_role` jamais hors de Supabase, et le téléphone devient possible plus tard sans réécrire une ligne. *Question posée, réponse partielle reçue* |
+| 5 | **P21 — désactiver la réflexion du modèle** | Non tranché, et hors du périmètre de la phase 3. Demande une mesure de qualité avant/après sur un échantillon, pas une décision au fil de l'eau |
+
+Les dernieres tranchees avant la phase 3 : matrice Adzuna en requetes precises
+avec full remote garanti par la requete, `category=it-jobs` conserve comme
+filet en premiere position d'ecriture, `angular` et `java` a +1 en contexte,
+`cobol` en signal rouge. Et pour le chantier de confiance : un ensemble de
+requetes plutot qu'un scalaire, `adzuna:local:javascript` maintenue `anchored`
+malgre sa majorite de hors sujet, son declassement coutant 5 offres adjacentes
+sans autre voie d'entree.
 
 ---
 

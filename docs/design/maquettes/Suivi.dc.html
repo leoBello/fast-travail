@@ -1,0 +1,289 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --accent: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sect { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .badge.sm { height: 19px; padding: 0 7px; font-size: 10px; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-accent { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-dash { background: transparent; border-style: dashed; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; font-weight: 500; }
+    .btn-sm { height: 28px; padding: 0 11px; font-size: 12px; border-radius: 8px; }
+    .col { background: #090b0f; border: 1px solid var(--border); border-radius: 12px; padding: 11px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .colH { display: flex; align-items: center; gap: 7px; }
+    .tk { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .tkT { font-size: 12px; font-weight: 600; line-height: 1.3; }
+    .tkM { font-size: 11px; color: var(--muted); }
+    .note { margin: 0; font-size: 11px; color: var(--faint); line-height: 1.55; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 940px; background: var(--bg); overflow: hidden; padding: 22px 24px; display: flex; flex-direction: column; gap: 15px">
+
+  <div style="display: flex; align-items: flex-end; gap: 16px">
+    <div>
+      <h1 style="font-size: 22px">Mes candidatures</h1>
+      <p style="margin: 4px 0 0; font-size: 12.5px; color: var(--muted)">Ce que la veille a produit, et ou chaque piste en est.</p>
+    </div>
+    <div style="flex-grow: 1"></div>
+    <button class="btn">Voir la veille
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </div>
+
+  <!-- ============ L'ENTONNOIR : ce que la machine a fait cette nuit ============ -->
+  <div class="sect">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
+      <span class="sectT">Cette nuit, pendant que le PC etait eteint</span>
+      <div style="flex-grow: 1"></div>
+      <span style="font-size: 11.5px; color: var(--faint)">collecte 6 h &amp; 6 h 30 &middot; jugement 7 h</span>
+    </div>
+
+    <div style="display: flex; align-items: stretch; gap: 4px">
+
+      <div style="flex-grow: 4; display: flex; flex-direction: column; gap: 7px">
+        <div style="height: 40px; border-radius: 8px 4px 4px 8px; background: var(--surface3); display: flex; align-items: center; padding: 0 13px">
+          <span class="num" style="font-family: var(--display); font-size: 19px; font-weight: 700">4 146</span>
+        </div>
+        <span style="font-size: 11px; color: var(--muted); padding-left: 2px">collectees en tout</span>
+      </div>
+
+      <div style="flex-grow: 3; display: flex; flex-direction: column; gap: 7px">
+        <div style="height: 40px; border-radius: 4px; background: rgba(109,146,255,0.22); border: 1px solid rgba(109,146,255,0.4); display: flex; align-items: center; padding: 0 13px">
+          <span class="num" style="font-family: var(--display); font-size: 19px; font-weight: 700; color: #a9c2ff">1 269</span>
+        </div>
+        <span style="font-size: 11px; color: var(--muted); padding-left: 2px">a portee, donc lues par l&rsquo;IA</span>
+      </div>
+
+      <div style="flex-grow: 2; display: flex; flex-direction: column; gap: 7px">
+        <div style="height: 40px; border-radius: 4px; background: rgba(167,139,250,0.22); border: 1px solid rgba(167,139,250,0.42); display: flex; align-items: center; padding: 0 13px">
+          <span class="num" style="font-family: var(--display); font-size: 19px; font-weight: 700; color: #c4b5fd">61</span>
+        </div>
+        <span style="font-size: 11px; color: var(--muted); padding-left: 2px">au-dessus de 50</span>
+      </div>
+
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px">
+        <div style="height: 40px; border-radius: 4px; background: rgba(79,209,165,0.22); border: 1px solid rgba(79,209,165,0.42); display: flex; align-items: center; padding: 0 13px">
+          <span class="num" style="font-family: var(--display); font-size: 19px; font-weight: 700; color: #86e3c1">12</span>
+        </div>
+        <span style="font-size: 11px; color: var(--muted); padding-left: 2px">retenues</span>
+      </div>
+
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px">
+        <div style="height: 40px; border-radius: 4px 8px 8px 4px; background: rgba(79,209,165,0.35); border: 1px solid rgba(79,209,165,0.6); display: flex; align-items: center; padding: 0 13px">
+          <span class="num" style="font-family: var(--display); font-size: 19px; font-weight: 700; color: #86e3c1">5</span>
+        </div>
+        <span style="font-size: 11px; color: var(--muted); padding-left: 2px">postulees</span>
+      </div>
+    </div>
+
+    <p class="note" style="margin-top: 13px; border-top: 1px solid var(--border); padding-top: 11px">
+      Les trois premiers nombres sont comptes en base. Les deux derniers viennent de vos decisions&nbsp;: ils valent <span class="num">0</span> tant que vous n&rsquo;avez rien retenu, et l&rsquo;entonnoir le dit plutot que de s&rsquo;effondrer.
+    </p>
+  </div>
+
+  <div style="display: flex; gap: 15px; flex-grow: 1; min-height: 0">
+
+    <!-- ============ LE PIPELINE ============ -->
+    <div style="flex-grow: 1; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px">
+
+      <div class="col">
+        <div class="colH">
+          <span class="badge sm b-accent"><span class="dot"></span>Retenue</span>
+          <div style="flex-grow: 1"></div>
+          <span class="num" style="font-size: 12px; color: var(--muted)">12</span>
+        </div>
+
+        <div class="tk">
+          <span class="tkT">Senior Fullstack Engineer</span>
+          <span class="tkM">Katchme</span>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap">
+            <span class="badge sm b-mint">Freelance</span>
+            <span class="badge sm b-accent">Remote</span>
+          </div>
+        </div>
+
+        <div class="tk">
+          <span class="tkT">Ingenieur Agentique FullStack</span>
+          <span class="tkM">FIGARO CLASSIFIEDS</span>
+          <div style="display: flex; gap: 4px; flex-wrap: wrap">
+            <span class="badge sm b-violet">IA</span>
+            <span class="badge sm b-accent">Remote</span>
+          </div>
+        </div>
+
+        <div class="tk" style="opacity: 0.55">
+          <span class="tkT">Developpeur React / Node / NestJS</span>
+          <span class="tkM">ALLEGIS GROUP</span>
+        </div>
+
+        <div style="font-size: 11px; color: var(--faint); text-align: center; padding-top: 2px">+ 9 autres</div>
+      </div>
+
+      <div class="col">
+        <div class="colH">
+          <span class="badge sm b-violet"><span class="dot"></span>Postulee</span>
+          <div style="flex-grow: 1"></div>
+          <span class="num" style="font-size: 12px; color: var(--muted)">5</span>
+        </div>
+
+        <div class="tk">
+          <span class="tkT">Developpeur Front-End React Senior</span>
+          <span class="tkM">MICHAEL PAGE</span>
+          <span class="tkM" style="color: var(--faint)">envoyee il y a <span class="num">3</span> j</span>
+        </div>
+
+        <!-- relance due : un fait calculable, pas une invention -->
+        <div class="tk" style="border-color: rgba(240,180,92,0.4)">
+          <span class="tkT">Senior Full-Stack Developer</span>
+          <span class="tkM">ematiss</span>
+          <div style="display: flex; align-items: center; gap: 6px">
+            <span class="badge sm b-amber">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              relance due
+            </span>
+            <span class="tkM" style="color: var(--faint)"><span class="num">9</span> j</span>
+          </div>
+        </div>
+
+        <div class="tk" style="opacity: 0.55">
+          <span class="tkT">Developpeur Full Stack (H/F)</span>
+          <span class="tkM">Agence intuition</span>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="colH">
+          <span class="badge sm b-amber"><span class="dot"></span>Relancee</span>
+          <div style="flex-grow: 1"></div>
+          <span class="num" style="font-size: 12px; color: var(--muted)">2</span>
+        </div>
+
+        <div class="tk">
+          <span class="tkT">Developpeur Full stack REACT/C#</span>
+          <span class="tkM">Digistrat consulting</span>
+          <span class="tkM" style="color: var(--faint)">relancee il y a <span class="num">2</span> j</span>
+        </div>
+
+        <div class="tk" style="opacity: 0.55">
+          <span class="tkT">Senior Software Engineer</span>
+          <span class="tkM">Tenacy</span>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="colH">
+          <span class="badge sm b-mint"><span class="dot"></span>Entretien</span>
+          <div style="flex-grow: 1"></div>
+          <span class="num" style="font-size: 12px; color: var(--muted)">1</span>
+        </div>
+
+        <div class="tk" style="border-color: rgba(79,209,165,0.4)">
+          <span class="tkT">Developpeur Front-end React / TypeScript</span>
+          <span class="tkM">employeur non publie</span>
+          <span class="tkM" style="color: #86e3c1">jeudi 14 h</span>
+        </div>
+
+        <!-- un vide nomme, au milieu d'une colonne qui en a un seul -->
+        <div style="border: 1px dashed var(--border2); border-radius: 10px; padding: 12px; text-align: center; margin-top: 2px">
+          <div style="font-size: 11.5px; color: var(--muted)">Rien d&rsquo;autre en attente</div>
+          <div style="font-size: 11px; color: var(--faint); margin-top: 2px">Les <span class="num">5</span> candidatures envoyees n&rsquo;ont pas encore repondu.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LA SERIE + L'ANTI-PERTE ============ -->
+    <div style="width: 268px; flex: none; display: flex; flex-direction: column; gap: 11px">
+
+      <!-- la serie : un fait, le geste qui compte -->
+      <div class="sect" style="padding: 15px">
+        <div class="sectT" style="margin-bottom: 12px">Serie</div>
+        <div style="display: flex; align-items: baseline; gap: 9px">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f0b45c" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="serie en cours"><path d="M12 2c1.5 4 5 5.5 5 9.5a5 5 0 0 1-10 0C7 8.5 9 7 9.5 5.5 10.5 7 11 8 12 8c0-2-1-4 0-6z"/></svg>
+          <span class="num" style="font-family: var(--display); font-size: 38px; font-weight: 700; letter-spacing: -0.03em; line-height: 1">3</span>
+          <span style="font-size: 12.5px; color: var(--muted)">jours de suite</span>
+        </div>
+
+        <div style="display: flex; gap: 4px; margin-top: 14px" role="img" aria-label="candidature envoyee lundi mardi mercredi, pas jeudi ni vendredi">
+          <div style="flex-grow: 1; text-align: center">
+            <div style="height: 26px; border-radius: 6px; background: rgba(240,180,92,0.30); border: 1px solid rgba(240,180,92,0.5)"></div>
+            <span style="font-size: 10px; color: var(--faint)">L</span>
+          </div>
+          <div style="flex-grow: 1; text-align: center">
+            <div style="height: 26px; border-radius: 6px; background: rgba(240,180,92,0.30); border: 1px solid rgba(240,180,92,0.5)"></div>
+            <span style="font-size: 10px; color: var(--faint)">M</span>
+          </div>
+          <div style="flex-grow: 1; text-align: center">
+            <div style="height: 26px; border-radius: 6px; background: rgba(240,180,92,0.30); border: 1px solid rgba(240,180,92,0.5)"></div>
+            <span style="font-size: 10px; color: var(--faint)">M</span>
+          </div>
+          <div style="flex-grow: 1; text-align: center">
+            <div style="height: 26px; border-radius: 6px; border: 1px dashed var(--border2)"></div>
+            <span style="font-size: 10px; color: var(--faint)">J</span>
+          </div>
+          <div style="flex-grow: 1; text-align: center">
+            <div style="height: 26px; border-radius: 6px; border: 1px dashed var(--border2)"></div>
+            <span style="font-size: 10px; color: var(--faint)">V</span>
+          </div>
+        </div>
+
+        <p class="note" style="margin-top: 12px">Compte les jours avec au moins une candidature <strong style="color: var(--muted)">envoyee</strong>. Lire des offres ne la maintient pas &mdash; c&rsquo;est voulu.</p>
+      </div>
+
+      <!-- l'anti-perte : le critere fondateur du depot, rendu visible -->
+      <div class="sect" style="padding: 15px; border-color: rgba(240,180,92,0.32)">
+        <div class="sectT" style="margin-bottom: 12px">Jamais ouvertes</div>
+        <div style="display: flex; align-items: baseline; gap: 9px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f0b45c" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-label="offres jamais ouvertes"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="num" style="font-family: var(--display); font-size: 38px; font-weight: 700; letter-spacing: -0.03em; line-height: 1">23</span>
+          <span style="font-size: 12.5px; color: var(--muted)">au-dessus de 50</span>
+        </div>
+        <p class="note" style="margin-top: 12px">Une offre affichee en trop se repere d&rsquo;un coup d&rsquo;&oelig;il&nbsp;; une offre jamais affichee est perdue. Ce nombre descend a <span class="num">0</span> quand vous avez tout regarde.</p>
+        <button class="btn btn-sm" style="width: 100%; margin-top: 11px">Les parcourir</button>
+      </div>
+
+      <div style="flex-grow: 1"></div>
+
+      <div class="sect" style="padding: 13px 15px">
+        <div style="display: flex; align-items: center; gap: 9px">
+          <span class="num" style="font-size: 15px; font-weight: 700">1 / 5</span>
+          <span style="font-size: 11.5px; color: var(--muted)">reponses recues</span>
+        </div>
+        <p class="note" style="margin-top: 7px">Trop peu d&rsquo;envois pour en tirer un taux. Le chiffre s&rsquo;affiche brut jusqu&rsquo;a <span class="num">20</span> candidatures.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
