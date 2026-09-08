@@ -59,12 +59,25 @@ que les recopier — c'est une requête, pas une archive.
 | Requêtes Adzuna actives | 11 sur 11 |
 | Jobs cron actifs | 2 |
 | Termes au lexique | 67 |
-| Tests | 128 verts |
+| Tests | 209 verts *(recompté le 2026-09-08 en clôture du plan B ; couvre aussi Free-Work et Collective)* |
 
 La ligne qui compte est la quatrième depuis le bas du bloc de sélection :
 **34 des 65 offres retenues n'ont ni `core_hits` ni `ai_hits`**. Sans la
 confiance par requête, elles seraient invisibles — c'est plus de la moitié de
 la liste quotidienne.
+
+**Les compteurs d'offres et de sélection de ce tableau datent d'avant le plan
+B et ne couvrent que les deux API.** Depuis, Free-Work et Collective.work
+alimentent la base elles aussi, et les deux tournent seules par Planificateur
+Windows en plus des deux crons `pg_cron`. Le compte à quatre sources,
+recompté en base le 2026-09-08 en clôture du plan B, est dans « Phase 1 —
+Plan B » plus bas : **3 184 offres collectées, 82 retenues**. Les deux
+rangées « Mentionnant React / TypeScript / Next.js » et « Mentionnant LLM /
+IA / agents » ci-dessus restent telles quelles pour la même raison : ce sont
+des mesures datées de la clôture du plan confiance-par-requête, sur les 1 296
+offres API d'alors, et elles n'ont pas été refaites sur les 3 184 offres
+actuelles — les recompter serait une tâche à part, pas une simple mise à jour
+de nombre.
 
 ---
 
@@ -245,11 +258,53 @@ immédiat sur les offres déjà collectées, `offers_shortlist` étant une vue.
 
 ## Phase 1 — Plan B : deux scrapers, et non quatre
 
-**Planifié le 2026-09-08, contre des pages réelles capturées d'abord. Pas
-encore implémenté.** Plan :
+**Terminé le 2026-09-08.** Plan :
 [`plans/2026-09-08-plan-b-scrapers-free-work-collective.md`](superpowers/plans/2026-09-08-plan-b-scrapers-free-work-collective.md),
-douze tâches. Les fixtures — quatre pages Free-Work, une page Collective, deux
-`robots.txt` — sont commitées sous `supabase/functions/_scrapers/`.
+douze tâches, toutes livrées. Les fixtures — quatre pages Free-Work, une page
+Collective, deux `robots.txt` — sont commitées sous `supabase/functions/_scrapers/`.
+
+| # | Tâche | État |
+|---|---|---|
+| 1 | Migration : les deux sources scrapées et leurs requêtes | ✅ |
+| 2 | Socle réseau — politesse et `robots.txt` | ✅ |
+| 3 | Socle d'extraction — JSON-LD, `__NEXT_DATA__` et texte | ✅ |
+| 4 | Réglages de source — lire `sources`, écrire l'état | ✅ |
+| 5 | Département depuis un nom de commune (zone PACA) | ✅ |
+| 6 | Client Free-Work — listing paginé puis pages de détail | ✅ |
+| 7 | Mapper Free-Work — JSON-LD vers `NormalizedOffer` | ✅ |
+| 8 | Lanceur commun aux deux scrapers | ✅ |
+| 9 | Point d'entrée Free-Work + **première collecte réelle** | ✅ |
+| 10 | Collective.work — client et mapper | ✅ |
+| 11 | Point d'entrée Collective + **collecte réelle** | ✅ |
+| 12 | Planification quotidienne, mesure d'ensemble et documentation | ✅ |
+
+**Planification quotidienne** : `scripts/scrape-daily.cmd` lance les deux
+scrapers en `--mode delta --trigger cron`, déclaré au Planificateur Windows
+sous le nom « fast-travail scrapers », tous les jours à 07 h 15 — après
+`ft-daily` (6 h UTC) et `adzuna-daily` (6 h 30 UTC), pour une sélection
+complète en une fois. Piège vérifié avant commit : le nom d'utilisateur
+(`Léo`) porte un accent, et un accent littéral dans un `.cmd` dépend à la fois
+de l'encodage du fichier et du codepage actif à l'exécution — deux choses qui
+peuvent diverger en silence. Le script utilise donc le nom court 8.3
+(`C:\Users\LO1A5A~1\...`), un alias ASCII stable, pour poser `PATH` avant
+d'appeler `deno` via `npm`. Vérifié : `cmd /c "where deno"` après ce `PATH`
+résout bien `...\WinGet\Links\deno.exe`.
+
+Preuve retenue, la même que pour `pg_cron` au plan A : `schtasks /Run /TN
+"fast-travail scrapers"` puis une lecture de `collection_runs`. Deux lignes
+portent `trigger = 'cron'`, `status = 'success'`, horodatées à la seconde où
+la tâche a tourné :
+
+```
+source      | trigger | status  | offers_new | offers_updated | started_at
+free_work   | cron    | success | 0          | 0              | 2026-09-08 09:52:45+00
+collective  | cron    | success | 1          | 539            | 2026-09-08 09:53:56+00
+```
+
+Contrairement au plan A, le Planificateur Windows ne tourne que **PC allumé**
+— compromis assumé du ROADMAP, documenté dans le script lui-même : les délais
+de politesse et le temps de parcours ne tiennent pas dans les 2 secondes de
+CPU d'une Edge Function.
 
 **La reconnaissance a démenti trois affirmations de ce document.**
 
@@ -296,6 +351,135 @@ structuré : `rate_raw`, nulle depuis le début du projet, cesse d'être morte.
   (`min_delay_ms`, `max_pages_per_run`, `user_agent`, `robots_allows`…), créées
   au plan A et jamais utilisées, deviennent le cinquième axe réglable.
   `robots.txt` est revérifié à **chaque** exécution.
+
+### Mesure d'ensemble, quatre sources — 2026-09-08
+
+Recompté en base à la clôture du plan B, après le run `cron` de preuve
+ci-dessus :
+
+```sql
+select source, count(*) as offres,
+       count(*) filter (where remote_label = 'full') as full_remote,
+       count(*) filter (where department in ('13','83','84')) as zone,
+       count(*) filter (where rate_raw is not null) as avec_tjm,
+       round(avg(length(description))) as desc_moy
+from offers group by source order by source;
+```
+
+| Source | Offres | Full remote | Zone 13/83/84 | Avec TJM | Description moy. |
+|---|---:|---:|---:|---:|---:|
+| adzuna | 557 | 80 | 483 | 0 | 500 |
+| collective¹ | 1 783 | 64 | 73 | 800 | 2 003 |
+| france_travail | 739 | 9 | 440 | 0 | 2 606 |
+| free_work | 105 | 3 | 33 | 34 | 1 684 |
+
+¹ Collective ne couvre que **11 jours** (2026-08-28 au 2026-09-08) là où
+adzuna et france_travail en couvrent 31 (depuis le 2026-08-08) — mesuré le
+2026-09-08 par `min(published_at)`/`max(published_at)` groupé par source. Le
+plafond de pages est corrigé (voir plus bas), mais le backfill qui couvrirait
+réellement les 31 jours n'a pas encore été rejoué.
+| **Total** | **3 184** | | | | |
+
+```sql
+select source, count(*) from offers_shortlist group by source order by source;
+select count(*) as total_shortlist from offers_shortlist;
+```
+
+| Source | Retenues |
+|---|---:|
+| adzuna | 51 |
+| collective | 14 |
+| france_travail | 14 |
+| free_work | 3 |
+| **Total** | **82** |
+
+Sur ces 82, **49 par la zone locale et 33 par le full remote national** — les
+deux catégories s'additionnent exactement au total, aucune offre n'entre par
+les deux à la fois. Et **34 restent des entrées par la seule confiance de
+requête** (`core_hits = 0 and ai_hits = 0`), toutes chez Adzuna — inchangé
+depuis la clôture du plan confiance-par-requête, Free-Work n'ayant plus aucune
+facette `anchored` depuis sa propre mesure (voir plus haut, migration
+`20260908090000`).
+
+**L'écart Free-Work / Adzuna, chiffré** — c'est la mesure qui a décidé du
+classement `net` de Free-Work et qui reste la meilleure illustration de « la
+description entière rend au lexique son rôle de filtre » :
+
+| Source | Description médiane | `core_hits >= 1` |
+|---|---:|---:|
+| adzuna | 500 caractères | 7 sur 557 |
+| free_work | 1 315 caractères | 59 sur 105 |
+
+Adzuna tronque toujours à 500 (médiane et plafond confondus, comme mesuré au
+plan A) ; Free-Work rend une description 2,6 fois plus longue en médiane, et
+le lexique y trouve un signal sur **56 % des offres** contre **1,3 %** côté
+Adzuna. C'est exactement l'écart que la requête `anchored` existe pour
+combler côté Adzuna, et que Free-Work n'a jamais eu besoin de combler.
+
+**Doublons inter-sources — P6 chiffré** :
+
+```sql
+select count(*) as doublons_inter_sources
+from (select lower(title), company_name from offers group by 1, 2 having count(distinct source) > 1) t;
+```
+
+**19 groupes** de titre (normalisé en minuscules) et d'entreprise partagés par
+deux sources ou plus, sur les 3 184 offres — quatre sources désormais, contre
+deux au moment où P6 a été ouvert. Beaucoup d'annonces d'ESN paraissent
+simultanément sur Free-Work et sur France Travail ; c'est la première dette de
+la phase 2 (détail dans « Problèmes ouverts », P6).
+
+**Sémantique de `seen_count` sur les sources scrapées — une différence à ne
+pas manquer.** Sur Free-Work, en mode delta, `needsKnownExternalIds = true` :
+le détail d'une offre déjà connue n'est **pas** repayé, donc son
+`seen_count` n'avance que quand une nouvelle facette la découvre pour la
+première fois dans un run — c'est une passe de **découverte**, pas une
+observation. Mesuré : 99 offres à `seen_count = 1`, 6 à `seen_count = 2`
+(revues par une seconde facette). Sur Collective, `needsKnownExternalIds =
+false` : la page de listing porte les missions entières, donc chaque passage
+du scraper rafraîchit `last_seen_at` et incrémente `seen_count` pour **toute**
+offre revue, exactement comme les deux API. Mesuré : 1 225 à `seen_count = 1`,
+19 à `2`, 40 à `3`, 499 à `4` — quatre runs Collective à ce jour (un delta
+initial, un backfill, puis deux delta), donc la borne à 4 correspond aux
+offres vues aux quatre. Conclusion :
+sur Free-Work, un `seen_count` élevé ne dit rien sur la fraîcheur d'une
+annonce ; sur Collective (et les deux API), il en dit autant que documenté
+plus bas dans ce fichier (« Attention à la sémantique »).
+
+### Le backfill Collective était tronqué — corrigé par migration
+
+`collection_query_results` du run de backfill (`05f6e113-…`) montrait
+`fetched: 1800` sur `total_available: 6597`, `truncated: true` : le plafond de
+60 pages arrêtait la collecte bien avant la fenêtre de 31 jours. Vérifié en
+base : les 1 771 offres alors présentes ne remontaient qu'au 2026-08-28, soit
+**11 jours de fenêtre réelle, pas 31**.
+
+Mesuré avant de trancher, en listant réellement les pages (pas une
+estimation) : la page 90 porte encore des dates du 2026-08-10/11 (dans la
+fenêtre), et la page 92 est la première dont la date la plus récente
+(2026-08-07) précède le début de fenêtre (2026-08-08) — **la frontière des 31
+jours tombe page 92**. Coût d'un plafond couvrant réellement la fenêtre : le
+délai de politesse sépare deux requêtes, pas la première, donc ~99 délais de
+3 000 ms pour 100 pages, soit environ 5 minutes d'horloge — payé une seule
+fois, en mode backfill uniquement. En delta (fenêtre de 3 jours), le run réel
+de ce jour s'est arrêté après 18 pages (540 offres), très en dessous même de
+l'ancien plafond : relever la limite ne coûte donc rien à la collecte
+quotidienne.
+
+**Décision : `max_pages_per_run` de Collective passe de 60 à 100** (migration
+`20260908100000_raise_collective_max_pages.sql`), avec une marge de 8 pages
+au-dessus de la frontière mesurée pour absorber la variation quotidienne de
+volume. Masquer la troncature n'était pas défendable : le coût mesuré d'un
+plafond correct (5 minutes, une fois) est minuscule au regard du gain (31
+jours réels au lieu de 11, sur la seule source qui porte un TJM structuré).
+
+**Le plafond corrigé ne suffit pas à lui seul : seule la CAUSE est corrigée,
+pas la donnée.** Relever `max_pages_per_run` change ce qu'une *prochaine*
+collecte backfill ramènera ; il ne rejoue rien. Le backfill tronqué à 60
+pages n'a **pas été relancé** depuis cette migration, et les offres en base
+couvrent donc toujours 11 jours, pas 31 (voir la note sous le tableau des
+quatre sources ci-dessus) — relancer ce backfill est une collecte réelle de
+l'ordre de 5 minutes, laissée au choix de l'utilisateur.
 
 ## Phases 2 à 5
 
@@ -409,11 +593,24 @@ concordent, le local est dominé par Angular et Java. **Le gisement exploitable
 est national et full remote** — 76 offres côté Adzuna contre 9 côté France
 Travail — ce qui pèse sur la phase 2 et rend P8 prioritaire.
 
-### P6 — Dédoublonnage inter-sources absent, et désormais actif
+### P6 — Dédoublonnage inter-sources absent, et désormais chiffré à quatre sources
 
 `unique (source, external_id)` empêche les doublons **dans** une source, pas
-entre sources. Les deux sources alimentent maintenant la base : le problème
-n'est plus théorique. Première dette à payer en phase 2.
+entre sources. Quatre sources alimentent maintenant la base (France Travail,
+Adzuna, Free-Work, Collective.work) : le problème n'est plus théorique.
+
+Chiffré en base le 2026-09-08, à la clôture du plan B :
+
+```sql
+select count(*) as doublons_inter_sources
+from (select lower(title), company_name from offers group by 1, 2 having count(distinct source) > 1) t;
+```
+
+**19 groupes** de titre normalisé et d'entreprise partagés par deux sources ou
+plus, sur 3 184 offres. Beaucoup d'annonces d'ESN paraissent simultanément sur
+Free-Work et sur France Travail — hypothèse plausible à vérifier nommément
+quand ce chantier s'ouvrira, pas encore fait ici. Première dette de la phase
+2, désormais avec un nombre de départ.
 
 ### P10 — Doublons intra-source, découverts en classant les 38 offres de la tâche 4
 
@@ -464,6 +661,24 @@ et P3 : il dégrade **directement** la liste que l'utilisateur consulte tous
 les jours, pas une hypothèse latente. Effet du déclassement de `fr-react`
 (ci-dessus) : la quadruplication Boond est sortie de la sélection au passage,
 ce qui a réduit d'autant ce problème sans action dédiée.
+
+### P11 — Pages Free-Work sans `JobPosting` : seulement journalisées, jamais comptées
+
+Le client Free-Work (`supabase/functions/_scrapers/free-work/client.ts:164`)
+avertit et saute une page de détail dépourvue de JSON-LD `JobPosting` —
+`log('warn', 'page d’offre sans JobPosting', …)` — mais rien de durable ne
+l'enregistre : pas de colonne, pas de compteur en télémétrie. Trois pages sur
+le premier run réel, plusieurs autres constatées pendant les essais de cette
+tâche (log `warn` visible dans la sortie de `scrape-daily.cmd`), sans qu'on
+sache si c'est une page retirée entre le listing et le détail, un format de
+page différent, ou une erreur de parsing.
+
+Volontairement **pas** de compteur ajouté ici — la tâche qui l'a découvert
+n'est pas celle qui doit décider de l'instrumentation. Mais c'est le premier
+endroit où chercher le jour où une question se pose sur la santé de la
+collecte Free-Work (« pourquoi si peu d'offres nouvelles cette semaine ? ») :
+`grep` les logs `warn` de `page d’offre sans JobPosting`, faute de mieux pour
+l'instant.
 
 ### ~~P9 — La re-revue de la tâche 11~~ *(rendue, approuvée)*
 
@@ -543,12 +758,55 @@ d'entrée par `deno run --env-file=.env.local` sur le port 8000, sans en-tête
 `Deno.serve`). Documenté dans `CLAUDE.md` et dans les trois étapes du plan qui
 pointaient encore vers `fn:serve`.
 
+### P12 — Une offre Free-Work vue par trois facettes se paie trois fois
+
+`knownExternalIds` est un instantané pris une seule fois avant la boucle, et il
+n'est jamais complété par les offres découvertes en cours de run. Les facettes
+`react`, `typescript` et `javascript` se recouvrent largement — 196, 180 et 330
+offres — donc une offre listée par trois d'entre elles coûte **trois pages de
+détail** à 3 000 ms chacune, dans le même run. Déjà visible : 6 offres portent
+deux étiquettes de provenance, ce qui est exactement ce chemin.
+
+Sans effet sur les données (l'upsert dédoublonne), mais c'est du temps de
+collecte et de la charge inutiles chez l'hôte. Alimenter l'ensemble au fil des
+requêtes serait un petit changement et un vrai gain de politesse au prochain
+backfill.
+
+### P13 — La provenance ne dit pas la même chose selon la source
+
+Parce que Free-Work saute les offres déjà connues d'un run à l'autre, l'ensemble
+`found_by_query_ids` d'une offre est **figé au run qui l'a découverte** :
+mesuré, 99 des 105 offres Free-Work ne portent qu'une seule étiquette, là où
+France Travail et Adzuna en accumulent jusqu'à cinq. `CLAUDE.md` laisse entendre
+que `found_by_labels` dit *quelles requêtes ont ramené l'offre* ; pour Free-Work
+il dit *quelle facette l'a vue en premier*.
+
+C'est une seconde raison, indépendante de la mesure, pour laquelle le
+déclassement des facettes en `net` était juste : une facette restée `anchored`
+aurait fait dépendre la confiance de l'ordre des runs.
+
+Même cause, même effet sur `last_seen_at`, qui ne se rafraîchit pas pour
+Free-Work : cette colonne ne peut donc pas servir à distinguer une annonce
+encore en ligne d'une annonce retirée, sur cette source. Personne ne s'en sert
+aujourd'hui.
+
 ---
 
 ## Mineurs consignés
 
+Les huit derniers viennent de la revue finale du plan B. Ils ont été vérifiés,
+jugés non bloquants, et laissés en l'état délibérément.
+
 | # | Sujet |
 |---|---|
+| M14 | `PoliteFetcher.requestCount` n'est lu par personne hors de son test, et le plan promet dans la sortie un champ `requests` que `CollectionSummary` n'a jamais eu. Câbler l'un ou supprimer les deux |
+| M15 | `collective/mapper.ts` code l'URL de base en dur pour reconstruire le lien d'une mission, alors que `sources.base_url` la porte déjà et que le client la reçoit en paramètre. Deux vérités pour un même fait |
+| M16 | Le troisième refus de `loadSourceSettings` — `user_agent` absent — est atteignable (la colonne est nullable) mais aucun test ne l'exerce |
+| M17 | Le client Collective ne déduplique pas entre pages, là où celui de Free-Work le fait. Sans effet sur les données, mais `collection_query_results.fetched` est gonflé pour cette source : 1 800 annoncées pour 1 760 lignes réellement écrites, soit les 40 missions ayant changé de page pendant le parcours |
+| M18 | `isPermanentContract === true ? 'CDI' : 'Freelance'` ne distingue pas `false` d'absent : si Collective cessait d'émettre le champ, tout deviendrait Freelance en silence. Mesuré aujourd'hui : 587 CDI, 1 196 Freelance, aucun null |
+| M19 | La sélection de groupe de `robots.txt` compare le jeton d'agent par sous-chaîne de notre agent complet, plus large que la correspondance par jeton de produit du RFC 9309. Aucun `robots.txt` des deux sites ne contient de jeton piège, et l'erreur va dans le sens « collecter moins » |
+| M20 | `contract_label` porte désormais quatre vocabulaires : libellé français (France Travail), temps de travail (Adzuna), énumérations schema.org jointes (Free-Work), rien (Collective). Et côté Free-Work l'ordre de la jointure varie — `CONTRACTOR, FULL_TIME` sur 18 offres, `FULL_TIME, CONTRACTOR` sur 3 — donc la même offre peut porter deux libellés différents. `contract_type`, lui, est cohérent entre les trois sources qui le renseignent |
+| M21 | Le mapper Free-Work laisse tomber un `baseSalary` qui ne porterait qu'un `maxValue`, là où le mapper Adzuna rend « jusqu'à X ». Non exercé par les fixtures |
 | M1 | `upsert_test.ts` : ternaire mort `offer ? [offer] : []` |
 | M2 | `upsertOffers` déduit la source de `rows[0]` et suppose un lot monosource. L'invariant tient par construction, l'écriture est protégée par l'`onConflict` composé, mais le comptage de télémétrie serait faussé si l'invariant sautait. Une garde explicite manque |
 | M3 | Correspondance des clés du payload `upsert` aux colonnes réelles : non vérifiable par le typage, `DbClient` n'étant pas typé sur le schéma |

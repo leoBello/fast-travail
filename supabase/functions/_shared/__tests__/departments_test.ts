@@ -1,5 +1,6 @@
 import { assertEquals } from '@std/assert';
 import { departmentCodeFromArea, departmentCodeFromName, DEPARTMENTS } from '../departments.ts';
+import { departmentCodeFromCityName } from '../departments.ts';
 
 Deno.test('departmentCodeFromName trouve les trois départements du filtre local', () => {
   assertEquals(departmentCodeFromName('Bouches-du-Rhône'), '13');
@@ -114,4 +115,25 @@ Deno.test('departmentCodeFromArea renvoie null sans zone reconnue', () => {
   assertEquals(departmentCodeFromArea([]), null);
   assertEquals(departmentCodeFromArea(null), null);
   assertEquals(departmentCodeFromArea(undefined), null);
+});
+
+Deno.test('departmentCodeFromCityName traduit les communes de la zone', () => {
+  assertEquals(departmentCodeFromCityName('Marseille'), '13');
+  assertEquals(departmentCodeFromCityName('Aix-en-Provence'), '13');
+  assertEquals(departmentCodeFromCityName('Toulon'), '83');
+  assertEquals(departmentCodeFromCityName('Avignon'), '84');
+});
+
+Deno.test('departmentCodeFromCityName ignore casse, accents et séparateurs', () => {
+  assertEquals(departmentCodeFromCityName('AIX EN PROVENCE'), '13');
+  assertEquals(departmentCodeFromCityName('aix-en-provence'), '13');
+  assertEquals(departmentCodeFromCityName("L'Isle-sur-la-Sorgue"), '84');
+});
+
+Deno.test('departmentCodeFromCityName rend null hors zone ou sur une entrée vide', () => {
+  assertEquals(departmentCodeFromCityName('Paris'), null);
+  assertEquals(departmentCodeFromCityName('Antibes'), null);
+  assertEquals(departmentCodeFromCityName('France'), null);
+  assertEquals(departmentCodeFromCityName(null), null);
+  assertEquals(departmentCodeFromCityName(''), null);
 });

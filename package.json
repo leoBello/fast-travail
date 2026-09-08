@@ -12,6 +12,8 @@
     "fn:local:adzuna": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/collect-adzuna/index.ts",
     "fn:deploy:ft": "supabase functions deploy collect-france-travail --import-map supabase/functions/deno.json",
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna --import-map supabase/functions/deno.json",
+    "scrape:free-work": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/_scrapers/free-work/main.ts",
+    "scrape:collective": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/_scrapers/collective/main.ts",
     "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",
     "fmt": "deno fmt --config supabase/functions/deno.json supabase/functions/ scripts/",
     "lint": "deno lint --config supabase/functions/deno.json supabase/functions/ scripts/",

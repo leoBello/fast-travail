@@ -145,3 +145,101 @@ export function departmentCodeFromArea(area: readonly string[] | null | undefine
   }
   return null;
 }
+
+/**
+ * Communes de la zone visée -> code de département. Volontairement limitée aux
+ * départements 13, 83 et 84, les trois que retient `offers_shortlist`.
+ *
+ * Raison d'être : mesuré le 2026-09-08, les sources scrapées ne donnent
+ * généralement PAS de code postal — les deux pages Free-Work capturées ont
+ * `postalCode: null` et un `addressRegion` qui est une région
+ * (« Provence-Alpes-Côte d'Azur »), et Collective ne donne qu'un libellé
+ * « Aix-en-Provence, France ». Sans ce repli, toutes leurs offres locales
+ * sortiraient de la sélection.
+ *
+ * Hors de cette table, on rend null : c'est exact, et sans conséquence, la
+ * branche non locale de la vue passant par `remote_label = 'full'`. Ce n'est
+ * donc PAS un référentiel de communes à compléter — c'est un filtre de zone.
+ * Le vrai géocodage par code INSEE reste le problème ouvert P1.
+ */
+const ZONE_CITY_TO_DEPARTMENT: Readonly<Record<string, string>> = {
+  // 13 — Bouches-du-Rhône
+  'Marseille': '13',
+  'Aix-en-Provence': '13',
+  'Aubagne': '13',
+  'La Ciotat': '13',
+  'Vitrolles': '13',
+  'Marignane': '13',
+  'Martigues': '13',
+  'Istres': '13',
+  'Miramas': '13',
+  'Salon-de-Provence': '13',
+  'Arles': '13',
+  'Gardanne': '13',
+  'Fos-sur-Mer': '13',
+  'Berre-l’Étang': '13',
+  'Rognac': '13',
+  'Les Pennes-Mirabeau': '13',
+  'Allauch': '13',
+  'Plan-de-Cuques': '13',
+  'Châteauneuf-les-Martigues': '13',
+  'Bouc-Bel-Air': '13',
+  'Cabriès': '13',
+  'Venelles': '13',
+  'Meyreuil': '13',
+  'Trets': '13',
+  'Cassis': '13',
+  'Carry-le-Rouet': '13',
+  'Sausset-les-Pins': '13',
+  'Port-de-Bouc': '13',
+  'Saint-Victoret': '13',
+  'Septèmes-les-Vallons': '13',
+  // 83 — Var
+  'Toulon': '83',
+  'La Seyne-sur-Mer': '83',
+  'Hyères': '83',
+  'Fréjus': '83',
+  'Saint-Raphaël': '83',
+  'Draguignan': '83',
+  'Six-Fours-les-Plages': '83',
+  'La Garde': '83',
+  'La Valette-du-Var': '83',
+  'Brignoles': '83',
+  'Sanary-sur-Mer': '83',
+  'Ollioules': '83',
+  'Le Pradet': '83',
+  'Saint-Maximin-la-Sainte-Baume': '83',
+  'Cuers': '83',
+  'Solliès-Pont': '83',
+  'Bandol': '83',
+  'Roquebrune-sur-Argens': '83',
+  // 84 — Vaucluse
+  'Avignon': '84',
+  'Carpentras': '84',
+  'Orange': '84',
+  'Cavaillon': '84',
+  'Le Pontet': '84',
+  'Sorgues': '84',
+  'L’Isle-sur-la-Sorgue': '84',
+  'Pertuis': '84',
+  'Apt': '84',
+  'Monteux': '84',
+  'Vedène': '84',
+  'Bollène': '84',
+  'Valréas': '84',
+  'Morières-lès-Avignon': '84',
+};
+
+const CITY_TO_DEPARTMENT: Map<string, string> = new Map(
+  Object.entries(ZONE_CITY_TO_DEPARTMENT).map(([city, code]) => [normalize(city), code]),
+);
+
+/**
+ * Traduit un NOM DE COMMUNE de la zone visée en code de département, ou null.
+ * Repli des sources qui ne fournissent pas de code postal ; ne remplace jamais
+ * un code postal reçu, qui reste prioritaire.
+ */
+export function departmentCodeFromCityName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return CITY_TO_DEPARTMENT.get(normalize(name)) ?? null;
+}

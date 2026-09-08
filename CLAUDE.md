@@ -94,8 +94,9 @@ quand le code déplaît au linter.
 
 **`supabase/functions/_shared/` est runtime-neutre.** Aucun `Deno.env`, aucun
 accès `Deno.*`, aucun import `node:` dans ces fichiers — la configuration
-arrive **en paramètre**. Ces fichiers seront importés tels quels par des
-scripts Node (les scrapers de la phase suivante). Contrôle :
+arrive **en paramètre**. Ces fichiers sont importés tels quels par les
+scrapers, des scripts Deno locaux sous `supabase/functions/_scrapers/`, hors
+Edge Functions. Contrôle :
 
 ```bash
 grep -rn "Deno\.\|node:" supabase/functions/_shared/ --include=*.ts | grep -v "__tests__"
@@ -106,13 +107,42 @@ Cette commande doit ne rien renvoyer. La lecture de l'environnement
 Deno assumé.
 
 **L'orchestration de collecte est mutualisée** dans
-`_shared/run-collection.ts` et sert les six sources. Les `index.ts` ne font que
+`_shared/run-collection.ts` et sert les quatre sources (France Travail, Adzuna,
+Free-Work, Collective.work). Les `index.ts` ne font que
 lire l'environnement, charger les requêtes et déléguer. Ne jamais dupliquer la
 boucle.
 
 **Le code partagé reste sous `supabase/functions/_shared/`**, pas à la racine :
 le CLI n'embarque dans le bundle que ce qui se trouve sous `supabase/functions`,
 sauf avec le flag expérimental `--use-api`.
+
+**`supabase/functions/_scrapers/`** : scripts Deno locaux, hors Edge
+Functions — Free-Work et Collective.work, lancés manuellement ou par le
+Planificateur Windows, jamais par `pg_cron`. Seuls les `main.ts` de chaque
+scraper lisent l'environnement (`Deno.env`, `Deno.args`) ; le reste
+(`_scrapers/_shared/`, les clients, les mappers) suit la même règle de
+neutralité runtime que `supabase/functions/_shared/` — configuration reçue en
+paramètre, jamais lue directement.
+
+**Le fait qui coûterait une demi-heure à quelqu'un d'autre** : `deno fmt`
+formate le HTML, et l'exclusion `**/__tests__/fixtures/**` de
+`supabase/functions/deno.json` est résolue relativement au dossier de **ce
+fichier** (`supabase/functions/deno.json`), pas à la racine du dépôt. Une
+fixture HTML placée hors de `supabase/functions/` — par exemple sous un
+`scripts/` ou un `_scrapers/` à la racine — ferait donc échouer `fmt:check`
+sans que l'exclusion existante ne la couvre. C'est la raison pour laquelle le
+code des scrapers vit sous `supabase/functions/_scrapers/` et non à la racine
+du dépôt ; ce n'est devinable qu'en le mesurant une fois.
+
+**La règle de politesse des scrapers** est en base, pas dans le code : les
+colonnes `min_delay_ms`, `max_pages_per_run`, `user_agent`, `robots_allows` de
+`sources` (voir « Base de données » plus bas) pilotent chaque exécution.
+`robots.txt` est revérifié à **chaque** collecte, jamais mis en cache d'une
+exécution à l'autre — une autorisation constatée un jour ne vaut rien le
+lendemain. L'agent utilisateur est honnête (`fast-travail/0.1 (veille
+personnelle)`), jamais un navigateur usurpé, et ne porte aucune adresse
+personnelle. Un seul en vol à la fois vers une même source : jamais de
+parallélisme.
 
 ## Base de données
 

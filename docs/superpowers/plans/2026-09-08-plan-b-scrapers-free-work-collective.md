@@ -289,11 +289,20 @@ contexte — ce protocole est ce qui lui dit comment travailler.
 
 ### Ordre non négociable
 
-La tâche 1 (migration) précède tout : les tâches suivantes lisent ces lignes. La
-tâche 2 (socle) produit ce que 4 à 8 consomment. La tâche 3 est indépendante et
-peut se faire en parallèle de 2. Free-Work (4, 5, 6) avant Collective (7, 8) :
-Free-Work porte la plus grande valeur mesurée, et son chemin — listing puis
-détail — est le plus exigeant ; Collective en réutilise le socle.
+La **tâche 1** (migration) précède tout : chacune des suivantes lit ces lignes
+en base. Les **tâches 2 à 4** forment le socle que 6 à 11 consomment, et la
+**tâche 5** (géographie) n'en dépend pas — elle peut se faire à tout moment
+avant la tâche 7.
+
+**Free-Work (6, 7, 9) avant Collective (10, 11)** : Free-Work porte la plus
+grande valeur mesurée, et son chemin — listing puis pages de détail — est le
+plus exigeant. Collective réutilise ensuite un socle éprouvé.
+
+La **tâche 8** (lanceur commun) se place entre les deux mappers Free-Work et le
+premier point d'entrée, et non après les deux sources : l'écrire une fois les
+deux `main.ts` livrés reviendrait à dupliquer d'abord pour factoriser ensuite.
+Elle est donc écrite avant d'avoir un second client à servir, ce qui est
+assumé — sa forme est dictée par une contrainte connue, pas devinée.
 
 ---
 
@@ -306,15 +315,18 @@ supabase/functions/_scrapers/
 │   ├── robots.ts                   # parseRobots + allows
 │   ├── html.ts                     # extractJsonLd, extractNextData, htmlToText
 │   ├── sources.ts                  # réglages, robots, marquage de run
+│   ├── main-runner.ts              # déroulé de lancement commun aux deux
 │   └── __tests__/
 │       ├── http_test.ts
 │       ├── robots_test.ts
 │       ├── html_test.ts
+│       ├── sources_test.ts
+│       ├── main-runner_test.ts
 │       └── fixtures/               # robots.txt réels (déjà capturés)
 ├── free-work/
 │   ├── client.ts                   # listing paginé + pages de détail
 │   ├── mapper.ts                   # JSON-LD JobPosting -> NormalizedOffer
-│   ├── main.ts                     # point d'entrée Deno (seul à lire l'env)
+│   ├── main.ts                     # définition Free-Work (seul à lire l'env)
 │   └── __tests__/
 │       ├── client_test.ts
 │       ├── mapper_test.ts
@@ -322,7 +334,7 @@ supabase/functions/_scrapers/
 └── collective/
     ├── client.ts                   # pages de listing, payload __NEXT_DATA__
     ├── mapper.ts                   # projet -> NormalizedOffer
-    ├── main.ts
+    ├── main.ts                     # définition Collective (seul à lire l'env)
     └── __tests__/
         ├── client_test.ts
         ├── mapper_test.ts
@@ -330,8 +342,8 @@ supabase/functions/_scrapers/
 ```
 
 Fichiers existants modifiés : `supabase/functions/_shared/departments.ts`
-(tâche 3), `package.json` (tâche 6), `docs/ETAT.md`, `docs/ROADMAP.md`,
-`CLAUDE.md` (tâche 9).
+(tâche 5), `package.json` (tâche 9), `docs/ETAT.md`, `docs/ROADMAP.md`,
+`CLAUDE.md` (tâche 12).
 
 ---
 
@@ -796,6 +808,38 @@ Deno.test('les jokers et la règle du motif le plus long sont respectés', () =>
   assertEquals(rules.allows('/projects?q=react'), false);
 });
 
+Deno.test('une ancre $ n’autorise que la correspondance exacte', () => {
+  // Motif réel courant (`Disallow: /*.pdf$`). Sans traitement du `$` sur le
+  // motif BRUT, l'échappement en fait un dollar littéral et la règle devient
+  // inapplicable : le site serait ignoré au lieu d'être respecté.
+  const rules = parseRobots(['User-agent: *', 'Disallow: /prive$'].join('\n'), UA);
+  assertEquals(rules.allows('/prive'), false);
+  assert(rules.allows('/prive/sous-page'));
+});
+
+Deno.test('à longueur de motif égale, Allow l’emporte', () => {
+  const rules = parseRobots(['User-agent: *', 'Disallow: /abc', 'Allow: /a*c'].join('\n'), UA);
+  assert(rules.allows('/abc'));
+});
+
+Deno.test('plusieurs User-agent empilés forment un seul groupe', () => {
+  const rules = parseRobots(
+    ['User-agent: AutreBot', 'User-agent: fast-travail', 'Disallow: /prive'].join('\n'),
+    UA,
+  );
+  assertEquals(rules.allows('/prive'), false);
+});
+
+Deno.test('une directive étrangère ferme la liste d’agents', () => {
+  // Sans cette règle, le groupe d'AutreBot fusionnerait avec le nôtre.
+  const rules = parseRobots(
+    ['User-agent: fast-travail', 'Crawl-delay: 5', 'User-agent: AutreBot', 'Disallow: /prive']
+      .join('\n'),
+    UA,
+  );
+  assert(rules.allows('/prive'));
+});
+
 Deno.test('un fichier vide autorise tout', () => {
   assert(parseRobots('', UA).allows('/quoi-que-ce-soit'));
 });
@@ -821,11 +865,16 @@ interface Rule {
 }
 
 function toRegExp(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // Le `$` de fin d'ancrage doit être détecté sur le motif BRUT, avant tout
+  // échappement : une fois échappé il vaut les deux caractères `\$` et n'est
+  // plus reconnaissable comme ancre. Le `?` est échappé comme les autres
+  // métacaractères — dans un robots.txt c'est un caractère littéral de query
+  // string, jamais un quantificateur.
+  const endAnchored = pattern.endsWith('$');
+  const body = endAnchored ? pattern.slice(0, -1) : pattern;
+  const escaped = body.replace(/[.+^${}()|[\]\\?]/g, '\\$&');
   const withWildcards = escaped.replace(/\*/g, '.*');
-  const anchored = withWildcards.endsWith('$')
-    ? `^${withWildcards.slice(0, -1)}$`
-    : `^${withWildcards}`;
+  const anchored = endAnchored ? `^${withWildcards}$` : `^${withWildcards}`;
   return new RegExp(anchored);
 }
 
@@ -859,8 +908,11 @@ export function parseRobots(text: string, userAgent: string): RobotsRules {
       continue;
     }
 
-    if (field !== 'allow' && field !== 'disallow') continue;
+    // Toute directive autre qu'un user-agent ferme la liste d'agents : un
+    // `Sitemap:` ou un `Crawl-delay:` glissé entre deux `User-agent:` ne doit
+    // pas faire fusionner deux groupes.
     expectingAgents = false;
+    if (field !== 'allow' && field !== 'disallow') continue;
     if (currentTargets === null) continue;
     // « Disallow: » vide veut dire « rien n'est interdit » : on ignore la ligne.
     if (field === 'disallow' && value === '') continue;
@@ -892,7 +944,7 @@ export function parseRobots(text: string, userAgent: string): RobotsRules {
 export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/_scrapers/
 ```
 
-Expected : 11 tests verts (5 pour `http.ts`, 6 pour `robots.ts`).
+Expected : 15 tests verts (5 pour `http.ts`, 10 pour `robots.ts`).
 
 - [ ] **Step 8: Porte complète et commit**
 
@@ -1044,6 +1096,20 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
 const ENTITY = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
 
 /**
+ * Point de code -> caractère, ou `undefined` hors de la plage Unicode.
+ *
+ * `String.fromCodePoint` lève une `RangeError` au-delà de `0x10FFFF`, et la
+ * regex ci-dessus accepte n'importe quelle suite de chiffres : une description
+ * contenant `&#1114112;` ferait donc échouer la collecte ENTIÈRE, alors qu'un
+ * bloc JSON-LD mal formé, lui, dégrade proprement. Une entité hors plage est
+ * laissée telle quelle, comme une entité nommée inconnue.
+ */
+function codePointToChar(codePoint: number): string | undefined {
+  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return undefined;
+  return String.fromCodePoint(codePoint);
+}
+
+/**
  * HTML -> texte brut, pour une description destinée à `offers.description`.
  *
  * La colonne alimente `description_tsv` et le lexique de compétences : y
@@ -1060,12 +1126,12 @@ export function htmlToText(html: string): string {
     .replace(TAG, ' ')
     .replace(ENTITY, (whole, name: string) => {
       if (name.startsWith('#x') || name.startsWith('#X')) {
-        return String.fromCodePoint(parseInt(name.slice(2), 16));
+        return codePointToChar(parseInt(name.slice(2), 16)) ?? whole;
       }
-      if (name.startsWith('#')) return String.fromCodePoint(parseInt(name.slice(1), 10));
+      if (name.startsWith('#')) return codePointToChar(parseInt(name.slice(1), 10)) ?? whole;
       return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
     })
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ 	 ]+/g, ' ')
     .replace(/ *\n *(?:\n *)*/g, '\n')
     .trim();
 }
@@ -1534,7 +1600,17 @@ donnerait l'illusion d'un géocodage qui n'existe pas (P1). Ne pas toucher à
 - Create: `supabase/functions/_scrapers/free-work/client.ts`
 - Test: `supabase/functions/_scrapers/free-work/__tests__/client_test.ts`
 - Fixtures (déjà présentes, ne pas modifier) :
-  `listing-react-sort-date-page1.html`, `job-contractor-tjm.html`
+  `listing-react-sort-date-page1.html`, `job-permanent-salary.html`
+
+**La paire de fixtures n'est pas interchangeable.** `job-contractor-tjm.html` a
+été capturée depuis le listing trié par **pertinence** et ne figure pas parmi
+les seize offres du listing trié par **date** : un test qui les apparie ne peut
+pas passer, puisque aucun `harvestPaths` ne peut produire une URL absente du
+texte source. La paire cohérente est
+`listing-react-sort-date-page1.html` + `job-permanent-salary.html`, dont le
+chemin `developpeur-front-end-javascript-node-react-angular-vue/developpeur-net-react-h-f-59`
+est bien présent dans le listing. `job-contractor-tjm.html` sert en tâche 7,
+où le listing n'intervient pas.
 
 **Interfaces:**
 - Consumes: `PageFetcher` de `_scrapers/_shared/http.ts`, `extractJsonLd` de
@@ -1567,7 +1643,7 @@ const listing = await Deno.readTextFile(
   new URL('./fixtures/listing-react-sort-date-page1.html', import.meta.url),
 );
 const detail = await Deno.readTextFile(
-  new URL('./fixtures/job-contractor-tjm.html', import.meta.url),
+  new URL('./fixtures/job-permanent-salary.html', import.meta.url),
 );
 
 function queryRow(extra: Record<string, unknown>): SearchQueryRow {
@@ -1600,7 +1676,7 @@ function fetcherFor(pages: Map<string, string>, seen: string[] = []): PageFetche
 const BASE = 'https://www.free-work.com';
 const LISTING_1 = `${BASE}/fr/tech-it/jobs/react?sort=date&page=1`;
 const DETAIL_PATH =
-  '/fr/tech-it/job-mission/developpeur-front-end-javascript-node-react-angular-vue/developpeur-react-node-nestjs-anglais-courant-obligatoire';
+  '/fr/tech-it/job-mission/developpeur-front-end-javascript-node-react-angular-vue/developpeur-net-react-h-f-59';
 
 Deno.test('facetOf lit la facette dans extra_params', () => {
   assertEquals(facetOf(queryRow({ facet: 'react' })), 'react');
@@ -1760,7 +1836,7 @@ const JOB_PATH = /href="(\/fr\/tech-it\/job-mission\/[^"]+)"/g;
 /** Date de publication affichée sur une carte, au format MM/JJ/AAAA. */
 const CARD_DATE = /<time>(\d{2})\/(\d{2})\/(\d{4})<\/time>/g;
 /** Nombre total d'offres de la facette, affiché par le site. Télémétrie seulement. */
-const TOTAL = /(\d[\d\s\u00a0]*)\s*résultats?/i;
+const TOTAL = /(\d[\d\s ]*)(?:<[^>]*>|\s)*résultats?/i;
 const PATH_PREFIX = '/fr/tech-it/job-mission/';
 const MS_PER_DAY = 86_400_000;
 
@@ -1843,6 +1919,7 @@ export async function fetchFreeWorkOffers(
   const windowStart = new Date(now.getTime() - cfg.windowDays * MS_PER_DAY);
 
   const paths: string[] = [];
+  const seenPaths = new Set<string>();
   let totalAvailable: number | null = null;
   let truncated = false;
 
@@ -1869,7 +1946,16 @@ export async function fetchFreeWorkOffers(
     const newest = dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null;
     if (newest !== null && newest < windowStart) break;
 
-    paths.push(...pagePaths);
+    // Déduplication sur TOUT le parcours, pas seulement dans une page : le
+    // listing est vivant et se retrie entre deux requêtes de pagination, donc
+    // une offre en bord de page reparaît couramment à la page suivante. Sans
+    // cela, elle coûte une seconde page de détail — à trois secondes de délai,
+    // c'est exactement la dépense que ce client est censé éviter.
+    for (const path of pagePaths) {
+      if (seenPaths.has(path)) continue;
+      seenPaths.add(path);
+      paths.push(path);
+    }
 
     if (page === cfg.maxListingPages) truncated = true;
   }
@@ -1902,7 +1988,7 @@ git add supabase/functions/_scrapers/free-work/
 git commit -m "feat(free-work): listing trie par date, details par JSON-LD"
 ```
 
-Expected : 8 tests de plus, `verify` vert.
+Expected : 14 tests de plus, `verify` vert.
 
 **Ce qu'il ne faut PAS faire :** ne pas extraire de titre, d'entreprise ou de
 salaire du listing. Ne pas paralléliser les requêtes de détail. Ne pas filtrer
@@ -1977,8 +2063,12 @@ Deno.test('mission freelance : contrat, TJM et télétravail', () => {
 Deno.test('la description est du texte, pas du HTML', () => {
   const offer = mapFreeWorkOffer(rawFromFixture('job-contractor-tjm.html', CONTRACTOR_PATH));
   assert(offer?.description);
-  // Mesuré sur la fixture : 1 267 caractères une fois les balises retirées.
-  assertEquals(offer.description.length, 1267);
+  // Mesuré sur la fixture : 1 269 une fois les balises retirées. Ce nombre
+  // compte des UNITÉS UTF-16, ce que rend `String.length`, et non des points
+  // de code : la description porte deux emoji hors du plan multilingue de base
+  // (🛠 et 🧩) qui pèsent deux unités chacun. Un comptage par point de code
+  // rendrait 1 267 — c'est la même chaîne, pas une autre mesure.
+  assertEquals(offer.description.length, 1269);
   assertEquals(offer.description.includes('<'), false);
   assertEquals(offer.description.includes('&nbsp;'), false);
 });
@@ -2239,7 +2329,529 @@ inventer un `department` hors de la table de zone. Ne pas faire primer
 
 ---
 
-### Task 8: Point d'entrée Free-Work et première collecte réelle
+### Task 8: Lanceur commun aux deux scrapers
+
+**Files:**
+- Create: `supabase/functions/_scrapers/_shared/main-runner.ts`
+- Test: `supabase/functions/_scrapers/_shared/__tests__/main-runner_test.ts`
+
+**Interfaces:**
+- Consumes: `createDbClient`, `runCollection`, `WINDOW_DAYS`, `PoliteFetcher`,
+  `parseRobots`, `loadSourceSettings`, `recordRobotsCheck`, `markSourceRun`,
+  `loadKnownExternalIds`.
+- Produces:
+  - `interface ScraperRunContext { fetcher: PageFetcher; settings: SourceSettings; mode: CollectionMode; windowDays: number; knownExternalIds: ReadonlySet<string> }`
+  - `interface ScraperDefinition { source: SourceKey; pathsUsed: string[]; needsKnownExternalIds: boolean; fetchAll(ctx, query): Promise<FetchResult>; map(raw: unknown): NormalizedOffer | null }`
+  - `interface ScraperEnvironment { args: string[]; env(name: string): string | undefined }`
+  - `function runScraperMain(scraper: ScraperDefinition, host: ScraperEnvironment): Promise<number>`
+
+**Pourquoi cette tâche existe.** Sans elle, les deux `main.ts` seraient
+identiques à quatre valeurs près — lecture de l'environnement, réglages,
+`robots.txt`, chargement des requêtes, appel à `runCollection`, marquage du
+run : environ quatre-vingts lignes en double. Le dépôt a déjà tranché ce
+débat une fois, et l'a écrit dans `CLAUDE.md` : « l'orchestration de collecte
+est mutualisée dans `_shared/run-collection.ts` […] **ne jamais dupliquer la
+boucle** ». Le lancement obéit à la même règle que la boucle.
+
+**Le gain n'est pas seulement l'économie de lignes.** `Deno.args` et
+`Deno.env` arrivent **en paramètre** (`ScraperEnvironment`), donc le lanceur
+reste runtime-neutre **et** devient testable : les chemins qui comptent — source
+désactivée, `robots.txt` qui refuse, répétition à blanc — sont vérifiés par des
+tests, alors qu'ils ne le seraient dans aucun `main.ts`.
+
+- [ ] **Step 1: Écrire les tests (rouge d'abord)**
+
+`supabase/functions/_scrapers/_shared/__tests__/main-runner_test.ts` :
+
+```ts
+import { assert, assertEquals, assertRejects } from '@std/assert';
+import type { DbClient } from '../../../_shared/db.ts';
+import type { FetchResult } from '../../../_shared/run-collection.ts';
+import type { NormalizedOffer, SearchQueryRow } from '../../../_shared/types.ts';
+import { emptyOffer } from '../../../_shared/types.ts';
+import type { PageFetcher } from '../http.ts';
+import { runScraperMain, type ScraperDefinition } from '../main-runner.ts';
+
+const ROBOTS_OK = 'User-agent: *\nDisallow: /login\n';
+const ROBOTS_KO = 'User-agent: *\nDisallow: /\n';
+
+const QUERY: SearchQueryRow = {
+  id: 1,
+  source: 'free_work',
+  label: 'fw:skill:react',
+  keywords: null,
+  commune_insee: null,
+  radius_km: null,
+  extra_params: { facet: 'react' },
+  published_since_days: 3,
+  priority: 60,
+  enabled: true,
+};
+
+interface FakeState {
+  enabled: boolean;
+  updates: Array<Record<string, unknown>>;
+  queries: SearchQueryRow[];
+  knownIds: string[];
+}
+
+/**
+ * Double de base de données. `as unknown as DbClient` est le moyen normal ici
+ * (voir CLAUDE.md) : `DbClient` n'est pas typé sur le schéma.
+ */
+function fakeDb(state: FakeState): DbClient {
+  const sourceRow = {
+    base_url: 'https://example.test',
+    min_delay_ms: 0,
+    max_pages_per_run: 5,
+    user_agent: 'fast-travail/0.1 (veille personnelle)',
+    enabled: state.enabled,
+  };
+
+  return {
+    from(table: string) {
+      if (table === 'sources') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: sourceRow, error: null }) }),
+          }),
+          update: (values: Record<string, unknown>) => {
+            state.updates.push(values);
+            return { eq: () => Promise.resolve({ error: null }) };
+          },
+        };
+      }
+      if (table === 'offers') {
+        return {
+          select: () => ({
+            eq: () => ({
+              range: (from: number) =>
+                Promise.resolve({
+                  data: from === 0 ? state.knownIds.map((id) => ({ external_id: id })) : [],
+                  error: null,
+                }),
+            }),
+          }),
+        };
+      }
+      // search_queries : select().eq().eq().order() et, avec --query, un eq() de plus.
+      const builder = {
+        select: () => builder,
+        eq: () => builder,
+        order: () => Promise.resolve({ data: state.queries, error: null }),
+        then: undefined,
+      };
+      return builder;
+    },
+  } as unknown as DbClient;
+}
+
+function fakeFetcherFactory(robots: string, seen: string[]) {
+  return (): PageFetcher => ({
+    get(url: string) {
+      seen.push(url);
+      return Promise.resolve({ url, status: 200, body: robots });
+    },
+  });
+}
+
+function scraper(overrides: Partial<ScraperDefinition> = {}): ScraperDefinition {
+  return {
+    source: 'free_work',
+    pathsUsed: ['/fr/tech-it/jobs/react'],
+    needsKnownExternalIds: true,
+    fetchAll: (): Promise<FetchResult> =>
+      Promise.resolve({ offers: [{ id: 'a' }], totalAvailable: 1, truncated: false, httpStatus: 200 }),
+    map: (): NormalizedOffer => emptyOffer('free_work', 'a', 'Une offre'),
+    ...overrides,
+  };
+}
+
+function host(args: string[]) {
+  return {
+    args,
+    env: (name: string) =>
+      ({ SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'clef' })[name],
+  };
+}
+
+Deno.test('une variable d’environnement manquante arrête tout', async () => {
+  await assertRejects(
+    () => runScraperMain(scraper(), { args: ['--dry-run'], env: () => undefined }),
+    Error,
+    'SUPABASE_URL',
+  );
+});
+
+Deno.test('une source désactivée en base ne collecte rien', async () => {
+  const state: FakeState = { enabled: false, updates: [], queries: [QUERY], knownIds: [] };
+  let called = false;
+
+  const code = await runScraperMain(
+    scraper({ fetchAll: () => {
+      called = true;
+      return Promise.resolve({ offers: [], totalAvailable: null, truncated: false, httpStatus: 200 });
+    } }),
+    host(['--dry-run']),
+    { createDb: () => fakeDb(state), createFetcher: fakeFetcherFactory(ROBOTS_OK, []) },
+  );
+
+  assertEquals(code, 0);
+  assertEquals(called, false, 'aucune collecte ne doit être tentée');
+});
+
+Deno.test('un robots.txt qui refuse arrête la collecte et consigne le verdict', async () => {
+  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+  let called = false;
+
+  const code = await runScraperMain(
+    scraper({ fetchAll: () => {
+      called = true;
+      return Promise.resolve({ offers: [], totalAvailable: null, truncated: false, httpStatus: 200 });
+    } }),
+    host([]),
+    { createDb: () => fakeDb(state), createFetcher: fakeFetcherFactory(ROBOTS_KO, []) },
+  );
+
+  assertEquals(code, 1);
+  assertEquals(called, false, 'rien ne doit être collecté après un refus');
+  assertEquals(state.updates[0].robots_allows, false);
+  assert(state.updates.some((u) => u.last_status === 'failed'));
+});
+
+Deno.test('robots.txt est lu à chaque exécution, et son verdict écrit même à blanc', async () => {
+  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+  const seen: string[] = [];
+
+  await runScraperMain(scraper(), host(['--dry-run']), {
+    createDb: () => fakeDb(state),
+    createFetcher: fakeFetcherFactory(ROBOTS_OK, seen),
+  });
+
+  assertEquals(seen[0], 'https://example.test/robots.txt');
+  assertEquals(state.updates[0].robots_allows, true);
+  // Le verdict est un fait sur le monde extérieur : une répétition à blanc doit
+  // justement servir à apprendre que robots.txt a changé.
+});
+
+Deno.test('une répétition à blanc ne marque aucun run', async () => {
+  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+
+  const code = await runScraperMain(scraper(), host(['--dry-run']), {
+    createDb: () => fakeDb(state),
+    createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+  });
+
+  assertEquals(code, 0);
+  assertEquals(state.updates.filter((u) => 'last_status' in u).length, 0);
+});
+
+Deno.test('le delta précharge les identifiants connus, le backfill les ignore', async () => {
+  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: ['deja-vu'] };
+  const seenSizes: number[] = [];
+  const spy = scraper({
+    fetchAll: (ctx) => {
+      seenSizes.push(ctx.knownExternalIds.size);
+      return Promise.resolve({ offers: [], totalAvailable: null, truncated: false, httpStatus: 200 });
+    },
+  });
+  const deps = { createDb: () => fakeDb(state), createFetcher: fakeFetcherFactory(ROBOTS_OK, []) };
+
+  await runScraperMain(spy, host(['--dry-run', '--mode', 'delta']), deps);
+  await runScraperMain(spy, host(['--dry-run', '--mode', 'backfill']), deps);
+
+  assertEquals(seenSizes, [1, 0]);
+});
+
+Deno.test('une source qui n’en a pas besoin ne paie pas le préchargement', async () => {
+  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: ['deja-vu'] };
+  let size = -1;
+
+  await runScraperMain(
+    scraper({
+      needsKnownExternalIds: false,
+      fetchAll: (ctx) => {
+        size = ctx.knownExternalIds.size;
+        return Promise.resolve({ offers: [], totalAvailable: null, truncated: false, httpStatus: 200 });
+      },
+    }),
+    host(['--dry-run', '--mode', 'delta']),
+    { createDb: () => fakeDb(state), createFetcher: fakeFetcherFactory(ROBOTS_OK, []) },
+  );
+
+  assertEquals(size, 0);
+});
+
+Deno.test('la fenêtre suit le mode', async () => {
+  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+  const windows: number[] = [];
+  const spy = scraper({
+    fetchAll: (ctx) => {
+      windows.push(ctx.windowDays);
+      return Promise.resolve({ offers: [], totalAvailable: null, truncated: false, httpStatus: 200 });
+    },
+  });
+  const deps = { createDb: () => fakeDb(state), createFetcher: fakeFetcherFactory(ROBOTS_OK, []) };
+
+  await runScraperMain(spy, host(['--dry-run', '--mode', 'delta']), deps);
+  await runScraperMain(spy, host(['--dry-run', '--mode', 'backfill']), deps);
+
+  assertEquals(windows, [3, 31]);
+});
+
+Deno.test('aucune requête active est une erreur, pas un succès silencieux', async () => {
+  const state: FakeState = { enabled: true, updates: [], queries: [], knownIds: [] };
+
+  await assertRejects(
+    () =>
+      runScraperMain(scraper(), host(['--dry-run']), {
+        createDb: () => fakeDb(state),
+        createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+      }),
+    Error,
+    'free_work',
+  );
+});
+```
+
+- [ ] **Step 2: Lancer les tests et les voir échouer**
+
+```bash
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/_scrapers/
+```
+
+Expected : FAIL — `Module not found "…/main-runner.ts"`.
+
+- [ ] **Step 3: Écrire `main-runner.ts`**
+
+```ts
+// Lancement commun aux deux scrapers.
+//
+// `CLAUDE.md` tranche déjà ce débat pour la boucle de collecte : « ne jamais
+// dupliquer la boucle ». Le lancement obéit à la même règle — sans ce fichier,
+// les deux main.ts seraient identiques à quatre valeurs près.
+//
+// Runtime-neutre : Deno.args et Deno.env arrivent en paramètre. C'est la
+// condition pour que ce fichier reste testable, et les chemins qui comptent —
+// source désactivée, robots.txt qui refuse, répétition à blanc — ne sont
+// vérifiables nulle part ailleurs.
+
+import { createDbClient, type DbClient } from '../../_shared/db.ts';
+import { log } from '../../_shared/logger.ts';
+import { type FetchResult, runCollection } from '../../_shared/run-collection.ts';
+import {
+  type CollectionMode,
+  type NormalizedOffer,
+  type RunTrigger,
+  type SearchQueryRow,
+  type SourceKey,
+  WINDOW_DAYS,
+} from '../../_shared/types.ts';
+import { type PageFetcher, PoliteFetcher } from './http.ts';
+import { parseRobots } from './robots.ts';
+import {
+  loadKnownExternalIds,
+  loadSourceSettings,
+  markSourceRun,
+  recordRobotsCheck,
+  type SourceSettings,
+} from './sources.ts';
+
+/** Ce que le lanceur a décidé, et dont la source a besoin pour collecter. */
+export interface ScraperRunContext {
+  fetcher: PageFetcher;
+  settings: SourceSettings;
+  mode: CollectionMode;
+  windowDays: number;
+  /** Vide si la source n'a pas demandé le préchargement. */
+  knownExternalIds: ReadonlySet<string>;
+}
+
+/** Tout ce qui distingue un scraper d'un autre. Le reste est commun. */
+export interface ScraperDefinition {
+  source: SourceKey;
+  /** Chemins réellement visités : ce sont EUX qu'on soumet à robots.txt. */
+  pathsUsed: string[];
+  /**
+   * Vrai si la source paie une requête par offre — on précharge alors les
+   * external_id connus pour ne pas repayer un détail déjà collecté. Faux quand
+   * la page de listing porte déjà les offres entières : il n'y a rien à
+   * économiser, et chaque passe rafraîchit last_seen_at.
+   */
+  needsKnownExternalIds: boolean;
+  fetchAll(ctx: ScraperRunContext, query: SearchQueryRow): Promise<FetchResult>;
+  map(raw: unknown): NormalizedOffer | null;
+}
+
+/** L'hôte d'exécution : c'est par là, et uniquement par là, qu'arrive Deno. */
+export interface ScraperEnvironment {
+  args: string[];
+  env(name: string): string | undefined;
+}
+
+/** Points d'injection réservés aux tests ; la production prend les valeurs par défaut. */
+export interface ScraperDependencies {
+  createDb?: (url: string, serviceRoleKey: string) => DbClient;
+  createFetcher?: (settings: SourceSettings) => PageFetcher;
+}
+
+function flag(args: string[], name: string): boolean {
+  return args.includes(`--${name}`);
+}
+
+/**
+ * Valeur d'un `--flag`, ou `null` si le flag est absent. Un flag *présent*
+ * mais sans valeur — dernier argument, ou suivi immédiatement d'un autre
+ * `--flag` — est une faute de frappe, pas une demande de valeur par défaut :
+ * ça doit échouer bruyamment plutôt que de se comporter comme si le flag
+ * n'avait jamais été donné.
+ */
+function option(args: string[], name: string): string | null {
+  const index = args.indexOf(`--${name}`);
+  if (index < 0) return null;
+  const value = index + 1 < args.length ? args[index + 1] : undefined;
+  if (value === undefined || value.startsWith('--')) {
+    throw new Error(`--${name} exige une valeur`);
+  }
+  return value;
+}
+
+/**
+ * Comme `option`, mais la valeur doit appartenir à `accepted` — sinon échec
+ * bruyant nommant la valeur fautive et les valeurs acceptées.
+ *
+ * Un `--mode` mal orthographié ne doit JAMAIS retomber silencieusement sur la
+ * valeur par défaut : `--mode backfil` lancerait une collecte de trois jours
+ * pendant que l'opérateur croit en faire une de trente et un, sans que rien
+ * dans la sortie ne le démente. C'est la forme exacte du faux succès que ce
+ * dépôt a déjà payée deux fois.
+ */
+function enumOption<T extends string>(
+  args: string[],
+  name: string,
+  accepted: readonly T[],
+  fallback: T,
+): T {
+  const value = option(args, name);
+  if (value === null) return fallback;
+  if (!accepted.includes(value as T)) {
+    throw new Error(
+      `--${name} invalide : « ${value} » n'est pas reconnu ; attendu ${accepted.join(' ou ')}`,
+    );
+  }
+  return value as T;
+}
+
+function requireEnv(host: ScraperEnvironment, name: string): string {
+  const value = host.env(name);
+  if (!value) throw new Error(`variable d'environnement manquante : ${name}`);
+  return value;
+}
+
+export async function runScraperMain(
+  scraper: ScraperDefinition,
+  host: ScraperEnvironment,
+  deps: ScraperDependencies = {},
+): Promise<number> {
+  const mode: CollectionMode = enumOption(host.args, 'mode', ['delta', 'backfill'] as const, 'delta');
+  const trigger: RunTrigger = enumOption(host.args, 'trigger', ['manual', 'cron'] as const, 'manual');
+  const dryRun = flag(host.args, 'dry-run');
+  const onlyLabel = option(host.args, 'query');
+
+  const url = requireEnv(host, 'SUPABASE_URL');
+  const serviceRoleKey = requireEnv(host, 'SUPABASE_SERVICE_ROLE_KEY');
+  const db = deps.createDb
+    ? deps.createDb(url, serviceRoleKey)
+    : createDbClient({ url, serviceRoleKey });
+
+  const settings = await loadSourceSettings(db, scraper.source);
+  if (!settings.enabled) {
+    log('warn', 'source désactivée en base, rien à faire', { source: scraper.source });
+    return 0;
+  }
+
+  const fetcher = deps.createFetcher
+    ? deps.createFetcher(settings)
+    : new PoliteFetcher({ userAgent: settings.userAgent, minDelayMs: settings.minDelayMs });
+
+  // robots.txt à CHAQUE exécution : une autorisation constatée en septembre ne
+  // vaut rien en décembre. Le verdict est écrit même à blanc — c'est un fait sur
+  // le monde extérieur, et une répétition à blanc sert justement à l'apprendre.
+  const robots = await fetcher.get(`${settings.baseUrl}/robots.txt`);
+  const rules = parseRobots(robots.body, settings.userAgent);
+  const allowed = scraper.pathsUsed.every((path) => rules.allows(path));
+  await recordRobotsCheck(db, scraper.source, allowed);
+  if (!allowed) {
+    log('error', 'robots.txt refuse désormais la collecte : arrêt', { source: scraper.source });
+    if (!dryRun) await markSourceRun(db, scraper.source, 'failed');
+    return 1;
+  }
+
+  let builder = db
+    .from('search_queries')
+    .select('*')
+    .eq('source', scraper.source)
+    .eq('enabled', true);
+  if (onlyLabel) builder = builder.eq('label', onlyLabel);
+
+  const { data, error } = await builder.order('priority', { ascending: true });
+  if (error) throw new Error(`lecture des requêtes : ${error.message}`);
+  const queries = (data ?? []) as SearchQueryRow[];
+  if (queries.length === 0) throw new Error(`aucune requête active pour ${scraper.source}`);
+
+  const knownExternalIds = scraper.needsKnownExternalIds && mode === 'delta'
+    ? await loadKnownExternalIds(db, scraper.source)
+    : new Set<string>();
+
+  const ctx: ScraperRunContext = {
+    fetcher,
+    settings,
+    mode,
+    windowDays: WINDOW_DAYS[mode],
+    knownExternalIds,
+  };
+
+  const summary = await runCollection({
+    db,
+    source: scraper.source,
+    mode,
+    trigger,
+    dryRun,
+    queries,
+    fetchAll: (query) => scraper.fetchAll(ctx, query),
+    map: (raw) => scraper.map(raw),
+  });
+
+  if (!dryRun) await markSourceRun(db, scraper.source, summary.status);
+  console.log(JSON.stringify(summary, null, 2));
+
+  return summary.status === 'failed' ? 1 : 0;
+}
+```
+
+**Note pour l'implémenteur** : l'ordre `.eq().eq().order()` importe pour le
+double de test ci-dessus, et `builder.order(...)` doit être **la dernière**
+étape, celle qui est attendue. Si le typage de supabase-js impose une autre
+forme, adapter le test **et le dire dans le rapport** — mais ne jamais
+supprimer l'assertion sur le filtre `--query`.
+
+- [ ] **Step 4: Tests verts, porte complète, commit**
+
+```bash
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm run verify
+git add supabase/functions/_scrapers/_shared/main-runner.ts supabase/functions/_scrapers/_shared/__tests__/main-runner_test.ts
+git commit -m "feat(scrapers): lanceur commun, robots verifie a chaque execution"
+```
+
+Expected : 14 tests de plus, `verify` vert.
+
+**Ce qu'il ne faut PAS faire :** aucun `Deno.*` dans ce fichier — c'est
+précisément ce que `ScraperEnvironment` évite. Ne pas ajouter d'option de ligne
+de commande que le plan ne demande pas.
+
+---
+
+### Task 9: Point d'entrée Free-Work et première collecte réelle
 
 **Files:**
 - Create: `supabase/functions/_scrapers/free-work/main.ts`
@@ -2261,129 +2873,38 @@ exécution réelle prouve que l'URL construite par le code répond.
 // lise l'environnement : la frontière runtime du dépôt s'applique ici comme
 // pour les index.ts des Edge Functions.
 //
+// Tout le déroulé — réglages de politesse, robots.txt, chargement des requêtes,
+// collecte, marquage du run — vit dans _shared/main-runner.ts et est partagé
+// avec Collective. Ce fichier ne dit que ce qui distingue Free-Work.
+//
 // Usage :
 //   npm run scrape:free-work -- --mode delta
 //   npm run scrape:free-work -- --mode backfill --query fw:skill:react
 //   npm run scrape:free-work -- --mode delta --dry-run
 
-import { createDbClient } from '../../_shared/db.ts';
-import { log } from '../../_shared/logger.ts';
-import { runCollection } from '../../_shared/run-collection.ts';
-import {
-  type CollectionMode,
-  type RunTrigger,
-  type SearchQueryRow,
-  WINDOW_DAYS,
-} from '../../_shared/types.ts';
-import { PoliteFetcher } from '../_shared/http.ts';
-import { parseRobots } from '../_shared/robots.ts';
-import {
-  loadKnownExternalIds,
-  loadSourceSettings,
-  markSourceRun,
-  recordRobotsCheck,
-} from '../_shared/sources.ts';
+import { runScraperMain, type ScraperDefinition } from '../_shared/main-runner.ts';
 import { fetchFreeWorkOffers } from './client.ts';
 import { mapFreeWorkOffer } from './mapper.ts';
 
-const SOURCE = 'free_work' as const;
-/** Chemins que le scraper visitera : ce sont EUX qu'on soumet à robots.txt. */
-const PATHS_USED = ['/fr/tech-it/jobs/react', '/fr/tech-it/job-mission/x/y'];
+const FREE_WORK: ScraperDefinition = {
+  source: 'free_work',
+  /** Les deux surfaces réellement visitées : un listing et une page d'offre. */
+  pathsUsed: ['/fr/tech-it/jobs/react', '/fr/tech-it/job-mission/x/y'],
+  /** Chaque offre coûte une page de détail : on ne repaie pas ce qu'on connaît. */
+  needsKnownExternalIds: true,
+  fetchAll: (ctx, query) =>
+    fetchFreeWorkOffers({
+      fetcher: ctx.fetcher,
+      baseUrl: ctx.settings.baseUrl,
+      maxListingPages: ctx.settings.maxPagesPerRun,
+      windowDays: ctx.windowDays,
+      knownExternalIds: ctx.knownExternalIds,
+      refetchKnown: ctx.mode === 'backfill',
+    }, query),
+  map: mapFreeWorkOffer,
+};
 
-function requireEnv(name: string): string {
-  const value = Deno.env.get(name);
-  if (!value) throw new Error(`variable d'environnement manquante : ${name}`);
-  return value;
-}
-
-function flag(name: string): boolean {
-  return Deno.args.includes(`--${name}`);
-}
-
-function option(name: string): string | null {
-  const index = Deno.args.indexOf(`--${name}`);
-  return index >= 0 && index + 1 < Deno.args.length ? Deno.args[index + 1] : null;
-}
-
-async function main(): Promise<number> {
-  const mode: CollectionMode = option('mode') === 'backfill' ? 'backfill' : 'delta';
-  const trigger: RunTrigger = option('trigger') === 'cron' ? 'cron' : 'manual';
-  const dryRun = flag('dry-run');
-  const onlyLabel = option('query');
-
-  const db = createDbClient({
-    url: requireEnv('SUPABASE_URL'),
-    serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  });
-
-  const settings = await loadSourceSettings(db, SOURCE);
-  if (!settings.enabled) {
-    log('warn', 'source désactivée en base, rien à faire', { source: SOURCE });
-    return 0;
-  }
-
-  const fetcher = new PoliteFetcher({
-    userAgent: settings.userAgent,
-    minDelayMs: settings.minDelayMs,
-  });
-
-  // robots.txt à CHAQUE exécution : une autorisation constatée en septembre ne
-  // vaut rien en décembre.
-  const robotsPage = await fetcher.get(`${settings.baseUrl}/robots.txt`);
-  const rules = parseRobots(robotsPage.body, settings.userAgent);
-  const allowed = PATHS_USED.every((path) => rules.allows(path));
-  await recordRobotsCheck(db, SOURCE, allowed);
-  if (!allowed) {
-    log('error', 'robots.txt refuse désormais la collecte : arrêt', { source: SOURCE });
-    await markSourceRun(db, SOURCE, 'failed');
-    return 1;
-  }
-
-  let builder = db
-    .from('search_queries')
-    .select('*')
-    .eq('source', SOURCE)
-    .eq('enabled', true)
-    .order('priority', { ascending: true });
-  if (onlyLabel) builder = builder.eq('label', onlyLabel);
-
-  const { data, error } = await builder;
-  if (error) throw new Error(`lecture des requêtes : ${error.message}`);
-  const queries = (data ?? []) as SearchQueryRow[];
-  if (queries.length === 0) throw new Error(`aucune requête active pour ${SOURCE}`);
-
-  // En delta, on ne repaie pas la page de détail d'une offre déjà connue : la
-  // facette react à elle seule coûterait 196 requêtes par jour pour rien.
-  const knownExternalIds = mode === 'backfill'
-    ? new Set<string>()
-    : await loadKnownExternalIds(db, SOURCE);
-
-  const summary = await runCollection({
-    db,
-    source: SOURCE,
-    mode,
-    trigger,
-    dryRun,
-    queries,
-    fetchAll: (query) =>
-      fetchFreeWorkOffers({
-        fetcher,
-        baseUrl: settings.baseUrl,
-        maxListingPages: settings.maxPagesPerRun,
-        windowDays: WINDOW_DAYS[mode],
-        knownExternalIds,
-        refetchKnown: mode === 'backfill',
-      }, query),
-    map: (raw) => mapFreeWorkOffer(raw),
-  });
-
-  if (!dryRun) await markSourceRun(db, SOURCE, summary.status);
-  console.log(JSON.stringify({ ...summary, requests: fetcher.requestCount }, null, 2));
-
-  return summary.status === 'failed' ? 1 : 0;
-}
-
-Deno.exit(await main());
+Deno.exit(await runScraperMain(FREE_WORK, { args: Deno.args, env: (name) => Deno.env.get(name) }));
 ```
 
 - [ ] **Step 2: Ajouter les scripts npm**
@@ -2475,7 +2996,7 @@ facette, et seulement si la mesure le justifie.
 
 ---
 
-### Task 9: Collective.work — client et mapper
+### Task 10: Collective.work — client et mapper
 
 **Files:**
 - Create: `supabase/functions/_scrapers/collective/client.ts`
@@ -2951,131 +3472,60 @@ page de listing est la surface publique, celle que `robots.txt` autorise.
 
 ---
 
-### Task 10: Point d'entrée Collective et collecte réelle
+### Task 11: Point d'entrée Collective et collecte réelle
 
 **Files:**
 - Create: `supabase/functions/_scrapers/collective/main.ts`
 
 **Interfaces:**
-- Consumes: tout ce qui précède. Le script npm existe déjà (tâche 8).
+- Consumes: tout ce qui précède. Le script npm existe déjà (tâche 9).
 - Produces: des missions Collective en base.
 
 - [ ] **Step 1: Écrire `main.ts`**
 
-Structure **identique** à celle de Free-Work, aux quatre différences près :
-`SOURCE = 'collective'`, `PATHS_USED = ['/jobs/fr']`, l'appel client
-(`fetchCollectiveOffers` avec `maxPages: settings.maxPagesPerRun`), et
-**l'absence de `knownExternalIds`** — Collective ne visite aucune page de
-détail, donc rien à économiser : chaque passe revoit les 30 missions de chaque
-page et met à jour `last_seen_at` et `seen_count`, comme les deux API.
+Le déroulé vit dans le lanceur commun de la tâche 8 : ce fichier ne déclare que
+ce qui distingue Collective. Une seule de ces valeurs mérite un mot —
+`needsKnownExternalIds: false`. Collective ne visite aucune page de détail, donc
+il n'y a **rien à économiser** : chaque passe revoit les 30 missions de chaque
+page et rafraîchit `last_seen_at` et `seen_count`, exactement comme les deux
+API. C'est l'inverse de Free-Work, et pour une raison mesurée, pas par symétrie.
 
 ```ts
 // Point d'entrée du scraper Collective.work. SEUL fichier de
 // _scrapers/collective/ qui lise l'environnement.
+//
+// Le déroulé est celui de _shared/main-runner.ts, partagé avec Free-Work : ce
+// fichier ne dit que ce qui distingue Collective.
 //
 // Usage :
 //   npm run scrape:collective -- --mode delta
 //   npm run scrape:collective -- --mode backfill
 //   npm run scrape:collective -- --mode delta --dry-run
 
-import { createDbClient } from '../../_shared/db.ts';
-import { log } from '../../_shared/logger.ts';
-import { runCollection } from '../../_shared/run-collection.ts';
-import {
-  type CollectionMode,
-  type RunTrigger,
-  type SearchQueryRow,
-  WINDOW_DAYS,
-} from '../../_shared/types.ts';
-import { PoliteFetcher } from '../_shared/http.ts';
-import { parseRobots } from '../_shared/robots.ts';
-import { loadSourceSettings, markSourceRun, recordRobotsCheck } from '../_shared/sources.ts';
+import { runScraperMain, type ScraperDefinition } from '../_shared/main-runner.ts';
 import { fetchCollectiveOffers } from './client.ts';
 import { mapCollectiveOffer } from './mapper.ts';
 
-const SOURCE = 'collective' as const;
-const PATHS_USED = ['/jobs/fr'];
+const COLLECTIVE: ScraperDefinition = {
+  source: 'collective',
+  pathsUsed: ['/jobs/fr'],
+  /**
+   * La page de listing porte déjà les missions ENTIÈRES : il n'y a aucune
+   * requête à économiser, et chaque passe rafraîchit last_seen_at et seen_count
+   * comme le font les deux API. C'est la différence de fond avec Free-Work.
+   */
+  needsKnownExternalIds: false,
+  fetchAll: (ctx, query) =>
+    fetchCollectiveOffers({
+      fetcher: ctx.fetcher,
+      baseUrl: ctx.settings.baseUrl,
+      maxPages: ctx.settings.maxPagesPerRun,
+      windowDays: ctx.windowDays,
+    }, query),
+  map: mapCollectiveOffer,
+};
 
-function requireEnv(name: string): string {
-  const value = Deno.env.get(name);
-  if (!value) throw new Error(`variable d'environnement manquante : ${name}`);
-  return value;
-}
-
-function flag(name: string): boolean {
-  return Deno.args.includes(`--${name}`);
-}
-
-function option(name: string): string | null {
-  const index = Deno.args.indexOf(`--${name}`);
-  return index >= 0 && index + 1 < Deno.args.length ? Deno.args[index + 1] : null;
-}
-
-async function main(): Promise<number> {
-  const mode: CollectionMode = option('mode') === 'backfill' ? 'backfill' : 'delta';
-  const trigger: RunTrigger = option('trigger') === 'cron' ? 'cron' : 'manual';
-  const dryRun = flag('dry-run');
-
-  const db = createDbClient({
-    url: requireEnv('SUPABASE_URL'),
-    serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  });
-
-  const settings = await loadSourceSettings(db, SOURCE);
-  if (!settings.enabled) {
-    log('warn', 'source désactivée en base, rien à faire', { source: SOURCE });
-    return 0;
-  }
-
-  const fetcher = new PoliteFetcher({
-    userAgent: settings.userAgent,
-    minDelayMs: settings.minDelayMs,
-  });
-
-  const robotsPage = await fetcher.get(`${settings.baseUrl}/robots.txt`);
-  const rules = parseRobots(robotsPage.body, settings.userAgent);
-  const allowed = PATHS_USED.every((path) => rules.allows(path));
-  await recordRobotsCheck(db, SOURCE, allowed);
-  if (!allowed) {
-    log('error', 'robots.txt refuse désormais la collecte : arrêt', { source: SOURCE });
-    await markSourceRun(db, SOURCE, 'failed');
-    return 1;
-  }
-
-  const { data, error } = await db
-    .from('search_queries')
-    .select('*')
-    .eq('source', SOURCE)
-    .eq('enabled', true)
-    .order('priority', { ascending: true });
-  if (error) throw new Error(`lecture des requêtes : ${error.message}`);
-  const queries = (data ?? []) as SearchQueryRow[];
-  if (queries.length === 0) throw new Error(`aucune requête active pour ${SOURCE}`);
-
-  const summary = await runCollection({
-    db,
-    source: SOURCE,
-    mode,
-    trigger,
-    dryRun,
-    queries,
-    fetchAll: (query) =>
-      fetchCollectiveOffers({
-        fetcher,
-        baseUrl: settings.baseUrl,
-        maxPages: settings.maxPagesPerRun,
-        windowDays: WINDOW_DAYS[mode],
-      }, query),
-    map: (raw) => mapCollectiveOffer(raw),
-  });
-
-  if (!dryRun) await markSourceRun(db, SOURCE, summary.status);
-  console.log(JSON.stringify({ ...summary, requests: fetcher.requestCount }, null, 2));
-
-  return summary.status === 'failed' ? 1 : 0;
-}
-
-Deno.exit(await main());
+Deno.exit(await runScraperMain(COLLECTIVE, { args: Deno.args, env: (name) => Deno.env.get(name) }));
 ```
 
 - [ ] **Step 2: Répétition à blanc**
@@ -3126,7 +3576,7 @@ sans mesure — au-delà, on paie des pages de 2024.
 
 ---
 
-### Task 11: Planification quotidienne, mesure d'ensemble et documentation
+### Task 12: Planification quotidienne, mesure d'ensemble et documentation
 
 **Files:**
 - Create: `scripts/scrape-daily.cmd`
@@ -3135,7 +3585,7 @@ sans mesure — au-delà, on paie des pages de 2024.
 - Modify: `CLAUDE.md`
 
 **Interfaces:**
-- Consumes: les collectes réelles des tâches 8 et 10.
+- Consumes: les collectes réelles des tâches 9 et 11.
 - Produces: une veille quotidienne qui tourne seule quand le PC est allumé, et
   une documentation qui dit la vérité mesurée.
 
@@ -3214,7 +3664,7 @@ et sur France Travail.
 C'est une exigence, pas une finition. Y consigner :
 
 - Le tableau d'indicateurs rafraîchi — **compté en base, jamais recopié**.
-- Une section « Plan B » listant les onze tâches et leur état.
+- Une section « Plan B » listant les douze tâches et leur état.
 - **Les trois affirmations démenties** par la reconnaissance : les sitemaps,
   Kicklox, et le sitemap comme surface. Corriger explicitement, à la manière de
   la ligne « Corrigé le 2026-09-08 » déjà présente. Ne pas laisser deux versions

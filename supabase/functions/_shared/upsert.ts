@@ -27,6 +27,24 @@ interface KnownOfferRow {
 }
 
 /**
+ * Taille de lot pour relire les offres connues (voir plus bas), et pour
+ * écrire le payload final. PostgREST met la liste de `.in(...)` dans la
+ * query string : un lot trop gros dépasse la limite de longueur d'URL et
+ * échoue en HTTP 400, avant toute écriture. Constaté en collecte réelle :
+ * 539 ids passent, ~1 800 ids échouent systématiquement. 200 ids par lot, à
+ * quelques dizaines de caractères chacun, tient très large sous n'importe
+ * quelle limite d'URL courante (souvent 8 ko), avec une marge d'environ 9x
+ * sous le seuil d'échec observé.
+ *
+ * L'écriture ne porte pas la même contrainte (elle passe par le corps de la
+ * requête, pas l'URL), mais elle porte le `raw` JSON complet de chaque
+ * offre : le backfill Collective réel a écrit 1 760 lignes ainsi, de l'ordre
+ * de 8 à 10 Mo en un seul POST. Réutiliser la même constante pour les deux
+ * évite un second seuil à justifier séparément.
+ */
+const KNOWN_OFFERS_CHUNK_SIZE = 200;
+
+/**
  * Insère ou met à jour un lot d'offres et renvoie le comptage new/updated.
  *
  * Le dédoublonnage repose sur la contrainte unique (source, external_id).
@@ -98,16 +116,27 @@ export async function upsertOffers(
   const source = rows[0].source;
   const ids = rows.map((r) => r.external_id);
 
-  const { data: existing, error: selectError } = await db
-    .from('offers')
-    .select('external_id, seen_count, found_by_query_ids')
-    .eq('source', source)
-    .in('external_id', ids);
+  // Lues par lots et non en une seule requête (voir KNOWN_OFFERS_CHUNK_SIZE) :
+  // un scraper peut soumettre un lot de plusieurs milliers d'ids en un seul
+  // appel, contrairement aux sources API qui upsertent une requête à la fois.
+  // Séquentiel, jamais en parallèle : une seule requête à la fois vers la
+  // base, comme partout ailleurs dans ce projet.
+  const existing: KnownOfferRow[] = [];
+  for (let i = 0; i < ids.length; i += KNOWN_OFFERS_CHUNK_SIZE) {
+    const chunk = ids.slice(i, i + KNOWN_OFFERS_CHUNK_SIZE);
+    const { data, error: selectError } = await db
+      .from('offers')
+      .select('external_id, seen_count, found_by_query_ids')
+      .eq('source', source)
+      .in('external_id', chunk);
 
-  if (selectError) throw new Error(`lecture des offres connues : ${selectError.message}`);
+    if (selectError) throw new Error(`lecture des offres connues : ${selectError.message}`);
+
+    existing.push(...(data ?? []));
+  }
 
   const known = new Map(
-    (existing ?? []).map((r: KnownOfferRow) => [r.external_id, {
+    existing.map((r: KnownOfferRow) => [r.external_id, {
       seenCount: r.seen_count ?? 1,
       foundByQueryIds: r.found_by_query_ids ?? [],
     }]),
@@ -135,11 +164,24 @@ export async function upsertOffers(
     };
   });
 
-  const { error: upsertError } = await db
-    .from('offers')
-    .upsert(payload, { onConflict: 'source,external_id' });
+  // Écrit par lots, comme la lecture, et pour la même raison de taille : un
+  // scraper peut soumettre plusieurs milliers d'offres d'un coup, `raw`
+  // complet compris — le backfill Collective réel a écrit 1 760 lignes ainsi,
+  // de l'ordre de 8 à 10 Mo en un seul POST, et la migration qui accompagne
+  // cette tâche fait grossir cette écriture d'encore deux tiers.
+  //
+  // Non atomique entre lots, et c'est sans danger : l'upsert est idempotent
+  // sur (source, external_id), donc un lot à moitié écrit par une panne
+  // réseau est simplement réparé par la prochaine collecte de cette source,
+  // qui réécrit les mêmes lignes avec les mêmes valeurs déterministes.
+  for (let i = 0; i < payload.length; i += KNOWN_OFFERS_CHUNK_SIZE) {
+    const chunk = payload.slice(i, i + KNOWN_OFFERS_CHUNK_SIZE);
+    const { error: upsertError } = await db
+      .from('offers')
+      .upsert(chunk, { onConflict: 'source,external_id' });
 
-  if (upsertError) throw new Error(`upsert des offres : ${upsertError.message}`);
+    if (upsertError) throw new Error(`upsert des offres : ${upsertError.message}`);
+  }
 
   const updated = ids.filter((id) => known.has(id)).length;
   return { new: rows.length - updated, updated };
