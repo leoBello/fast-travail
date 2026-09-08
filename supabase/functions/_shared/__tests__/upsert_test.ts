@@ -287,7 +287,9 @@ Deno.test(
     // toutes les autres sont nouvelles.
     assertEquals(result, { new: total - 1, updated: 1 });
 
-    const knownRow = (upserted[0] as Record<string, unknown>[]).find(
+    // L'écriture est elle aussi en plusieurs lots (voir les tests dédiés
+    // plus bas) : la ligne connue peut tomber dans n'importe lequel.
+    const knownRow = (upserted.flat() as Record<string, unknown>[]).find(
       (r) => r.external_id === knownId,
     );
     assertEquals(knownRow?.seen_count, 8);
@@ -335,3 +337,81 @@ Deno.test(
     assertEquals(upserted.length, 0);
   },
 );
+
+Deno.test(
+  "upsertOffers écrit par lots quand le nombre d'offres dépasse un lot, en couvrant chaque ligne une seule fois",
+  async () => {
+    // Régression : Collective upserte tout un run d'un coup — 1 760 lignes
+    // avec le raw JSON complet lors du backfill réel, plusieurs Mo en un seul
+    // POST. 500 ici, largement au-dessus d'un seul lot, pour forcer plusieurs
+    // écritures séquentielles.
+    const total = 500;
+    const ids = Array.from({ length: total }, (_, i) => `W${i}`);
+    const { db, upserted } = fakeDb([]);
+    const offers = ids.map((id) => emptyOffer('collective', id, `Dev ${id}`));
+
+    const result = await upsertOffers(db, offers, { queryId: null });
+
+    // Plusieurs écritures séquentielles ont eu lieu.
+    assertEquals(upserted.length > 1, true);
+
+    // Chaque offre a été écrite exactement une fois, tous lots confondus.
+    const written = upserted.flat() as Record<string, unknown>[];
+    assertEquals(written.length, total);
+    const writtenIds = written.map((r) => r.external_id);
+    assertEquals(new Set(writtenIds).size, total);
+    assertEquals([...new Set(writtenIds)].sort(), [...ids].sort());
+
+    assertEquals(result, { new: total, updated: 0 });
+  },
+);
+
+Deno.test('upsertOffers écrit en un seul lot quand le nombre d’offres tient dans un lot', async () => {
+  const { db, upserted } = fakeDb([]);
+  const offers = [
+    emptyOffer('france_travail', 'A1', 'Dev React'),
+    emptyOffer('france_travail', 'A2', 'Dev TypeScript'),
+    emptyOffer('france_travail', 'A3', 'Dev Next'),
+  ];
+
+  await upsertOffers(db, offers, { queryId: null });
+
+  assertEquals(upserted.length, 1);
+  assertEquals((upserted[0] as unknown[]).length, 3);
+});
+
+Deno.test('upsertOffers propage une erreur d’écriture survenue sur un lot tardif', async () => {
+  const total = 500;
+  const ids = Array.from({ length: total }, (_, i) => `Z${i}`);
+  const upserted: unknown[][] = [];
+  let upsertCalls = 0;
+  const db = {
+    from(_table: string) {
+      return {
+        select() {
+          return { eq: () => ({ in: () => Promise.resolve({ data: [], error: null }) }) };
+        },
+        upsert(rows: unknown[], _opts: unknown) {
+          upsertCalls += 1;
+          if (upsertCalls === 2) {
+            return Promise.resolve({ error: { message: 'connexion perdue' } });
+          }
+          upserted.push(rows);
+          return Promise.resolve({ error: null });
+        },
+      };
+    },
+  } as unknown as DbClient;
+  const offers = ids.map((id) => emptyOffer('collective', id, `Dev ${id}`));
+
+  await assertRejects(
+    () => upsertOffers(db, offers, { queryId: null }),
+    Error,
+    'upsert des offres : connexion perdue',
+  );
+
+  // Le premier lot a bien été écrit avant que le second échoue : l'upsert
+  // étant idempotent sur (source, external_id), une réexécution répare un
+  // lot à moitié écrit — voir le commentaire dans upsert.ts.
+  assertEquals(upserted.length, 1);
+});
