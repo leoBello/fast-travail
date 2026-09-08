@@ -1,7 +1,7 @@
 # État d'avancement et reste à faire
 
 **Dernière mise à jour** : 2026-09-08
-**Branche de travail** : `phase-1-collecte-api`
+**Branche de travail** : `plan-b-scrapers`, partie de `confiance-par-requete`
 
 Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUDE.md`](../CLAUDE.md)
 
@@ -180,20 +180,59 @@ elle-même ; une requête `net` reste soumise à la confirmation lexicale
 (`core_hits >= 1 or ai_hits >= 1`). L'effet est immédiat sur les offres déjà
 collectées, `offers_shortlist` étant une vue.
 
-## Phase 1 — Plan B : les 4 scrapers
+## Phase 1 — Plan B : deux scrapers, et non quatre
 
-**Pas commencé, et volontairement pas encore planifié.** Free-Work,
-Codeur.com, Collective.work et Kicklox. Le `robots.txt` des quatre a été
-vérifié et autorise la collecte ; les quatre publient un sitemap XML, retenu
-comme surface de collecte plutôt que les pages de listing.
+**Planifié le 2026-09-08, contre des pages réelles capturées d'abord. Pas
+encore implémenté.** Plan :
+[`plans/2026-09-08-plan-b-scrapers-free-work-collective.md`](superpowers/plans/2026-09-08-plan-b-scrapers-free-work-collective.md),
+onze tâches. Les fixtures — quatre pages Free-Work, une page Collective, deux
+`robots.txt` — sont commitées sous `supabase/functions/_scrapers/`.
 
-Le plan sera écrit contre des fixtures HTML réelles, à capturer d'abord. Deux
-contraintes déjà connues : Codeur.com interdit les query strings sauf `?page=N`,
-et Free-Work banne `Wget` et `HTTrack` nommément.
+**La reconnaissance a démenti trois affirmations de ce document.**
 
-**Fait nouveau à exploiter** : Collective.work et Malt apparaissent comme
-employeurs dans les résultats Adzuna. Adzuna couvre donc déjà une partie des
-cibles du plan B, ce qui peut en réduire le périmètre.
+| Ce qui était écrit | Ce que la mesure dit |
+|---|---|
+| « Les quatre publient un sitemap XML, retenu comme surface de collecte » | **Faux pour trois sur quatre.** `codeur.com/sitemap.xml` répond 404. Le sitemap de Kicklox ne contient aucune mission, celui de Collective non plus — 85 URL de blog et de pages légales, et son board `/jobs` n'y figure même pas. Seul Free-Work publie un sitemap d'offres : 7 276 URL, **sans aucun `lastmod`**, donc inutilisable comme delta |
+| « Le `robots.txt` des quatre autorise la collecte » | Exact, mais sans objet pour Kicklox : **il n'y a rien à collecter**. Aucune mission publique, `app.kicklox.com/missions` est une coquille SPA de 3 955 octets derrière un login |
+| « Free-Work banne `Wget` et `HTTrack` » | Exact et sans conséquence : l'agent utilisateur honnête `fast-travail/0.1 (veille personnelle)` obtient **HTTP 200** sur les deux sources retenues. Aucune usurpation de navigateur n'est nécessaire |
+
+**Périmètre retenu, sur mesure et non sur intention :**
+
+| Source | Mesuré le 2026-09-08 | Décision |
+|---|---|---|
+| **Free-Work** | React **196**, TypeScript **180**, JavaScript **330**, Next.js 19, Marseille **66**, Aix **140**. Description **entière** (577 à 7 752 car., médiane 1 176). TJM structuré en JSON-LD sur 8 offres sur 12 | **Retenue** |
+| **Collective.work** | 6 544 missions, 30 par page en JSON complet. Sur 300 mesurées : 12 TypeScript, 3 React, 4 en full remote, 11 en PACA dont 8 à Aix | **Retenue** |
+| Codeur.com | 4 slugs front-end sur 103 projets ; flux WordPress / Webflow / SEO / marketing | Écartée : hors profil |
+| Kicklox | aucune mission publique | Écartée : impossible |
+
+**Free-Work vaut à elle seule les deux API réunies sur ce profil** : 196 offres
+React contre 5 chez Adzuna et 0 chez France Travail. Et sa description n'étant
+pas tronquée, **le lexique de compétences y redevient le filtre principal**,
+comme sur France Travail. C'est aussi la première source à porter un TJM
+structuré : `rate_raw`, nulle depuis le début du projet, cesse d'être morte.
+
+**Décisions de conception tranchées** (détail et mesures dans le plan) :
+
+- **Le sitemap est écarté comme surface** pour toutes les sources. On collecte
+  par listing paginé : `/fr/tech-it/jobs/<facette>?sort=date&page=N` chez
+  Free-Work — le tri par date est un vrai paramètre serveur, sans lui les dates
+  d'une page vont du 27/08 au 07/09 —, `/jobs/fr?page=N` chez Collective, dont
+  les filtres d'URL sont **ignorés par le serveur** (mesuré : `?query=react` rend
+  la page 1 non filtrée).
+- **Aucun champ stocké ne vient du HTML de présentation** : JSON-LD `JobPosting`
+  chez Free-Work, `__NEXT_DATA__` chez Collective. Le HTML n'est lu que pour les
+  URL et le signal d'arrêt.
+- **Scripts Deno locaux, pas Node** — contrairement à ce qu'annonce le ROADMAP.
+  La contrainte réelle était « hors Edge Functions », et Node coûterait un
+  second outillage : `verify` ne couvre que Deno.
+- **Le code va sous `supabase/functions/_scrapers/`**, et c'est mesuré :
+  `deno fmt` formate le HTML, et l'exclusion `**/__tests__/fixtures/**` de
+  `supabase/functions/deno.json` est résolue relativement au dossier de ce
+  fichier. Des fixtures placées ailleurs font échouer `fmt:check`.
+- **La politesse est une ligne en base** : les huit colonnes de `sources`
+  (`min_delay_ms`, `max_pages_per_run`, `user_agent`, `robots_allows`…), créées
+  au plan A et jamais utilisées, deviennent le cinquième axe réglable.
+  `robots.txt` est revérifié à **chaque** exécution.
 
 ## Phases 2 à 5
 

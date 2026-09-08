@@ -1,0 +1,4 @@
+# Une fixture est la capture verbatim d'une reponse externe : git ne doit y
+# convertir aucune fin de ligne, sous peine que le fichier commite differe de
+# celui qui a ete capture, et que la promesse de verbatim soit fausse.
+supabase/functions/**/__tests__/fixtures/** -text

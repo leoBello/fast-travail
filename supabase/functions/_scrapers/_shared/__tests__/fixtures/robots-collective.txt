@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /style-guide
+
+Sitemap: https://www.collective.work/sitemap.xml
+
+Sitemap: https://www.collective.work/sitemap.xml
