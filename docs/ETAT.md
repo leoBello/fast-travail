@@ -591,8 +591,29 @@ la base plutôt que le fichier.
 **1. Le dedoublonnage (P10 + P6), des que le chantier plan B est termine.**
 Les deux se concoivent ensemble : c'est le meme probleme vu de deux cotes,
 la meme annonce sous deux `external_id` dans une source, et la meme annonce
-vue par deux sources. Mesure du jour, casse et suffixes « (H/F) » normalises :
-**67 groupes, 159 offres, 92 en exces** — et ca gonfle a chaque collecte.
+vue par deux sources.
+
+Mesure du 2026-09-08 sur 1 399 offres, casse et suffixes « (H/F) »
+normalises :
+
+| | Groupes | Offres | En exces |
+|---|---:|---:|---:|
+| **Intra**-source (P10) | 57 | 139 | 82 |
+| **Inter**-sources (P6) | 21 | 49 | — |
+
+Repartition des groupes inter-sources par paire : **adzuna + france_travail
+14**, adzuna + free_work 4, france_travail + free_work 3.
+
+Ce dernier chiffre corrige une impression du document : P6 n'attendait pas
+l'arrivee des scrapers pour etre reel. **Les deux API se recouvrent deja sur
+14 annonces**, et personne ne l'avait mesure — la meme offre d'ESN publiee sur
+les deux canaux. L'arrivee de Free-Work n'ajoute que 7 groupes pour l'instant,
+mais elle republie beaucoup d'annonces d'ESN qui paraissent aussi sur France
+Travail : le gisement grossira quand Collective entrera. La tache 12 du plan B
+le chiffrera, on partira d'un nombre et non d'une intuition.
+
+Ces nombres gonflent a chaque collecte : **les remesurer au demarrage, ne pas
+les recopier.**
 
 Cette tache a un **ordre impose**, seule de la liste : elle touche
 `_shared/upsert.ts`, que les scrapers du plan B importeront. La faire avant
