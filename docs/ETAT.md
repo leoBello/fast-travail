@@ -369,9 +369,15 @@ from offers group by source order by source;
 | Source | Offres | Full remote | Zone 13/83/84 | Avec TJM | Description moy. |
 |---|---:|---:|---:|---:|---:|
 | adzuna | 557 | 80 | 483 | 0 | 500 |
-| collective | 1 783 | 64 | 73 | 800 | 2 003 |
+| collective¹ | 1 783 | 64 | 73 | 800 | 2 003 |
 | france_travail | 739 | 9 | 440 | 0 | 2 606 |
 | free_work | 105 | 3 | 33 | 34 | 1 684 |
+
+¹ Collective ne couvre que **11 jours** (2026-08-28 au 2026-09-08) là où
+adzuna et france_travail en couvrent 31 (depuis le 2026-08-08) — mesuré le
+2026-09-08 par `min(published_at)`/`max(published_at)` groupé par source. Le
+plafond de pages est corrigé (voir plus bas), mais le backfill qui couvrirait
+réellement les 31 jours n'a pas encore été rejoué.
 | **Total** | **3 184** | | | | |
 
 ```sql
@@ -466,6 +472,14 @@ au-dessus de la frontière mesurée pour absorber la variation quotidienne de
 volume. Masquer la troncature n'était pas défendable : le coût mesuré d'un
 plafond correct (5 minutes, une fois) est minuscule au regard du gain (31
 jours réels au lieu de 11, sur la seule source qui porte un TJM structuré).
+
+**Le plafond corrigé ne suffit pas à lui seul : seule la CAUSE est corrigée,
+pas la donnée.** Relever `max_pages_per_run` change ce qu'une *prochaine*
+collecte backfill ramènera ; il ne rejoue rien. Le backfill tronqué à 60
+pages n'a **pas été relancé** depuis cette migration, et les offres en base
+couvrent donc toujours 11 jours, pas 31 (voir la note sous le tableau des
+quatre sources ci-dessus) — relancer ce backfill est une collecte réelle de
+l'ordre de 5 minutes, laissée au choix de l'utilisateur.
 
 ## Phases 2 à 5
 
