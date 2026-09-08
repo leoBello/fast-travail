@@ -1919,6 +1919,7 @@ export async function fetchFreeWorkOffers(
   const windowStart = new Date(now.getTime() - cfg.windowDays * MS_PER_DAY);
 
   const paths: string[] = [];
+  const seenPaths = new Set<string>();
   let totalAvailable: number | null = null;
   let truncated = false;
 
@@ -1945,7 +1946,16 @@ export async function fetchFreeWorkOffers(
     const newest = dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null;
     if (newest !== null && newest < windowStart) break;
 
-    paths.push(...pagePaths);
+    // Déduplication sur TOUT le parcours, pas seulement dans une page : le
+    // listing est vivant et se retrie entre deux requêtes de pagination, donc
+    // une offre en bord de page reparaît couramment à la page suivante. Sans
+    // cela, elle coûte une seconde page de détail — à trois secondes de délai,
+    // c'est exactement la dépense que ce client est censé éviter.
+    for (const path of pagePaths) {
+      if (seenPaths.has(path)) continue;
+      seenPaths.add(path);
+      paths.push(path);
+    }
 
     if (page === cfg.maxListingPages) truncated = true;
   }
@@ -1978,7 +1988,7 @@ git add supabase/functions/_scrapers/free-work/
 git commit -m "feat(free-work): listing trie par date, details par JSON-LD"
 ```
 
-Expected : 8 tests de plus, `verify` vert.
+Expected : 9 tests de plus, `verify` vert.
 
 **Ce qu'il ne faut PAS faire :** ne pas extraire de titre, d'entreprise ou de
 salaire du listing. Ne pas paralléliser les requêtes de détail. Ne pas filtrer
