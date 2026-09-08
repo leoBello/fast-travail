@@ -29,8 +29,10 @@ quand le lexique ne voit rien dans les 500 caractères tronqués — c'est ce qu
 manquait pour exploiter les offres full remote qu'Adzuna indexe sans les
 rendre lisibles. Résultat mesuré : la sélection passe de 31 à 66 puis, après
 correction de la revue (`adzuna:remote:fr-js` déclassée), à **64** offres
-(voir la section dédiée plus bas). Chiffre qui suit dans ce document : **64**,
-pas les 12, 31 ou 66 des étapes précédentes.
+(voir la section dédiée plus bas). **Ne pas figer ce nombre ici** : deux crons
+collectent chaque matin, donc il bouge tous les jours. Le tableau ci-dessous
+est recompté en base ; c'est lui qui fait foi, et la trajectoire 31 → 69 → 66
+→ 64 ne décrit que l'effet du plan au moment de sa livraison.
 
 ```sql
 select * from offers_shortlist order by score desc, published_at desc;
@@ -430,8 +432,9 @@ Mesuré en base (regroupement par `source`, `company_name`, et titre normalisé
   `company_name <> ''`, et une reformulation par `count() over (partition
   by ...)`), toutes stables à ce total — le rapport initial de la tâche 4
   annonçait par erreur 47/106/59.
-- Sur les 64 offres actuellement dans `offers_shortlist` (après le
-  déclassement `fr-js` ci-dessus) — ce qui compte pour l'usage réel, une
+- Sur les 64 offres que comptait `offers_shortlist` au moment de cette mesure
+  (après le déclassement `fr-js` ci-dessus ; la sélection a grossi depuis, le
+  cron tournant chaque matin) — ce qui compte pour l'usage réel, une
   liste triée par score que le propriétaire relit à la main : **5 paires
   détectées par regroupement sensible à la casse** (AMILTONE, Capgemini,
   KLANIK, Malt « Senior Fullstack Engineer », Pretto), soit 10 offres sur 64
