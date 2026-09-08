@@ -12,7 +12,19 @@ export const IMPLIES_REMOTE_KEY = 'implies_remote';
 /** Valeurs acceptées pour extra_params.implies_remote — le reste est ignoré. RemoteMode
  * inclut déjà `null`, donc le tuple couvre tout le type sans qu'il faille répéter `| null`
  * dans AdzunaProvenance ci-dessous. */
-const REMOTE_MODE_VALUES = ['full', 'hybride', 'ponctuel', 'mention'] as const;
+/**
+ * Valeurs acceptées pour `extra_params.implies_remote`, indexées par la valeur elle-même.
+ *
+ * La forme `Record<Exclude<RemoteMode, null>, true>` n'est pas décorative : elle est
+ * **exhaustive**. Ajouter un mode à `RemoteMode` sans l'ajouter ici casse la compilation,
+ * là où un tableau de littéraux aurait silencieusement cessé de couvrir le type.
+ */
+const REMOTE_MODE_VALUES: Readonly<Record<Exclude<RemoteMode, null>, true>> = {
+  full: true,
+  hybride: true,
+  ponctuel: true,
+  mention: true,
+};
 
 export interface AdzunaProvenance {
   searchOriginInsee: string | null;
@@ -52,15 +64,15 @@ interface AdzunaRawOffer {
 }
 
 /**
- * Garde de type sur le tuple `as const` : un seul `as` (élargissement du tuple littéral
- * vers `readonly string[]` pour que `.includes` accepte un `string` quelconque), au lieu
- * des deux conversions de l'ancienne version (`REMOTE_MODES as readonly string[]` en
- * entrée ET `raw as RemoteMode` en sortie). Grâce à ce prédicat, TypeScript restreint
- * automatiquement le type de `raw` dans le ternaire de `asRemoteMode` : la valeur de
- * retour n'a plus besoin d'aucune conversion.
+ * Garde de type sans aucune conversion.
+ *
+ * Le prédicat `value is …` porte la restriction de type, et le corps n'a plus qu'à
+ * répondre un booléen : c'est ce découplage qui évite le `as`. `Object.hasOwn` plutôt
+ * que l'opérateur `in`, qui suit la chaîne de prototypes et aurait accepté `toString`
+ * ou `constructor` comme des modes de télétravail valides.
  */
-function isRemoteModeValue(value: string): value is (typeof REMOTE_MODE_VALUES)[number] {
-  return (REMOTE_MODE_VALUES as readonly string[]).includes(value);
+function isRemoteModeValue(value: string): value is Exclude<RemoteMode, null> {
+  return Object.hasOwn(REMOTE_MODE_VALUES, value);
 }
 
 function asRemoteMode(raw: unknown): RemoteMode {

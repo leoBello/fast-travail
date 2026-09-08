@@ -210,6 +210,33 @@ Deno.test(
   },
 );
 
+Deno.test(
+  'buildAdzunaUrl refuse `what` et renvoie vers what_and (le piège mesuré)',
+  () => {
+    // `what` existe chez Adzuna, donc l'admettre serait défendable — sauf qu'il
+    // n'est PAS un ET logique : mesuré à 1 offre pour `what "React télétravail"`
+    // contre 313 pour `what_and`. Quelqu'un qui règle la matrice en SQL
+    // l'emploierait en croyant obtenir un ET, et sa requête tournerait, verte et
+    // quasi vide. Le refus au moment de construire l'URL est le seul endroit où
+    // l'avertissement arrive à temps.
+    const trapQuery: SearchQueryRow = {
+      ...remoteQuery,
+      id: 110,
+      keywords: null,
+      extra_params: { what: 'React télétravail' },
+    };
+    const error = assertThrows(
+      () => buildAdzunaUrl(cfg, trapQuery, 'delta', 1),
+      Error,
+      'what',
+    );
+    // Le message doit nommer le remplaçant, sinon il interdit sans orienter.
+    assertMatch(error.message, /what_and/);
+    // Et porter la mesure : une règle sans son chiffre finit contournée.
+    assertMatch(error.message, /313/);
+  },
+);
+
 function pagedFetch(total: number, calls: { pages: number[] }): typeof fetch {
   return ((url: string | URL) => {
     const page = Number(new URL(String(url)).pathname.split('/').pop());

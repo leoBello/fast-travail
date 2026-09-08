@@ -185,6 +185,21 @@ Deno.test('provenanceOf renvoie null sans implies_remote', () => {
   assertEquals(provenanceOf(baseQuery).impliesRemote, null);
 });
 
+Deno.test(
+  "provenanceOf ignore les propriétés héritées d'Object (toString, constructor)",
+  () => {
+    // La garde de type interroge un objet indexé par les modes valides. Avec
+    // l'opérateur `in`, qui remonte la chaîne de prototypes, « toString » et
+    // « constructor » auraient été acceptés comme des modes de télétravail —
+    // et une requête portant `implies_remote: "toString"` aurait écrit cette
+    // chaîne dans offers.remote_label. D'où Object.hasOwn.
+    for (const hérité of ['toString', 'constructor', 'hasOwnProperty', '__proto__']) {
+      const query = { ...baseQuery, extra_params: { implies_remote: hérité } };
+      assertEquals(provenanceOf(query).impliesRemote, null, `${hérité} doit être rejeté`);
+    }
+  },
+);
+
 // Valeurs attendues écrites en dur d'après le contenu réel de la fixture (vérifiées en
 // exécutant mapAdzunaOffer dessus), pas relues dynamiquement depuis elle : le test doit
 // prouver la justesse du mapping (Résolutions B et C), pas seulement l'absence

@@ -33,12 +33,11 @@ const INSEE_TO_PLACE: Record<string, string> = {
 // lignes en base, jamais du code ») : elle doit donc couvrir tout le vocabulaire de
 // recherche d'Adzuna, pas seulement ce qu'utilise la matrice du jour.
 //
-// Trois catégories, chacune avec sa raison d'être :
+// Quatre catégories, chacune avec sa raison d'être :
 //
 // 1. Paramètres d'URL Adzuna transmissibles librement — réglables par un simple
 //    `UPDATE search_queries` sans toucher au code.
 const ADZUNA_URL_PARAMS = new Set([
-  'what',
   'what_or',
   'what_phrase',
   'what_exclude',
@@ -73,6 +72,17 @@ const OWNED_PARAM_HINTS: Readonly<Record<string, string>> = {
 // 3. Métadonnées destinées au mapper (provenanceOf dans mapper.ts), jamais transmises à
 //    l'URL Adzuna.
 const KNOWN_NON_URL_KEYS = new Set([IMPLIES_REMOTE_KEY]);
+// 4. Paramètres qui existent bel et bien chez Adzuna, mais dont la mesure a montré
+//    qu'ils trompent. Les refuser ici est le seul endroit où l'avertissement arrive à
+//    temps : celui qui règle la matrice le fait en SQL, sans lire ce fichier. Le message
+//    porte la mesure, pas seulement l'interdiction — sans le chiffre, la règle ressemble
+//    à un caprice et finira contournée.
+const TRAP_PARAM_HINTS: Readonly<Record<string, string>> = {
+  what: "`what` n'est PAS un ET logique chez Adzuna : mesuré à 1 offre pour " +
+    '`what "React télétravail"` contre 313 pour `what_and`. Utiliser la colonne ' +
+    'search_queries.keywords, qui alimente what_and, ou what_phrase pour imposer ' +
+    'une locution exacte',
+};
 
 export interface AdzunaConfig {
   appId: string;
@@ -112,10 +122,18 @@ export function buildAdzunaUrl(
     if (query.radius_km !== null) params.set('distance', String(query.radius_km));
   }
 
-  // Trois catégories de clés dans extra_params, voir les constantes de module ci-dessus.
+  // Quatre catégories de clés dans extra_params, voir les constantes de module ci-dessus.
   for (const [key, value] of Object.entries(query.extra_params ?? {})) {
     // 3. Métadonnée pour le mapper : jamais transmise, jamais un échec.
     if (KNOWN_NON_URL_KEYS.has(key)) continue;
+
+    // 4. Paramètre piège : refusé avec la mesure qui justifie le refus.
+    const trap = TRAP_PARAM_HINTS[key];
+    if (trap) {
+      throw new Error(
+        `extra_params contient "${key}" pour ${query.label} — ${trap}.`,
+      );
+    }
 
     // 2. Possédée par le client ou par une colonne dédiée : le message dit laquelle.
     const hint = OWNED_PARAM_HINTS[key];
