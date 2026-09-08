@@ -1600,7 +1600,17 @@ donnerait l'illusion d'un géocodage qui n'existe pas (P1). Ne pas toucher à
 - Create: `supabase/functions/_scrapers/free-work/client.ts`
 - Test: `supabase/functions/_scrapers/free-work/__tests__/client_test.ts`
 - Fixtures (déjà présentes, ne pas modifier) :
-  `listing-react-sort-date-page1.html`, `job-contractor-tjm.html`
+  `listing-react-sort-date-page1.html`, `job-permanent-salary.html`
+
+**La paire de fixtures n'est pas interchangeable.** `job-contractor-tjm.html` a
+été capturée depuis le listing trié par **pertinence** et ne figure pas parmi
+les seize offres du listing trié par **date** : un test qui les apparie ne peut
+pas passer, puisque aucun `harvestPaths` ne peut produire une URL absente du
+texte source. La paire cohérente est
+`listing-react-sort-date-page1.html` + `job-permanent-salary.html`, dont le
+chemin `developpeur-front-end-javascript-node-react-angular-vue/developpeur-net-react-h-f-59`
+est bien présent dans le listing. `job-contractor-tjm.html` sert en tâche 7,
+où le listing n'intervient pas.
 
 **Interfaces:**
 - Consumes: `PageFetcher` de `_scrapers/_shared/http.ts`, `extractJsonLd` de
@@ -1633,7 +1643,7 @@ const listing = await Deno.readTextFile(
   new URL('./fixtures/listing-react-sort-date-page1.html', import.meta.url),
 );
 const detail = await Deno.readTextFile(
-  new URL('./fixtures/job-contractor-tjm.html', import.meta.url),
+  new URL('./fixtures/job-permanent-salary.html', import.meta.url),
 );
 
 function queryRow(extra: Record<string, unknown>): SearchQueryRow {
@@ -1666,7 +1676,7 @@ function fetcherFor(pages: Map<string, string>, seen: string[] = []): PageFetche
 const BASE = 'https://www.free-work.com';
 const LISTING_1 = `${BASE}/fr/tech-it/jobs/react?sort=date&page=1`;
 const DETAIL_PATH =
-  '/fr/tech-it/job-mission/developpeur-front-end-javascript-node-react-angular-vue/developpeur-react-node-nestjs-anglais-courant-obligatoire';
+  '/fr/tech-it/job-mission/developpeur-front-end-javascript-node-react-angular-vue/developpeur-net-react-h-f-59';
 
 Deno.test('facetOf lit la facette dans extra_params', () => {
   assertEquals(facetOf(queryRow({ facet: 'react' })), 'react');
@@ -1826,7 +1836,7 @@ const JOB_PATH = /href="(\/fr\/tech-it\/job-mission\/[^"]+)"/g;
 /** Date de publication affichée sur une carte, au format MM/JJ/AAAA. */
 const CARD_DATE = /<time>(\d{2})\/(\d{2})\/(\d{4})<\/time>/g;
 /** Nombre total d'offres de la facette, affiché par le site. Télémétrie seulement. */
-const TOTAL = /(\d[\d\s\u00a0]*)\s*résultats?/i;
+const TOTAL = /(\d[\d\s ]*)(?:<[^>]*>|\s)*résultats?/i;
 const PATH_PREFIX = '/fr/tech-it/job-mission/';
 const MS_PER_DAY = 86_400_000;
 
