@@ -161,6 +161,37 @@ Deno.test('le plafond de pages marque le résultat comme tronqué', async () => 
   assertEquals(result.truncated, true);
 });
 
+Deno.test('une offre vue sur deux pages ne coûte qu’une requête de détail', async () => {
+  // Le listing est vivant et retrié entre deux pages paginées : la même offre
+  // peut se retrouver à la fois en page 1 et en page 2. On sert ici la même
+  // fixture pour les deux pages afin de le reproduire, et on vérifie que la
+  // page de détail n'est demandée qu'une fois — pas deux.
+  const seen: string[] = [];
+  const pages = new Map([
+    [LISTING_1, listing],
+    [`${BASE}/fr/tech-it/jobs/react?sort=date&page=2`, listing],
+    [`${BASE}${DETAIL_PATH}`, detail],
+  ]);
+  const known = new Set(
+    [...listing.matchAll(/href="\/fr\/tech-it\/job-mission\/([^"]+)"/g)].map((m) => m[1]),
+  );
+  known.delete(externalIdFromPath(DETAIL_PATH));
+
+  const result = await fetchFreeWorkOffers({
+    fetcher: fetcherFor(pages, seen),
+    baseUrl: BASE,
+    maxListingPages: 2,
+    windowDays: 3,
+    knownExternalIds: known,
+    refetchKnown: false,
+    now: () => new Date('2026-09-08T12:00:00Z'),
+  }, queryRow({ facet: 'react' }));
+
+  assertEquals(result.offers.length, 1);
+  const detailRequests = seen.filter((url) => url === `${BASE}${DETAIL_PATH}`);
+  assertEquals(detailRequests.length, 1, 'la page de détail ne doit être demandée qu’une fois');
+});
+
 Deno.test('une page de listing absente remonte l’erreur', async () => {
   await assertRejects(
     () =>

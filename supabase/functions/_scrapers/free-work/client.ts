@@ -111,6 +111,11 @@ export async function fetchFreeWorkOffers(
   const windowStart = new Date(now.getTime() - cfg.windowDays * MS_PER_DAY);
 
   const paths: string[] = [];
+  // Le listing est vivant et retrié entre deux fetchs paginés : une même offre
+  // se retrouve couramment à cheval sur deux pages. `harvestPaths` ne déduplique
+  // que dans une page ; ici on déduplique sur tout le parcours, en gardant le
+  // premier passage de chaque chemin — sinon sa page de détail est payée deux fois.
+  const seenPaths = new Set<string>();
   let totalAvailable: number | null = null;
   let truncated = false;
 
@@ -137,7 +142,11 @@ export async function fetchFreeWorkOffers(
     const newest = dates.length > 0 ? dates.reduce((a, b) => (a > b ? a : b)) : null;
     if (newest !== null && newest < windowStart) break;
 
-    paths.push(...pagePaths);
+    for (const path of pagePaths) {
+      if (seenPaths.has(path)) continue;
+      seenPaths.add(path);
+      paths.push(path);
+    }
 
     if (page === cfg.maxListingPages) truncated = true;
   }
