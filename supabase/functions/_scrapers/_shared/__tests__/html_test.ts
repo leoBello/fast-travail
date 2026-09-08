@@ -54,3 +54,15 @@ Deno.test('htmlToText décode les entités en une seule passe', () => {
   // Une passe unique : &amp;lt; rend le TEXTE &lt;, jamais le caractère <.
   assertEquals(htmlToText('&amp;lt;'), '&lt;');
 });
+
+Deno.test('htmlToText laisse une entité numérique hors plage en texte littéral', () => {
+  assertEquals(htmlToText('avant &#1114112; apres'), 'avant &#1114112; apres');
+});
+
+Deno.test('htmlToText décode une entité numérique astrale valide', () => {
+  assertEquals(htmlToText('&#128512;'), '😀');
+});
+
+Deno.test('htmlToText réduit une espace insécable brute à une espace ordinaire', () => {
+  assertEquals(htmlToText('a\u00A0b'), 'a b');
+});

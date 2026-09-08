@@ -49,6 +49,18 @@ const NAMED_ENTITIES: Readonly<Record<string, string>> = {
 const ENTITY = /&(#x[0-9a-f]+|#\d+|[a-z]+);/gi;
 
 /**
+ * Point de code -> caractère, ou undefined s'il est hors de la plage Unicode
+ * valide (0 à 0x10FFFF). `ENTITY` accepte n'importe quelle suite de chiffres
+ * après `#`, donc une entité malformée comme `&#1114112;` (un de plus que
+ * 0x10FFFF) ferait lever `String.fromCodePoint` sans ce garde-fou — et une
+ * seule description mal formée ferait échouer toute la collecte.
+ */
+function codePointToChar(codePoint: number): string | undefined {
+  if (!Number.isFinite(codePoint) || codePoint < 0 || codePoint > 0x10ffff) return undefined;
+  return String.fromCodePoint(codePoint);
+}
+
+/**
  * HTML -> texte brut, pour une description destinée à `offers.description`.
  *
  * La colonne alimente `description_tsv` et le lexique de compétences : y
@@ -65,12 +77,12 @@ export function htmlToText(html: string): string {
     .replace(TAG, ' ')
     .replace(ENTITY, (whole, name: string) => {
       if (name.startsWith('#x') || name.startsWith('#X')) {
-        return String.fromCodePoint(parseInt(name.slice(2), 16));
+        return codePointToChar(parseInt(name.slice(2), 16)) ?? whole;
       }
-      if (name.startsWith('#')) return String.fromCodePoint(parseInt(name.slice(1), 10));
+      if (name.startsWith('#')) return codePointToChar(parseInt(name.slice(1), 10)) ?? whole;
       return NAMED_ENTITIES[name.toLowerCase()] ?? whole;
     })
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ \t\u00a0]+/g, ' ')
     .replace(/ *\n *(?:\n *)*/g, '\n')
     .trim();
 }
