@@ -3,6 +3,8 @@
 **Dernière mise à jour** : 2026-09-08
 **Branche de travail** : `dedoublonnage`
 
+Reste à faire, priorités et coûts : [`RESTE-A-FAIRE.md`](RESTE-A-FAIRE.md)
+
 Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUDE.md`](../CLAUDE.md)
 
 ---

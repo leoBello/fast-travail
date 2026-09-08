@@ -6,6 +6,7 @@ React / TypeScript, zone Marseille / Aix-en-Provence et full-remote national.
 | Document | À quoi il sert |
 |---|---|
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Vision produit, les 5 phases, décisions structurantes et ce que la mesure a démenti |
+| [`docs/RESTE-A-FAIRE.md`](docs/RESTE-A-FAIRE.md) | Ce qui reste, ce que chaque chantier coûte et rapporte, et quand le faire |
 | [`docs/ETAT.md`](docs/ETAT.md) | **Où on en est, ce qui reste, problèmes ouverts priorisés.** À lire en premier pour reprendre le travail |
 | [`docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md`](docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md) | Design détaillé de la phase 1 |
 | [`docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md`](docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md) | Plan d'implémentation, tâche par tâche |
