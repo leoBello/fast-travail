@@ -53,7 +53,7 @@
 -- de liste par un score nul ou quasi nul). Rien ne change pour cette
 -- requete : aucune migration ne la touche.
 --
--- Detail offre par offre, requete SQL et sortie litterale dans
--- .superpowers/sdd/task-4-report.md, section "Correctifs de revue".
+-- Detail offre par offre et chiffres verifies dans docs/ETAT.md, section
+-- "Resultat mesure (tache 4, corrige par sa revue)".
 
 update search_queries set trust = 'net' where label = 'adzuna:remote:fr-js';

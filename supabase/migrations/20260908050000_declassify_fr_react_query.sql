@@ -47,6 +47,7 @@
 -- adzuna:local:nextjs, volume trop faible pour juger a la tache 3 (0/2), est
 -- maintenant mesurable : 2/2 pertinentes. Le pari se confirme aussi.
 --
--- Detail complet, offre par offre, dans .superpowers/sdd/task-4-report.md.
+-- Detail complet, offre par offre, dans docs/ETAT.md, section
+-- "Resultat mesure (tache 4, corrige par sa revue)".
 
 update search_queries set trust = 'net' where label = 'adzuna:remote:fr-react';
