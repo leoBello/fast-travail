@@ -131,7 +131,11 @@ create table if not exists offer_applications (
   interview_at      timestamptz,
   notes             text,
   created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now(),
+  -- PAS de colonne `updated_at`. Le depot n'a aucun declencheur et aucune
+  -- convention de ce nom : la colonne serait figee a sa valeur par defaut, et
+  -- afficherait une date de derniere modification FAUSSE que rien ne
+  -- signalerait. `status_changed_at` porte deja la seule date de modification
+  -- qui compte. Ne pas la rajouter « pour faire propre ».
 
   constraint offer_applications_status_connu check (
     status in ('a_traiter','retenue','postulee','relancee','entretien','terminee','ecartee')
