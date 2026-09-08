@@ -1,5 +1,5 @@
-import { assertEquals } from '@std/assert';
-import { runScoring } from '../run-scoring.ts';
+import { assertEquals, assertRejects } from '@std/assert';
+import { runScoring, WRITE_CHUNK_SIZE } from '../run-scoring.ts';
 import type { DbClient } from '../db.ts';
 import type { ClaudeResult } from '../claude.ts';
 import type { OfferJudgement, OfferToScore } from '../scoring-types.ts';
@@ -33,7 +33,17 @@ interface Recorded {
   upserts: Record<string, unknown>[][];
 }
 
-function fakeDb(candidates: OfferToScore[]): { db: DbClient; rec: Recorded } {
+interface FakeDbOptions {
+  /** Remplace le profil actif par defaut (utile pour la profile_version). */
+  profileVersion?: string;
+  /** Simule le resultat d'un upsert ; par defaut, toujours un succes. */
+  onUpsert?: (rows: Record<string, unknown>[]) => { error: { message: string } | null };
+}
+
+function fakeDb(
+  candidates: OfferToScore[],
+  opts: FakeDbOptions = {},
+): { db: DbClient; rec: Recorded } {
   const rec: Recorded = { upserts: [] };
   const db = {
     from(table: string) {
@@ -47,7 +57,7 @@ function fakeDb(candidates: OfferToScore[]): { db: DbClient; rec: Recorded } {
                     label: 'CV',
                     cv_text: 'CV de test',
                     seniority_years: 7,
-                    profile_version: 'cv-1',
+                    profile_version: opts.profileVersion ?? 'cv-1',
                   },
                   error: null,
                 }),
@@ -81,7 +91,7 @@ function fakeDb(candidates: OfferToScore[]): { db: DbClient; rec: Recorded } {
         return {
           upsert(rows: Record<string, unknown>[]) {
             rec.upserts.push(rows);
-            return Promise.resolve({ error: null });
+            return Promise.resolve(opts.onUpsert ? opts.onUpsert(rows) : { error: null });
           },
         };
       }
@@ -203,4 +213,74 @@ Deno.test('aucun candidat : succes silencieux, aucun appel paye', async () => {
   assertEquals(summary.scored, 0);
   assertEquals(appels, 0);
   assertEquals(rec.upserts.length, 0);
+});
+
+Deno.test('un lot plus grand que WRITE_CHUNK_SIZE produit plusieurs ecritures, toutes les lignes finissent ecrites', async () => {
+  const total = WRITE_CHUNK_SIZE * 2 + 3;
+  const candidates = Array.from({ length: total }, (_, i) => candidate(`c${i}`));
+  const { db, rec } = fakeDb(candidates);
+
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: total,
+    concurrency: 4,
+    dryRun: false,
+    callClaude: () => Promise.resolve(judgement(80)),
+  });
+
+  assertEquals(summary.scored, total);
+  assertEquals(summary.writeFailures, 0);
+  // Plus d'une tranche : la preuve que l'ecriture se fait au fil de l'eau,
+  // pas en un seul upsert final.
+  assertEquals(rec.upserts.length > 1, true);
+  const toutesLesLignes = rec.upserts.flat();
+  assertEquals(toutesLesLignes.length, total);
+  // Aucune ligne perdue ni ecrite deux fois : les id sont tous distincts.
+  const ids = toutesLesLignes.map((r) => r.offer_id);
+  assertEquals(new Set(ids).size, total);
+});
+
+Deno.test('une ecriture qui echoue est comptee dans writeFailures et n empeche pas les autres tranches d etre ecrites', async () => {
+  const total = WRITE_CHUNK_SIZE * 2;
+  const candidates = Array.from({ length: total }, (_, i) => candidate(`c${i}`));
+  let appelsUpsert = 0;
+  const { db, rec } = fakeDb(candidates, {
+    onUpsert: () => {
+      appelsUpsert += 1;
+      return appelsUpsert === 1 ? { error: { message: 'coupure reseau' } } : { error: null };
+    },
+  });
+
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: total,
+    concurrency: 1,
+    dryRun: false,
+    callClaude: () => Promise.resolve(judgement(80)),
+  });
+
+  assertEquals(summary.scored, total);
+  assertEquals(summary.failed, 0);
+  assertEquals(summary.writeFailures, WRITE_CHUNK_SIZE);
+  assertEquals(rec.upserts.length, 2);
+});
+
+Deno.test('une profile_version contenant une virgule casse la selection : echec bruyant, pas de filtre silencieusement faux', async () => {
+  const { db } = fakeDb([candidate('a')], { profileVersion: 'cv-1,evil' });
+
+  await assertRejects(
+    () =>
+      runScoring({
+        db,
+        claude,
+        limit: 10,
+        concurrency: 1,
+        dryRun: false,
+        callClaude: () => Promise.resolve(judgement(80)),
+      }),
+    Error,
+    'virgule',
+  );
 });
