@@ -54,16 +54,25 @@ export async function upsertOffers(
     // on garantit ici que le contrat SQL est respecté quel que soit le mapper.
     raw: offer.raw ?? {},
     last_seen_at: new Date().toISOString(),
-    // Combien de collectes ont vu cette offre. Une offre qui traîne depuis des
-    // semaines a un compte élevé : signe d'un poste difficile à pourvoir, ou
-    // d'une annonce republiée en boucle. Le design le promettait ; le code ne
-    // l'écrivait pas, et la colonne restait figée à 1 pour toutes les offres.
+    // Nombre de fois qu'une requête a ramené cette offre. Le design le
+    // promettait ; le code ne l'écrivait pas, et la colonne restait figée à 1.
+    //
+    // ATTENTION à la sémantique exacte, mesurée et non supposée : ce n'est PAS
+    // un compteur de collectes. runCollection appelle upsertOffers après CHAQUE
+    // requête, donc une offre que cinq requêtes de la matrice ramènent dans le
+    // même run est comptée cinq fois. Constaté au premier run réel : des offres
+    // à seen_count = 5 après une seule collecte.
+    //
+    // Le signal reste utile — un compte élevé veut dire « largement diffusée,
+    // ou en ligne depuis longtemps », les deux étant des indices d'un poste
+    // difficile à pourvoir. Mais qui voudra « depuis combien de jours » devra
+    // passer par first_seen_at et last_seen_at, pas par ce compteur.
     //
     // Lecture puis écriture, donc non atomique : deux collectes simultanées sur
     // la même offre n'incrémenteraient que d'un. Les deux crons sont espacés
     // d'une demi-heure pour des exécutions de 11 et 17 secondes, et une source
-    // ne se collecte jamais en parallèle d'elle-même — le compte est donc juste
-    // en pratique, et une sous-estimation n'induit personne en erreur.
+    // ne se collecte jamais en parallèle d'elle-même — une sous-estimation
+    // n'induirait donc personne en erreur.
     seen_count: (known.get(offer.external_id) ?? 0) + 1,
   }));
 

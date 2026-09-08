@@ -242,9 +242,19 @@ ce qui est sans effet ici : une source ne se collecte jamais en parallèle
 d'elle-même, et les deux crons sont espacés d'une demi-heure pour des
 exécutions de 11 et 17 secondes.
 
+Vérifié par une collecte réelle après correctif : 57 offres à 2, trois à 3, une à
+4, deux à 5.
+
+**Attention à la sémantique**, que cette mesure a précisée : ce n'est **pas** un
+compteur de collectes. `runCollection` appelle `upsertOffers` après **chaque
+requête**, donc une offre que cinq requêtes de la matrice ramènent dans le même
+run est comptée cinq fois — d'où les `seen_count = 5` observés dès la première
+collecte. Le signal garde sa valeur (largement diffusée, ou en ligne depuis
+longtemps : deux indices d'un poste dur à pourvoir), mais qui voudra « depuis
+combien de jours » devra passer par `first_seen_at` et `last_seen_at`.
+
 Les offres déjà en base repartent de 1 : l'historique des passages passés est
-perdu, il n'avait jamais été écrit. Le comptage devient juste à partir de la
-prochaine collecte.
+perdu, il n'avait jamais été écrit.
 
 ### P7 — La Corse s'encode de deux façons
 
