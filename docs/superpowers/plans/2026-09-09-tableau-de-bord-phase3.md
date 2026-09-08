@@ -326,8 +326,19 @@ select distinct on (g.display_key)
   g.display_key,
   count(*)              over (partition by g.display_key) as group_size,
   array_agg(s.source)   over (partition by g.display_key) as group_sources,
-  st.status, st.outcome, st.opened_at, st.applied_at,
-  st.last_followup_at, st.interview_at, st.heritee
+  -- Les colonnes de candidature sont PREFIXEES, et ce n'est pas cosmetique :
+  -- `s.*` projette les ~31 colonnes d'offers_scored, dont la liste evoluera.
+  -- Le jour ou l'une d'elles s'appellerait `status` ou `outcome`, la vue
+  -- exposerait deux colonnes de meme nom — PostgreSQL l'accepte a la creation
+  -- et c'est le client qui recevrait la mauvaise, en silence. Le prefixe rend
+  -- la collision impossible.
+  st.status            as candidature_statut,
+  st.outcome           as candidature_issue,
+  st.opened_at         as candidature_ouverte_le,
+  st.applied_at        as candidature_envoyee_le,
+  st.last_followup_at  as candidature_relancee_le,
+  st.interview_at      as candidature_entretien_le,
+  st.heritee           as candidature_heritee
 from offers_scored s
 join offers o                     on o.id = s.id
 join offer_display_groups g       on g.offer_id = s.id
