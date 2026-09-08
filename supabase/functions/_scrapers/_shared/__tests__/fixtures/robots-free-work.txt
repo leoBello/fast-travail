@@ -1,0 +1,45 @@
+# robots.txt for https://www.free-work.com/
+
+# ███████╗██████╗ ███████╗███████╗    ██╗    ██╗ ██████╗ ██████╗ ██╗  ██╗
+# ██╔════╝██╔══██╗██╔════╝██╔════╝    ██║    ██║██╔═══██╗██╔══██╗██║ ██╔╝
+# █████╗  ██████╔╝█████╗  █████╗█████╗██║ █╗ ██║██║   ██║██████╔╝█████╔╝
+# ██╔══╝  ██╔══██╗██╔══╝  ██╔══╝╚════╝██║███╗██║██║   ██║██╔══██╗██╔═██╗
+# ██║     ██║  ██║███████╗███████╗    ╚███╔███╔╝╚██████╔╝██║  ██║██║  ██╗
+# ╚═╝     ╚═╝  ╚═╝╚══════╝╚══════╝     ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
+
+User-agent: *
+Disallow: /login
+Disallow: /logout
+Disallow: /fw-deals
+
+User-agent: Googlebot-News
+Disallow: /
+Allow: /tech-it/blog/*
+User-agent: OAI-SearchBot
+Allow: /
+User-agent: AdIdxBot
+Disallow: /
+User-agent: Yandex
+Disallow: /
+User-agent: Baiduspider
+Disallow: /
+User-agent: Nutch
+Disallow: /
+User-agent: ia_archiver
+Disallow: /
+User-agent: ScoutJet
+Disallow: /
+User-agent: SearchmetricsBot
+Disallow: /
+User-Agent: Wget
+Disallow: /
+User-Agent: TurnitinBot
+Disallow: /
+User-Agent: HTTrack
+Disallow: /
+User-agent: MJ12bot
+Disallow: /
+
+Sitemap: https://statics.free-work.com/sitemapindex.xml
+
+# Last modified: 20/07/2026

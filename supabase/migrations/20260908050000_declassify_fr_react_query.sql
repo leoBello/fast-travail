@@ -1,0 +1,53 @@
+-- Confronte le pari de classement de la tache 1 aux offres reellement
+-- entrees (tache 4). Six des sept requetes 'anchored' se confirment ; une
+-- seule se declasse.
+--
+-- CE QUI A ETE MESURE (sur les 1176 offres en base, 38 offres shortlistees
+-- uniquement par une requete anchored, aucune par core_hits/ai_hits) :
+--
+--   label                        | offres | pertinent | adjacent | hors sujet
+--   adzuna:local:react-ts        |      5 |         2 |        3 |          0
+--   adzuna:local:typescript      |      9 |         2 |        6 |          1
+--   adzuna:local:nextjs          |      2 |         2 |        0 |          0
+--   adzuna:local:javascript      |     15 |         2 |        8 |          5
+--   adzuna:remote:fr-ts          |     12 |         1 |        9 |          2
+--   adzuna:remote:fr-js          |      5 |         1 |        2 |          2
+--   adzuna:remote:fr-react       |      6 |         1 |        2 |          3
+--
+-- Aucune de ces sept requetes ne fait entrer une majorite de hors sujet sur
+-- le decompte brut (fr-react est la pire au ratio, 3/6 = 50%, pas une
+-- majorite stricte). Mais le decompte brut partage a tort le merite entre
+-- requetes qui se recouvrent : Konecta, RECRUT-INFO et Galadrim portent
+-- chacune fr-react ET fr-ts (et pour deux d'entre elles fr-js), donc ces
+-- trois offres restent dans la selection meme sans fr-react. La contribution
+-- MARGINALE de fr-react — les cas ou elle est la SEULE etiquette anchored a
+-- avoir ramene l'offre, donc la seule cause reelle de son entree — est
+-- entierement composee des 3 doublons "Lead Product Marketing Manager"
+-- (Boond), une offre de marketing sans aucun rapport avec React ni le
+-- developpement : 3 offres isolees, 3 hors sujet, soit 100%. Le texte recu
+-- (500 caracteres, tronque) ne contient ni "react" ni rien d'approchant ;
+-- la cause probable est la meme collision de lemmatisation francaise deja
+-- documentee dans CLAUDE.md pour "React"/"reacteur", mais cette fois sur un
+-- terme different (reactivite, proactif...) invisible sans acces au texte
+-- integral qu'Adzuna indexe.
+--
+-- fr-ts et fr-js restent 'anchored' et couvrent deja, a elles seules, les 3
+-- offres non-Boond ou fr-react apparait (Konecta, RECRUT-INFO, Galadrim).
+-- Declasser fr-react ne fait donc sortir de la selection aucune offre
+-- pertinente ni adjacente : le gain (3 offres hors sujet en moins par
+-- collecte future) n'a pas de cout mesure.
+--
+-- adzuna:local:javascript reste 'anchored' malgre le plus grand nombre brut
+-- de hors sujet (5) : rapporte a sa contribution isolee (7 offres ou c'est
+-- la seule etiquette anchored), le ratio est de 3/7 hors sujet contre 4/7
+-- adjacent — pas de majorite de hors sujet, dans un sens ou dans l'autre.
+-- Le pari initial ("JavaScript reste une technologie, meme si large") se
+-- confirme donc pour cette requete precise : rien ne change.
+--
+-- adzuna:local:nextjs, volume trop faible pour juger a la tache 3 (0/2), est
+-- maintenant mesurable : 2/2 pertinentes. Le pari se confirme aussi.
+--
+-- Detail complet, offre par offre, dans docs/ETAT.md, section
+-- "Resultat mesure (tache 4, corrige par sa revue)".
+
+update search_queries set trust = 'net' where label = 'adzuna:remote:fr-react';

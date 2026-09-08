@@ -1,7 +1,7 @@
 # État d'avancement et reste à faire
 
 **Dernière mise à jour** : 2026-09-08
-**Branche de travail** : `phase-1-collecte-api`
+**Branche de travail** : `plan-b-scrapers`, partie de `confiance-par-requete`
 
 Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUDE.md`](../CLAUDE.md)
 
@@ -22,26 +22,49 @@ de 6 à **12 offres**, moitié-moitié entre les deux sources.
 
 **Le plan A est terminé.** Les 13 tâches sont livrées.
 
+**Le plan « confiance par requête » (4 tâches, plus les correctifs de sa
+revue) est terminé aussi.** Une requête Adzuna ancrée à une technologie
+(`search_queries.trust = 'anchored'`) ouvre désormais `offers_shortlist` même
+quand le lexique ne voit rien dans les 500 caractères tronqués — c'est ce qui
+manquait pour exploiter les offres full remote qu'Adzuna indexe sans les
+rendre lisibles. Résultat mesuré : la sélection passe de 31 à 66 puis, après
+correction de la revue (`adzuna:remote:fr-js` déclassée), à **64** offres
+(voir la section dédiée plus bas). **Ne pas figer ce nombre ici** : deux crons
+collectent chaque matin, donc il bouge tous les jours. Le tableau ci-dessous
+est recompté en base ; c'est lui qui fait foi, et la trajectoire 31 → 69 → 66
+→ 64 ne décrit que l'effet du plan au moment de sa livraison.
+
 ```sql
 select * from offers_shortlist order by score desc, published_at desc;
 ```
 
+Recompté en base le 2026-09-08 en fin de chantier. **Ces nombres bougent
+chaque matin** : deux crons collectent à 6 h et 6 h 30. Les recompter plutôt
+que les recopier — c'est une requête, pas une archive.
+
 | Indicateur | Valeur |
 |---|---:|
-| Offres collectées | 1 176 |
-| — dont France Travail | 700 |
-| — dont Adzuna | 476 |
-| Offres retenues (`offers_shortlist`) | **31** |
-| — dont locales (13, 83, 84) | 19 |
-| — dont full remote national | 12 |
-| Mentionnant React / TypeScript / Next.js | 54 |
-| Mentionnant LLM / IA / agents | 63 |
-| En full remote | 9 |
+| Offres collectées | 1 296 |
+| — dont France Travail | 739 |
+| — dont Adzuna | 557 |
+| Offres retenues (`offers_shortlist`) | **65** |
+| — dont locales (13, 83, 84) | 41 |
+| — dont full remote national | 24 |
+| — entrant **uniquement** par la confiance par requête | **34** |
+| Mentionnant React / TypeScript / Next.js, **sur les 1 296 collectées** | 60 |
+| — dont, **restreint aux 65 retenues** | 12 |
+| Mentionnant LLM / IA / agents, **sur les 1 296 collectées** | 65 |
+| — dont, **restreint aux 65 retenues** | 21 |
 | Requêtes France Travail actives | 24 sur 38 |
 | Requêtes Adzuna actives | 11 sur 11 |
 | Jobs cron actifs | 2 |
 | Termes au lexique | 67 |
-| Tests | 117 verts |
+| Tests | 128 verts |
+
+La ligne qui compte est la quatrième depuis le bas du bloc de sélection :
+**34 des 65 offres retenues n'ont ni `core_hits` ni `ai_hits`**. Sans la
+confiance par requête, elles seraient invisibles — c'est plus de la moitié de
+la liste quotidienne.
 
 ---
 
@@ -68,20 +91,211 @@ select * from offers_shortlist order by score desc, published_at desc;
 Chaque tâche a été relue par un agent distinct, sur conformité au cahier des
 charges **et** sur qualité.
 
-## Phase 1 — Plan B : les 4 scrapers
+## Phase 1 — Plan « confiance par requête »
 
-**Pas commencé, et volontairement pas encore planifié.** Free-Work,
-Codeur.com, Collective.work et Kicklox. Le `robots.txt` des quatre a été
-vérifié et autorise la collecte ; les quatre publient un sitemap XML, retenu
-comme surface de collecte plutôt que les pages de listing.
+**Terminé, 4 tâches.** Répond à P8 (résolu) : Adzuna tronque toute description
+à 500 caractères, donc le lexique ne peut confirmer aucune offre dont la stack
+technique figure plus loin dans le texte intégral. Le principe : certaines
+requêtes Adzuna sont **ancrées** à une technologie précise, et le seul fait
+d'avoir ramené une offre est déjà une preuve, même si la description tronquée
+est muette.
 
-Le plan sera écrit contre des fixtures HTML réelles, à capturer d'abord. Deux
-contraintes déjà connues : Codeur.com interdit les query strings sauf `?page=N`,
-et Free-Work banne `Wget` et `HTTrack` nommément.
+| # | Tâche | État |
+|---|---|---|
+| 1 | Migration : `offers.found_by_query_ids`, `search_queries.trust`, seed du pari initial (7 requêtes `anchored`) | ✅ |
+| 2 | `upsertOffers` peuple `found_by_query_ids` par union à chaque collecte | ✅ |
+| 3 | Les vues exposent la provenance (`found_by_labels`, `trusted_query`) et `offers_shortlist` s'ouvre à une requête `anchored` | ✅ |
+| 4 | Mesure du pari contre les offres réelles, correction du classement, documentation | ✅ |
 
-**Fait nouveau à exploiter** : Collective.work et Malt apparaissent comme
-employeurs dans les résultats Adzuna. Adzuna couvre donc déjà une partie des
-cibles du plan B, ce qui peut en réduire le périmètre.
+### Décision de conception : un ensemble de requêtes, pas un scalaire de source
+
+`found_by_query_ids` est un **tableau** (l'union des requêtes ayant ramené
+l'offre), et `trusted_query` en dérive par `bool_or` sur ce tableau — pas une
+colonne scalaire du genre `found_by_source` ou `first_query_id`. Raison : une
+colonne scalaire aurait fait dépendre la confiance de l'**ordre d'exécution**
+(`priority`), puisque l'upsert écrase et que « la dernière requête à voir une
+offre fixe ses colonnes » est déjà la règle pour `remote_label` et la
+provenance géographique — un couplage qui a coûté une migration corrective
+entière (`20260907234512_fix_adzuna_priority_order.sql`, tâche 11). Si la
+confiance dépendait de quelle requête a écrit l'offre en dernier, reclasser une
+requête ou réordonner `priority` changerait silencieusement quelles offres
+passent le filtre, sans lien logique avec la question posée (« une requête
+digne de confiance a-t-elle vu cette offre ? »). L'ensemble supprime ce
+couplage : une offre reste `trusted_query` tant qu'**au moins une** des
+requêtes qui l'ont vue est `anchored`, quel que soit l'ordre dans lequel elles
+sont passées.
+
+### Résultat mesuré (tâche 4, corrigé par sa revue)
+
+`offers_shortlist` passe de **31 à 69** offres avec le pari initial (7
+requêtes `anchored`), sans aucune sortie (inclusion stricte prouvée par
+intersection). Les 38 offres ajoutées, classées à la main sur le profil
+front-end React/TypeScript, Marseille/Aix ou full remote national : **3
+franchement pertinentes, 23 adjacentes** (Angular/Java/Vue, ou fullstack/
+backend générique), **12 hors sujet** (marketing, impression, qualification
+logicielle sans lien front-end...).
+
+Compter par requête, restreint aux offres qui n'entrent **que** par
+`trusted_query` (`core_hits = 0 and ai_hits = 0`, donc les 38 ajoutées) donne,
+par étiquette — décompte **brut**, qui partage le mérite entre requêtes qui se
+recouvrent sur une même offre :
+
+| Requête | Offres | Pertinentes | Adjacentes | Hors sujet |
+|---|---:|---:|---:|---:|
+| `adzuna:local:react-ts` | 5 | 2 | 3 | 0 |
+| `adzuna:local:typescript` | 9 | 2 | 6 | 1 |
+| `adzuna:local:nextjs` | 2 | 2 | 0 | 0 |
+| `adzuna:local:javascript` | 15 | 2 | 8 | 5 |
+| `adzuna:remote:fr-ts` | 12 | 1 | 9 | 2 |
+| `adzuna:remote:fr-js` | 5 | 1 | 2 | 2 |
+| `adzuna:remote:fr-react` | 6 | 1 | 2 | 3 |
+
+**Critère de décision** (celui demandé par la tâche) : une requête `anchored`
+ne se déclasse que si elle fait entrer une **majorité** de hors sujet — pas au
+premier faux positif, parce qu'une offre hors sujet en bas de liste triée par
+score coûte peu, alors qu'une offre pertinente jamais affichée coûte cher.
+Mesuré en comptant la contribution **marginale** de chaque requête (les
+offres où elle est la **seule** étiquette `anchored` restante parmi
+`found_by_labels`, donc la seule cause réelle de son entrée), pas le décompte
+brut ci-dessus. **La revue de la tâche 4 a montré que ce décompte marginal
+était incomplet pour `adzuna:local:javascript` (7 offres comptées au lieu de
+12, en omettant Collective.work et Easy Partner — Vue.js —, un second
+exemplaire « VIRTUALEXPO GROUP », et deux offres — W HUB « Data Ingénieur
+SKYWISE » et EASY PARTNER « PL/SQL Senior » — que ce document classait
+pourtant déjà hors sujet ailleurs, sans vérifier la cohérence entre les deux
+sections)**, et qu'il n'avait pas été refait pour les cinq autres requêtes.
+Refait au complet, requête par requête, sur les 66 offres (avant la
+correction `fr-js` ci-dessous) :
+
+| Requête | Marginal | Hors sujet | Adjacentes |
+|---|---:|---:|---:|
+| `adzuna:local:react-ts` | 0 | — | — |
+| `adzuna:local:typescript` | 3 | 1 (33 %) | 2 |
+| `adzuna:local:nextjs` | 0 | — | — |
+| `adzuna:local:javascript` | 12 | 7 (58 %) | 5 |
+| `adzuna:remote:fr-ts` | 9 | 2 (22 %) | 7 |
+| `adzuna:remote:fr-js` | 2 | 2 (100 %) | 0 |
+
+Deux requêtes franchissent la majorité de hors sujet sur ce décompte
+corrigé : `javascript` et `fr-js`. Le coût du déclassement, mesuré offre par
+offre avant toute décision, diverge complètement entre les deux :
+
+- **`adzuna:remote:fr-js` se déclasse** (`anchored` → `net`, migration
+  `20260908070000_declassify_fr_js_query.sql`). Ses 2 offres marginales
+  (Diabolocom « Software Support Specialist LV2 », NEXTON « Consultant ECM /
+  GED F/H ») sont toutes les deux hors sujet — aucune pertinente ni
+  adjacente à perdre. Coût du déclassement : **zéro**. Vérifié en base par
+  inclusion : `offers_shortlist` passe de 66 à **64**, exactement ces deux
+  offres en moins (`company_name in ('Diabolocom','NEXTON')` ne rend plus que
+  « NEXTON — AI Developer F/H », entrée par `fr-dev` et `ai_hits = 2`, sans
+  rapport avec `fr-js`).
+- **`adzuna:local:javascript` reste `anchored`**, malgré la même majorité de
+  hors sujet (58 % par ligne, **55 % par annonce distincte** une fois fusionné
+  le doublon de casse « Virtualexpo Group » / « VIRTUALEXPO GROUP », 6 hors
+  sujet sur 11 annonces — voir P10). Contrairement à `fr-react` et `fr-js`,
+  son coût de déclassement n'est **pas** nul : ses 5 offres adjacentes
+  marginales (DigDash, Dassault Systèmes, Capgemini, Collective.work,
+  Easy Partner — toutes Java/JS générique ou Vue.js) n'ont **aucune autre
+  voie d'entrée** (ni `core_hits`, ni `ai_hits`, ni autre étiquette
+  `anchored`) et disparaîtraient purement et simplement si la requête était
+  déclassée. Le critère du projet vaut dans les deux sens : une offre hors
+  sujet en bas de liste triée par score coûte peu, mais une offre adjacente
+  **jamais affichée** coûte cher. Ici le coût (5 offres adjacentes rendues
+  invisibles à l'avenir) l'emporte sur le bruit évité (7 offres hors sujet,
+  déjà reléguées en bas de liste par un score nul ou quasi nul). Décision :
+  rien ne change, aucune migration ne touche cette requête.
+- **`adzuna:local:nextjs`**, jugée à volume trop faible en tâche 3 (0/2), est
+  maintenant mesurable : **2/2 pertinentes**. Pari confirmé.
+- **`react-ts`, `typescript` local, `fr-ts`** restent propres (0 à 22 % de
+  hors sujet sur leur décompte marginal). Rien ne change.
+
+**`adzuna:remote:fr-react`** a été déclassée par la tâche 4 elle-même
+(`anchored` → `net`, migration `20260908050000_declassify_fr_react_query.sql`)
+avant même cette revue, sur la base de 3 offres isolées, toutes hors sujet.
+**Précision apportée par la revue** : ces 3 occurrences sont en réalité **une
+seule et même annonce** — « Lead Product Marketing Manager - 100% remote »
+(Boond), publiée trois fois (deux exemplaires au suffixe « (H/F) » près, un
+troisième sans), un doublon intra-source du genre décrit en P10.
+L'échantillon de preuve vaut donc **n = 1**, pas n = 3 comme le rapport
+initial le laissait entendre en écrivant « 100 %, 3 cas sur 3 ». **La décision
+reste correcte** : le coût mesuré du déclassement est nul quelle que soit la
+taille de l'échantillon — les 3 autres offres où `fr-react` apparaît
+(Konecta, RECRUT-INFO, Galadrim) restent couvertes par `fr-ts`, restée
+`anchored` — ce qui rend la décision sûre malgré un échantillon de preuve
+mince. Mais l'affirmation de robustesse statistique du rapport initial était
+trompeuse et est corrigée ici.
+
+Effet cumulé des deux déclassements, vérifié en base : `offers_shortlist`
+passe de 69 (pari initial) à 66 (après `fr-react`, les 3 Boond sortent) puis à
+**64** (après `fr-js`, Diabolocom et le NEXTON « Consultant ECM / GED »
+sortent). Konecta/RECRUT-INFO/Galadrim et le NEXTON « AI Developer » restent
+présents (vérifié nommément à chaque étape). Aucune régression sur une offre
+pertinente ou adjacente.
+
+### Nouvel axe réglable : `search_queries.trust`
+
+`'anchored'` ou `'net'`, réglable par **migration** (donnée de référence,
+jamais un `UPDATE` à la main) — voir `20260908033042_query_provenance_and_trust.sql`
+(pose et pari initial), `20260908050000_declassify_fr_react_query.sql` et
+`20260908070000_declassify_fr_js_query.sql` (corrections mesurées, la seconde
+issue de la revue de la tâche 4). Une requête `anchored` ouvre
+`offers_shortlist` par elle-même ; une requête `net` reste soumise à la
+confirmation lexicale (`core_hits >= 1 or ai_hits >= 1`). L'effet est
+immédiat sur les offres déjà collectées, `offers_shortlist` étant une vue.
+
+## Phase 1 — Plan B : deux scrapers, et non quatre
+
+**Planifié le 2026-09-08, contre des pages réelles capturées d'abord. Pas
+encore implémenté.** Plan :
+[`plans/2026-09-08-plan-b-scrapers-free-work-collective.md`](superpowers/plans/2026-09-08-plan-b-scrapers-free-work-collective.md),
+douze tâches. Les fixtures — quatre pages Free-Work, une page Collective, deux
+`robots.txt` — sont commitées sous `supabase/functions/_scrapers/`.
+
+**La reconnaissance a démenti trois affirmations de ce document.**
+
+| Ce qui était écrit | Ce que la mesure dit |
+|---|---|
+| « Les quatre publient un sitemap XML, retenu comme surface de collecte » | **Faux pour trois sur quatre.** `codeur.com/sitemap.xml` répond 404. Le sitemap de Kicklox ne contient aucune mission, celui de Collective non plus — 85 URL de blog et de pages légales, et son board `/jobs` n'y figure même pas. Seul Free-Work publie un sitemap d'offres : 7 276 URL, **sans aucun `lastmod`**, donc inutilisable comme delta |
+| « Le `robots.txt` des quatre autorise la collecte » | Exact, mais sans objet pour Kicklox : **il n'y a rien à collecter**. Aucune mission publique, `app.kicklox.com/missions` est une coquille SPA de 3 955 octets derrière un login |
+| « Free-Work banne `Wget` et `HTTrack` » | Exact et sans conséquence : l'agent utilisateur honnête `fast-travail/0.1 (veille personnelle)` obtient **HTTP 200** sur les deux sources retenues. Aucune usurpation de navigateur n'est nécessaire |
+
+**Périmètre retenu, sur mesure et non sur intention :**
+
+| Source | Mesuré le 2026-09-08 | Décision |
+|---|---|---|
+| **Free-Work** | React **196**, TypeScript **180**, JavaScript **330**, Next.js 19, Marseille **66**, Aix **140**. Description **entière** (577 à 7 752 car., médiane 1 176). TJM structuré en JSON-LD sur 8 offres sur 12 | **Retenue** |
+| **Collective.work** | 6 544 missions, 30 par page en JSON complet. Sur 300 mesurées : 12 TypeScript, 3 React, 4 en full remote, 11 en PACA dont 8 à Aix | **Retenue** |
+| Codeur.com | 4 slugs front-end sur 103 projets ; flux WordPress / Webflow / SEO / marketing | Écartée : hors profil |
+| Kicklox | aucune mission publique | Écartée : impossible |
+
+**Free-Work vaut à elle seule les deux API réunies sur ce profil** : 196 offres
+React contre 5 chez Adzuna et 0 chez France Travail. Et sa description n'étant
+pas tronquée, **le lexique de compétences y redevient le filtre principal**,
+comme sur France Travail. C'est aussi la première source à porter un TJM
+structuré : `rate_raw`, nulle depuis le début du projet, cesse d'être morte.
+
+**Décisions de conception tranchées** (détail et mesures dans le plan) :
+
+- **Le sitemap est écarté comme surface** pour toutes les sources. On collecte
+  par listing paginé : `/fr/tech-it/jobs/<facette>?sort=date&page=N` chez
+  Free-Work — le tri par date est un vrai paramètre serveur, sans lui les dates
+  d'une page vont du 27/08 au 07/09 —, `/jobs/fr?page=N` chez Collective, dont
+  les filtres d'URL sont **ignorés par le serveur** (mesuré : `?query=react` rend
+  la page 1 non filtrée).
+- **Aucun champ stocké ne vient du HTML de présentation** : JSON-LD `JobPosting`
+  chez Free-Work, `__NEXT_DATA__` chez Collective. Le HTML n'est lu que pour les
+  URL et le signal d'arrêt.
+- **Scripts Deno locaux, pas Node** — contrairement à ce qu'annonce le ROADMAP.
+  La contrainte réelle était « hors Edge Functions », et Node coûterait un
+  second outillage : `verify` ne couvre que Deno.
+- **Le code va sous `supabase/functions/_scrapers/`**, et c'est mesuré :
+  `deno fmt` formate le HTML, et l'exclusion `**/__tests__/fixtures/**` de
+  `supabase/functions/deno.json` est résolue relativement au dossier de ce
+  fichier. Des fixtures placées ailleurs font échouer `fmt:check`.
+- **La politesse est une ligne en base** : les huit colonnes de `sources`
+  (`min_delay_ms`, `max_pages_per_run`, `user_agent`, `robots_allows`…), créées
+  au plan A et jamais utilisées, deviennent le cinquième axe réglable.
+  `robots.txt` est revérifié à **chaque** exécution.
 
 ## Phases 2 à 5
 
@@ -176,12 +390,16 @@ L'ordre importait : ouvrir le filtre **avant** d'assainir `ai_hits` ramenait 42
 offres au lieu de 31, avec « Gestionnaire facturation » et « Chargé(e)
 Prépaie » dedans.
 
-*Reste ouvert, moins urgent* : la confiance par **requête** plutôt que par
-source. `fr-react` et `fr-ts` sont ancrées à une techno ; `it-jobs` et
-`fr-dev` sont des filets — le lemmatiseur d'Adzuna fait correspondre
-« développeur » à « Business Developer ». Les distinguer exige de retenir
-quelle requête a trouvé l'offre : une colonne de plus sur `offers`, peuplée
-dès la collecte suivante.
+*Reste ouvert, moins urgent* — **fait, voir « Phase 1 — Plan confiance par
+requête » plus haut.** Ce paragraphe proposait de classer `fr-react` et
+`fr-ts` comme ancrées à une techno, `it-jobs` et `fr-dev` comme des filets.
+**Corrigé le 2026-09-08** : la mesure a démenti la moitié de ce pari sur
+`fr-react` — sur les 6 offres qu'elle a fait entrer, elle n'est la seule cause
+d'entrée que 3 fois, et ces 3 fois sont 3 doublons d'un poste de marketing
+sans aucun rapport avec React. Reclassée `net` par la migration
+`20260908050000`, sans perte mesurée d'aucune offre pertinente ou adjacente
+(les autres offres qu'elle touchait restent couvertes par `fr-ts`). `fr-ts`,
+elle, se confirme propre.
 
 ### P5 — Signal local mince, et ce n'est pas un défaut d'outillage
 
@@ -196,6 +414,56 @@ Travail — ce qui pèse sur la phase 2 et rend P8 prioritaire.
 `unique (source, external_id)` empêche les doublons **dans** une source, pas
 entre sources. Les deux sources alimentent maintenant la base : le problème
 n'est plus théorique. Première dette à payer en phase 2.
+
+### P10 — Doublons intra-source, découverts en classant les 38 offres de la tâche 4
+
+`unique (source, external_id)` **n'empêche pas non plus** les doublons dans
+une même source quand celle-ci republie la même annonce sous un nouvel
+`external_id` — ce qui arrive constamment sur Adzuna. Distinct de P6, qui vise
+les doublons **entre** sources.
+
+Mesuré en base (regroupement par `source`, `company_name`, et titre normalisé
+— suffixe `H/F`/`F/H`, avec ou sans parenthèses, retiré) :
+
+- Sur l'ensemble des 1 253 offres collectées : **57 groupes, 126 offres,
+  69 doublons excédentaires** (`company_name` non nul, pour éviter les faux
+  positifs des offres sans employeur identifié). Chiffre revérifié par la
+  revue de la tâche 4, trois façons indépendantes (`group by` classique,
+  `company_name <> ''`, et une reformulation par `count() over (partition
+  by ...)`), toutes stables à ce total — le rapport initial de la tâche 4
+  annonçait par erreur 47/106/59.
+- Sur les 64 offres que comptait `offers_shortlist` au moment de cette mesure
+  (après le déclassement `fr-js` ci-dessus ; la sélection a grossi depuis, le
+  cron tournant chaque matin) — ce qui compte pour l'usage réel, une
+  liste triée par score que le propriétaire relit à la main : **5 paires
+  détectées par regroupement sensible à la casse** (AMILTONE, Capgemini,
+  KLANIK, Malt « Senior Fullstack Engineer », Pretto), soit 10 offres sur 64
+  (16 %).
+- **Angle mort du regroupement : il respecte la casse.** « Virtualexpo
+  Group » et « VIRTUALEXPO GROUP » — la même annonce « Ingénieur
+  qualification logiciel H/F » republiée deux fois — échappent au groupe
+  pour cette seule raison, alors que le titre normalisé est identique.
+  Regrouper insensible à la casse (`lower(company_name)`) fait passer le
+  compte de la sélection à **6 groupes, 12 offres, 6 excédentaires** : la
+  paire Virtualexpo s'ajoute aux 5 déjà détectées. Généralisation du cas Malt
+  déjà noté ci-dessous (ordre des mots et ponctuation) : la normalisation de
+  chaîne actuelle a plusieurs angles morts distincts, pas un seul.
+- **Un doublon de plus, invisible à toute normalisation de titre** : Malt
+  publie la même mission deux fois sous « Senior Java - Kotlin Developer H/F »
+  et « Senior Java/Kotlin Developer » — ponctuation et ordre des mots
+  diffèrent, pas seulement un suffixe. Un `group by (title, company_name)`
+  strict, même après avoir retiré les suffixes `H/F`, ne le voit pas. Preuve
+  que le problème dépasse la normalisation de chaîne et demande soit une
+  clef métier plus stable côté Adzuna (aucune n'est documentée), soit un
+  rapprochement approximatif (distance d'édition sur le titre, fenêtre
+  temporelle, même entreprise).
+
+Priorité : sous P6 (le dédoublonnage inter-sources reste la dette la plus
+dure — deux schémas de champs différents à réconcilier), mais au-dessus de P7
+et P3 : il dégrade **directement** la liste que l'utilisateur consulte tous
+les jours, pas une hypothèse latente. Effet du déclassement de `fr-react`
+(ci-dessus) : la quadruplication Boond est sortie de la sélection au passage,
+ce qui a réduit d'autant ce problème sans action dédiée.
 
 ### ~~P9 — La re-revue de la tâche 11~~ *(rendue, approuvée)*
 
@@ -346,13 +614,97 @@ from collection_query_results where truncated
 order by total_available desc;
 ```
 
+### Surveiller la confiance par requête — la seule chose qui remesure
+
+`trusted_query` court-circuite **tout** le lexique : seul `red_flags` reste
+éliminatoire. Sa sûreté ne repose que sur un classement à la main de 38 offres,
+fait une fois le 2026-09-08. Rien ne le remesure tout seul. Voici de quoi le
+faire, à lancer après quelques jours de cron.
+
+**Ce qu'on regarde** : la contribution *marginale* de chaque requête ancrée —
+les offres dont elle est la **seule** étiquette de confiance responsable de
+l'entrée. Le décompte brut ne vaut rien : deux requêtes ancrées qui se
+recouvrent se partagent un mérite qu'aucune n'a seule.
+
+```sql
+with marginales as (
+  select o.id, o.title, o.company_name, o.score,
+         (select array_agg(sq.label order by sq.label)
+            from search_queries sq
+           where sq.id = any (o.found_by_query_ids)
+             and sq.trust = 'anchored' and sq.enabled) as ancrees
+  from offers_shortlist o
+  where o.core_hits = 0 and o.ai_hits = 0   -- entrées UNIQUEMENT par la confiance
+)
+select ancrees[1] as requete, count(*) as dont_elle_est_seule_responsable
+from marginales
+where array_length(ancrees, 1) = 1
+group by 1 order by 2 desc;
+```
+
+Remplacer les deux dernières lignes par `select requete, title, company_name,
+score from marginales where array_length(ancrees, 1) = 1 order by 1, score desc;`
+donne les intitulés, seul moyen de juger.
+
+**Ce qu'on en fait** : une requête ne se déclasse que si elle fait entrer une
+**majorité** de hors-sujet *et* que son déclassement ne coûte aucune offre
+pertinente ou adjacente. Le critère n'est pas « zéro bruit » : une offre hors
+sujet en bas d'une liste triée par score coûte peu, une offre pertinente jamais
+affichée coûte cher. C'est exactement ce raisonnement qui a fait déclasser
+`fr-react` et `fr-js` — coût nul — et **maintenir** `adzuna:local:javascript`
+malgré 7 hors-sujet sur 12, ses 5 adjacentes n'ayant aucune autre voie d'entrée.
+Compter les **annonces**, pas les lignes : le défaut P10 en triple certaines.
+
+Relevé du 2026-09-08 en fin de chantier, pour servir de point de comparaison :
+`adzuna:local:javascript` 13, `adzuna:remote:fr-ts` 12,
+`adzuna:local:typescript` 3, les autres 0.
+
+Corriger un classement passe par une **migration**, jamais par un `UPDATE` :
+c'est une donnée de référence, et la migration porte la mesure qui la justifie.
+
 Désactiver une requête : `update search_queries set enabled = false where label = '…';`
 Ajuster un poids : `update skill_lexicon set weight = … where term = '…';`
 Dans les deux cas, l'effet est immédiat sur les offres déjà collectées — le score
 est une vue.
 
+Désactiver une requête ancrée lui retire aussi sa **confiance** : depuis la
+migration `20260908080000`, `trusted_query` ne compte que les requêtes encore
+actives. Ce n'était pas le cas à la livraison du plan — la vue ignorait
+`enabled`, et le remède documenté ici n'aurait rien changé aux offres déjà
+entrées. En revanche `found_by_labels` continue d'afficher la requête
+désactivée : « elle a trouvé cette offre » reste un fait vrai.
+
+**Désactiver, jamais supprimer.** `found_by_query_ids` est un `int[]`, qui ne
+peut pas porter de clé étrangère : supprimer la ligne de `search_queries`
+retirerait son étiquette en silence et pourrait faire **sortir** une offre de
+la sélection. Et ne jamais réécrire les `keywords` d'une requête `anchored` —
+créer une nouvelle étiquette : l'id survit à la redéfinition, donc les offres
+déjà estampillées resteraient dignes de confiance sur la foi d'un texte de
+requête disparu, sans aucun signal.
+
+Régler la confiance d'une requête (`search_queries.trust`, `'anchored'` ou
+`'net'`) : **par migration seulement**, à la différence des deux réglages
+ci-dessus — c'est ce que la tâche 4 du plan « confiance par requête » impose
+explicitement, pour garder une trace du pari et de sa correction (voir
+`20260908033042`, `20260908050000` et `20260908070000`). Effet immédiat aussi
+sur `offers_shortlist`, une fois la migration poussée.
+
 **Ordre d'écriture, à ne pas confondre avec un ordre d'importance** : `priority`
 croissante décide de l'ordre d'exécution, et comme l'upsert écrase, **la
-dernière requête à voir une offre fixe ses colonnes** — provenance et
-`remote_label` compris. Les requêtes les plus informatives doivent donc passer
-en dernier.
+dernière requête à voir une offre fixe ses colonnes scalaires** —
+`remote_label`, `search_origin_insee`, `search_radius_km`. Les requêtes les
+plus informatives doivent donc passer en dernier.
+
+**Attention à un mot qui porte deux sens dans ce dépôt.** Le code appelle
+« provenance » deux choses différentes, et elles ne s'écrivent pas de la même
+façon :
+
+| Ce que le code nomme ainsi | Ce que c'est | Comment ça s'écrit |
+|---|---|---|
+| `provenanceOf()`, `FtProvenance`, `AdzunaProvenance` (mappers) | la commune INSEE et le rayon de la requête | **dernier écrivain gagne** |
+| `UpsertProvenance` (`_shared/upsert.ts`) | l'**id de la requête** qui a ramené l'offre | **union**, jamais écrasée |
+
+La phrase ci-dessus ne vaut donc que pour la première. `found_by_query_ids`
+échappe entièrement à l'ordre d'exécution : c'est tout l'objet de la décision
+de conception « un ensemble, pas un scalaire » — la relire plus haut dans ce
+document avant de toucher aux `priority` en croyant déplacer la confiance.

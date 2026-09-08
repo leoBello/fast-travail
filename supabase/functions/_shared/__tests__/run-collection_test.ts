@@ -261,6 +261,32 @@ Deno.test('runCollection distingue les offres déjà connues', async () => {
 });
 
 Deno.test(
+  "runCollection transmet l'id de la requête courante à upsertOffers, un id différent par requête",
+  async () => {
+    const { db, rec } = fakeDb();
+
+    await runCollection({
+      db,
+      source: 'france_travail',
+      mode: 'delta',
+      trigger: 'manual',
+      dryRun: false,
+      queries: [query(11, 'a'), query(27, 'b')],
+      fetchAll: okFetch(1),
+      map: mapAll,
+    });
+
+    // Une requête par appel à upsertOffers : deux requêtes dans la boucle
+    // doivent produire deux lots distincts, chacun portant son propre id.
+    assertEquals(rec.upserts.length, 2);
+    const firstRow = (rec.upserts[0] as Record<string, unknown>[])[0];
+    const secondRow = (rec.upserts[1] as Record<string, unknown>[])[0];
+    assertEquals(firstRow.found_by_query_ids, [11]);
+    assertEquals(secondRow.found_by_query_ids, [27]);
+  },
+);
+
+Deno.test(
   'runCollection renvoie le résumé complet même si la clôture du run échoue',
   async () => {
     const { db } = fakeDb([], { failFinishRun: true });

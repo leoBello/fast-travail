@@ -1,0 +1,59 @@
+-- Correctif du constat 2 de la revue de la tache 4 (plan "confiance par
+-- requete") : le decompte marginal des 6 requetes encore 'anchored' a ete
+-- refait au complet, pas seulement pour adzuna:local:javascript comme
+-- l'avait fait le rapport initial.
+--
+-- METHODE : parmi les offres de offers_shortlist entrees UNIQUEMENT par
+-- trusted_query (core_hits = 0 and ai_hits = 0), on ne garde de
+-- found_by_labels que les etiquettes 'anchored' ; une requete est jugee sur
+-- les offres ou elle est la SEULE etiquette anchored restante (contribution
+-- marginale, la seule cause reelle d'entree), pas sur le decompte brut qui
+-- partage a tort le merite entre requetes qui se recouvrent.
+--
+-- RESULTAT, mesure le 2026-09-08 (les 6 requetes anchored a ce moment-la) :
+--
+--   label                     | marginal | hors sujet | adjacent
+--   adzuna:local:react-ts     |        0 |          - |        -
+--   adzuna:local:typescript   |        3 |          1 |        2
+--   adzuna:local:nextjs       |        0 |          - |        -
+--   adzuna:local:javascript   |       12 |          7 |        5
+--   adzuna:remote:fr-ts       |        9 |          2 |        7
+--   adzuna:remote:fr-js       |        2 |          2 |        0
+--
+-- adzuna:local:javascript et adzuna:remote:fr-js font toutes deux entrer une
+-- majorite de hors sujet sur leur contribution marginale (javascript : 7/12
+-- = 58% par ligne, 6/11 = 55% par annonce distincte une fois fusionne le
+-- doublon de casse "Virtualexpo Group" / "VIRTUALEXPO GROUP" ; fr-js : 2/2 =
+-- 100%). Le rapport initial de la tache 4 avait sous-compte javascript a 7
+-- offres marginales au lieu de 12, en omettant Collective.work (Vue.js),
+-- Easy Partner (Vue.js), un second exemplaire Virtualexpo, W HUB (Data
+-- Ingenieur SKYWISE) et EASY PARTNER (PL/SQL Senior) -- ces deux dernieres
+-- deja classees hors sujet ailleurs dans le meme rapport, sans verifier la
+-- coherence entre les deux sections.
+--
+-- DECISION, au cout mesure et non au seul ratio :
+--
+-- adzuna:remote:fr-js SE DECLASSE ('anchored' -> 'net') : ses 2 offres
+-- marginales (Diabolocom "Software Support Specialist LV2", NEXTON
+-- "Consultant ECM / GED F/H") sont toutes les deux hors sujet, aucune
+-- pertinente ni adjacente. Cout du declassement : zero offre perdue. Meme
+-- methode et meme verdict que adzuna:remote:fr-react (migration
+-- 20260908050000).
+--
+-- adzuna:local:javascript RESTE 'anchored', malgre la meme majorite de hors
+-- sujet (58%/55%), car son cout de declassement n'est PAS nul : ses 5 offres
+-- adjacentes marginales (DigDash, Dassault Systemes, Capgemini,
+-- Collective.work, Easy Partner) n'ont aucune autre voie d'entree (ni
+-- core_hits, ni ai_hits, ni autre etiquette anchored) et disparaitraient
+-- purement et simplement de offers_shortlist si javascript etait declasse.
+-- Le critere du projet est explicite : une offre hors sujet en bas d'une
+-- liste triee par score coute peu, une offre pertinente ou adjacente jamais
+-- affichee coute cher. Ici le cout (5 offres adjacentes rendues invisibles a
+-- l'avenir) l'emporte sur le bruit evite (7 offres hors sujet, deja en bas
+-- de liste par un score nul ou quasi nul). Rien ne change pour cette
+-- requete : aucune migration ne la touche.
+--
+-- Detail offre par offre et chiffres verifies dans docs/ETAT.md, section
+-- "Resultat mesure (tache 4, corrige par sa revue)".
+
+update search_queries set trust = 'net' where label = 'adzuna:remote:fr-js';
