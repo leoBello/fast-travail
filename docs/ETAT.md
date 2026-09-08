@@ -31,15 +31,16 @@ select * from offers_shortlist order by score desc, published_at desc;
 | Offres collectées | 1 176 |
 | — dont France Travail | 700 |
 | — dont Adzuna | 476 |
-| Offres retenues (`offers_shortlist`) | **12** |
-| — dont full remote national | 5 |
+| Offres retenues (`offers_shortlist`) | **31** |
+| — dont locales (13, 83, 84) | 19 |
+| — dont full remote national | 12 |
 | Mentionnant React / TypeScript / Next.js | 47 |
 | Mentionnant LLM / IA / agents | 67 |
 | En full remote | 9 |
 | Requêtes France Travail actives | 24 sur 38 |
 | Requêtes Adzuna actives | 11 sur 11 |
 | Jobs cron actifs | 2 |
-| Termes au lexique | 66 |
+| Termes au lexique | 67 |
 | Tests | 115 verts |
 
 ---
@@ -149,25 +150,38 @@ Non déclenché sur les collectes réelles — `fetched` égalait `total_availab
 sur les 24 requêtes, et de nouveau sur le run du cron — mais le défaut reste
 dans le code. Le client Adzuna, lui, renseigne désormais `truncated`.
 
-### P8 — La troncature bride la sélection : 76 full remote pour 3 retenues
+### ~~P8 — La sélection était étouffée : 3 retenues sur 76 full remote~~ *(résolu)*
 
-**C'est le problème le plus rentable à résoudre.** Adzuna rend 76 offres en full
-remote, mais 3 seulement entrent dans `offers_shortlist`. La cause n'est pas la
-collecte : elle est que la vue exige `core_hits >= 1`, donc que le lexique voie
-« React » dans un texte coupé à 500 caractères avant la stack. Sur 476 offres
-Adzuna, **7 seulement ont un `core_hits`**.
+Deux causes, et la première n'était pas celle qu'on croyait.
 
-Relâcher `core_hits` pour Adzuna a été mesuré et **ne marche pas** : les 15
-offres ainsi admises comprennent « Business Developer Assurance », « Sales »,
-« UX designer » et « Senior Data Engineer ». La requête `adzuna:remote:fr-dev`
-est trop large — le lemmatiseur d'Adzuna fait correspondre « développeur » à
-« Business Developer ».
+**Le signal IA était pollué par la lemmatisation française.** `agentique` était
+en `fts`, or le stemmer français le réduit au même radical qu'`agent` : 46
+correspondances pour 14 réelles, soit 32 faux positifs à +3 points, dont
+« AGENT DE PRODUCTION (POSTE APRES MIDI 13H 21H) ». Et `prompt` captait
+l'adjectif français (« une industrie *prompte* à valoriser l'initiative »),
+pollué dans **les deux** modes de correspondance. Corrigés par les migrations
+`20260908003545` et `20260908003753`. Le choix du mode dépend du mot et se
+mesure : `rag` doit rester en `fts`, car en `ilike` il matcherait 282 offres
+(« cadRAGe », « encadRAGement »).
 
-*Piste, à arbitrer* : la confiance doit être **par requête**, pas par source.
-`fr-react` et `fr-ts` sont précises et ancrées à une techno (13 et 17 offres sur
-31 jours) ; `it-jobs` et `fr-dev` sont des filets. Les distinguer exige de
-retenir **quelle requête a trouvé l'offre** — une colonne de plus sur `offers`,
-renseignée par la provenance, qui se peuplerait à la collecte suivante.
+**Et `core_hits >= 1` écartait les différenciateurs du profil.** Une offre
+« Ingénieur Agentique FullStack » ou « AI Developer » ne nomme ni React ni
+TypeScript dans les 500 caractères reçus. La règle est devenue
+`core_hits >= 1 OR ai_hits >= 1`, le signal rouge restant éliminatoire
+(migration `20260908004235`). **La sélection passe de 12 à 31 offres**, 19
+locales et 12 en full remote. Sur les 19 ajoutées : 10 franchement
+pertinentes, 4 adjacentes, 5 hors sujet que le score relègue en bas.
+
+L'ordre importait : ouvrir le filtre **avant** d'assainir `ai_hits` ramenait 42
+offres au lieu de 31, avec « Gestionnaire facturation » et « Chargé(e)
+Prépaie » dedans.
+
+*Reste ouvert, moins urgent* : la confiance par **requête** plutôt que par
+source. `fr-react` et `fr-ts` sont ancrées à une techno ; `it-jobs` et
+`fr-dev` sont des filets — le lemmatiseur d'Adzuna fait correspondre
+« développeur » à « Business Developer ». Les distinguer exige de retenir
+quelle requête a trouvé l'offre : une colonne de plus sur `offers`, peuplée
+dès la collecte suivante.
 
 ### P5 — Signal local mince, et ce n'est pas un défaut d'outillage
 
@@ -183,11 +197,12 @@ Travail — ce qui pèse sur la phase 2 et rend P8 prioritaire.
 entre sources. Les deux sources alimentent maintenant la base : le problème
 n'est plus théorique. Première dette à payer en phase 2.
 
-### P9 — La re-revue de la tâche 11 n'a pas eu lieu
+### P9 — La re-revue de la tâche 11 est en cours
 
-Les six constats de revue ont été corrigés (commit `2c678d5`) mais le relecteur
-a été coupé par une limite de session avant de rendre son verdict. Le diff
-l'attend dans `.superpowers/sdd/review-983e858..2c678d5.diff`.
+Les six constats de revue ont été corrigés (commit `2c678d5`). Un premier
+relecteur a été coupé par une limite de session avant de rendre son verdict ;
+un second a été relancé sur le même diff,
+`.superpowers/sdd/review-983e858..2c678d5.diff`.
 
 Ce qui a été vérifié à la place, par exécution : `verify` vert à 115 tests, et
 neuf contrôles de comportement sur le code réel, dont un appel HTTP véritable.
