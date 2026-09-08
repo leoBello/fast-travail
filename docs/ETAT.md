@@ -59,7 +59,7 @@ que les recopier — c'est une requête, pas une archive.
 | Requêtes Adzuna actives | 11 sur 11 |
 | Jobs cron actifs | 2 |
 | Termes au lexique | 67 |
-| Tests | 209 verts *(recompté le 2026-09-08 en clôture du plan B ; couvre aussi Free-Work et Collective)* |
+| Tests | 219 verts *(recompté le 2026-09-08 en clôture du plan B ; couvre aussi Free-Work et Collective)* |
 
 La ligne qui compte est la quatrième depuis le bas du bloc de sélection :
 **34 des 65 offres retenues n'ont ni `core_hits` ni `ai_hits`**. Sans la
@@ -71,11 +71,13 @@ B et ne couvrent que les deux API.** Depuis, Free-Work et Collective.work
 alimentent la base elles aussi, et les deux tournent seules par Planificateur
 Windows en plus des deux crons `pg_cron`. Le compte à quatre sources,
 recompté en base le 2026-09-08 en clôture du plan B, est dans « Phase 1 —
-Plan B » plus bas : **3 184 offres collectées, 82 retenues**. Les deux
+Plan B » plus bas : **4 112 offres collectées, 87 retenues** (recompté le
+2026-09-08 en clôture du plan de dédoublonnage — ces nombres bougent chaque
+matin, quatre sources collectant seules). Les deux
 rangées « Mentionnant React / TypeScript / Next.js » et « Mentionnant LLM /
 IA / agents » ci-dessus restent telles quelles pour la même raison : ce sont
 des mesures datées de la clôture du plan confiance-par-requête, sur les 1 296
-offres API d'alors, et elles n'ont pas été refaites sur les 3 184 offres
+offres API d'alors, et elles n'ont pas été refaites sur les 4 112 offres
 actuelles — les recompter serait une tâche à part, pas une simple mise à jour
 de nombre.
 
@@ -369,16 +371,17 @@ from offers group by source order by source;
 | Source | Offres | Full remote | Zone 13/83/84 | Avec TJM | Description moy. |
 |---|---:|---:|---:|---:|---:|
 | adzuna | 557 | 80 | 483 | 0 | 500 |
-| collective¹ | 1 783 | 64 | 73 | 800 | 2 003 |
+| collective¹ | 2 711 | 108 | 95 | 1 339 | 1 970 |
 | france_travail | 739 | 9 | 440 | 0 | 2 606 |
 | free_work | 105 | 3 | 33 | 34 | 1 684 |
+| **Total** | **4 112** | **200** | **1 051** | **1 373** | |
 
-¹ Collective ne couvre que **11 jours** (2026-08-28 au 2026-09-08) là où
-adzuna et france_travail en couvrent 31 (depuis le 2026-08-08) — mesuré le
-2026-09-08 par `min(published_at)`/`max(published_at)` groupé par source. Le
-plafond de pages est corrigé (voir plus bas), mais le backfill qui couvrirait
-réellement les 31 jours n'a pas encore été rejoué.
-| **Total** | **3 184** | | | | |
+¹ **Corrigé le 2026-09-08** : ce tableau annonçait 1 783 offres Collective sur
+11 jours, en notant que le backfill restait à rejouer. Il l'a été depuis.
+Collective couvre désormais **34 jours** (2026-08-06 au 2026-09-08), soit plus
+que les 31 d'adzuna et de france_travail, pour **2 711 offres** — et elle
+apporte **1 339 TJM** sur les 1 373 de la base. La colonne `rate_raw` était
+morte il y a une semaine ; elle porte maintenant le tiers du corpus.
 
 ```sql
 select source, count(*) from offers_shortlist group by source order by source;
@@ -434,7 +437,7 @@ from (select lower(title), company_name from offers group by 1, 2 having count(d
 ```
 
 **19 groupes** de titre (normalisé en minuscules) et d'entreprise partagés par
-deux sources ou plus, sur les 3 184 offres — quatre sources désormais, contre
+deux sources ou plus, sur les 4 112 offres — quatre sources désormais, contre
 deux au moment où P6 a été ouvert. Beaucoup d'annonces d'ESN paraissent
 simultanément sur Free-Work et sur France Travail ; c'était la première dette
 de la phase 2.
@@ -580,7 +583,10 @@ disparu de ma liste du jour »).
 ### Résultat mesuré le 2026-09-08
 
 ```sql
-select count(distinct dup_group_id), count(*) filter (where not is_primary), count(*) from offer_duplicate_groups;
+select count(distinct dup_group_id) as groupes,
+       count(*) filter (where not is_primary) as masquees,
+       count(*) as couvertes
+from offer_duplicate_groups;
 ```
 
 **3 770 groupes, 191 offres masquées sur 3 961** couvertes par la clé (les
@@ -809,8 +815,8 @@ excédentaires là où il y en a 0. Mesuré sur l'ensemble du corpus actuel
 (4 112 offres) pour chiffrer l'écart : la clé sans ville forme **213
 groupes, 529 offres, 316 excédentaires** ; la clé correcte, avec ville et le
 garde-fou `coalesce(norm_city, offer_id)` pour les villes nulles, n'en forme
-que **129, pour 269 offres et 140 excédentaires** — l'excès retombe de
-**316 à 140, soit environ 56 % de moins**, du même ordre que le « environ
+que **133, pour 278 offres et 145 excédentaires** — l'excès retombe de
+**316 à 145, soit environ 54 % de moins**, du même ordre que le « environ
 60 % » pressenti avant de mesurer. Achil, pris isolément, illustre l'écart au
 maximum : 8 des 8 doublons qu'une clé sans ville lui aurait attribués sont
 des faux positifs.
@@ -1001,7 +1007,16 @@ automatique fondé sur le seul recouvrement lexical confondrait donc « vrai
 doublon tronqué différemment » et « faux positif Malt ».
 
 **Décision** : rien codé ici (aucune vue ni migration n'est touchée dans
-cette tâche), le problème est réel mais rare — 1 cas propre sur 191, 0,5 %.
+cette tâche). Mais **attention au dénominateur, la revue finale l'a relevé** :
+1 cas sur 191 paires masquées fait 0,5 % du corpus, et c'est le chiffre
+rassurant — or la décision porte sur la **liste quotidienne**, qui ne perd
+que **5 offres**, dont Malt. Le taux qui gouverne est donc **1 sur 5, soit
+20 %**. C'est tout le reste du document qui raisonne sur le coût asymétrique
+de la liste du matin ; ce paragraphe est le seul à avoir basculé sur le
+corpus entier, et c'est précisément ce qui rendait le risque négligeable.
+Le choix de ne rien automatiser reste défendable — le signal lexical
+confondrait vrai doublon tronqué et faux positif — mais il se prend en
+sachant qu'une disparition sur cinq est douteuse, pas une sur deux cents.
 À revisiter si la proportion grossit, ou si une source publie
 massivement au nom d'employeurs intermédiaires. En attendant, la recette de
 surveillance ci-dessous (plus gros groupes de doublons) reste le meilleur
@@ -1172,6 +1187,49 @@ et aucune source n'y domine systématiquement. Un groupe qui grimperait
 soudain à 10 ou 20 pour une seule source, ou une même entreprise apparaissant
 en boucle dans le haut de ce classement, serait le signal à suivre — à relire
 de temps en temps, pas seulement quand la sélection paraît étrange.
+
+### Vérifier que le dédoublonnage n'a pas dérapé — doit rendre zéro ligne
+
+Environ 750 lignes de SQL décident si une offre est vue. Leurs invariants ont
+été **prouvés** en revue par des requêtes écrites pour l'occasion, mais rien ne
+les rejouait ensuite : `deno test` ne sait pas tester une vue. Voici de quoi
+le faire, à lancer quand la liste paraît étrange, et après toute migration qui
+touche `offers_ranked`, `offers_shortlist` ou les vues de dédoublonnage.
+
+```sql
+with elig as materialized (
+  select id, dup_group_id from offers_ranked
+  where red_flags = 0
+    and (core_hits >= 1 or ai_hits >= 1 or trusted_query)
+    and (department in ('13', '83', '84') or remote_label = 'full')
+),
+sl as materialized (select id, dup_group_id from offers_shortlist)
+select 'groupe eligible sans ligne affichee' as anomalie, count(*) as n
+  from (select dup_group_id from elig except select dup_group_id from sl) a
+  having count(*) > 0
+union all
+select 'groupe affiche plusieurs fois', count(*)
+  from (select dup_group_id from sl group by 1 having count(*) > 1) b
+  having count(*) > 0
+union all
+select 'ligne affichee hors criteres', count(*)
+  from sl where id not in (select id from elig)
+  having count(*) > 0;
+```
+
+**Elle doit ne rien rendre.** Exécutée le 2026-09-08 : zéro ligne, sur 87
+groupes éligibles et 87 lignes affichées.
+
+Ce que chaque anomalie voudrait dire, et quoi faire :
+
+| Anomalie | Ce qui s'est cassé | Où chercher |
+|---|---|---|
+| `groupe eligible sans ligne affichee` | **Le plus grave** : un poste a disparu de la liste alors qu'il satisfaisait les critères. C'est exactement le défaut trouvé en revue de la tâche 3, où le représentant était élu sans regarder s'il était lui-même visible | l'élection dans `offers_shortlist`, migration `20260908180000` |
+| `groupe affiche plusieurs fois` | Le dédoublonnage ne dédoublonne plus — partition cassée, ou `dup_group_id` devenu nul quelque part | `coalesce(dup_group_id, id::text)` dans `offers_ranked` |
+| `ligne affichee hors criteres` | Un filtre a sauté : signal rouge, lexique ou géographie | la clause `where` de `eligibles` |
+
+`materialized` n'est pas décoratif ici non plus : sans lui la requête rejoue
+les vues à chaque ligne et expire.
 
 ### Surveiller la confiance par requête — la seule chose qui remesure
 

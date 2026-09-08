@@ -249,41 +249,71 @@ order by score desc, published_at desc;
 
 `dup_count` dit en combien d'exemplaires ce poste a été vu (1 s'il est seul).
 `dup_first_seen_at` est la date de la **première** offre du groupe, pas celle
-de la ligne affichée : la sélection garde la ligne la plus récente (URL qui a
-le plus de chances de fonctionner encore), ce qui perd l'ancienneté réelle du
-poste si on ne regarde que `first_seen_at`. Un poste vu depuis longtemps sous
-plusieurs republications (`dup_count` élevé, `dup_first_seen_at` ancien) est
-un signal — dur à pourvoir, ou très demandé.
+de la ligne affichée. Un poste vu depuis longtemps sous plusieurs
+republications (`dup_count` élevé, `dup_first_seen_at` ancien) est un signal
+— dur à pourvoir, ou très demandé.
+
+**L'annonce affichée n'est pas toujours la plus récente**, et c'est le piège
+à connaître avant de cliquer sur un lien. L'ordre d'élection est : d'abord
+celle qui porte un **TJM**, puis la **description la plus longue**, puis la
+plus récemment publiée, puis la plus récemment vue, puis l'`id` pour que
+l'ordre soit total. La fraîcheur ne vient donc qu'en troisième position :
+mesuré le 2026-09-08, **15 groupes intra-source sur 129** affichent une ligne
+qui n'est pas la plus récente, et le groupe KLANIK « Ingénieur IA » montre
+une annonce du 21 août en masquant une du 3 septembre. Si un lien est mort,
+c'est `offers_hidden_duplicates` qu'il faut regarder : une republication plus
+fraîche y attend peut-être.
 
 **Interroger `offers_shortlist`, jamais `offers_ranked` avec une clause écrite
 à la main.** La vue encode la règle complète — signal rouge éliminatoire, puis
 `core_hits` **ou** `ai_hits` **ou** une requête de confiance, puis
 l'accessibilité géographique — et cette règle a changé deux fois. La recette
 précédente de ce fichier filtrait sur `core_hits >= 1` : mesurée le
-2026-09-08, elle rendait 32 lignes là où la sélection réelle en compte 65, et
-**12 seulement** des 65 ont un `core_hits`. Elle cachait donc 53 offres, dont
+2026-09-08, elle rendait 32 lignes là où la sélection réelle en compte 87, et
+**20 seulement** des 87 ont un `core_hits`. Elle cachait donc 67 offres, dont
 exactement le gisement full-remote — Adzuna tronquant à 500 caractères, une
 offre y est retenue par la requête qui l'a trouvée, pas par son texte.
 
 `found_by_labels` dit **quelle requête** a ramené l'offre, et `trusted_query`
-si l'une d'elles est ancrée à une technologie. Sur les 65 offres retenues, 34
+si l'une d'elles est ancrée à une technologie. Sur les 87 offres retenues, 29
 n'entrent **que** par ce chemin : elles n'ont ni `core_hits` ni `ai_hits`, et
-sans lui elles seraient invisibles.
+sans lui elles seraient invisibles. Ces nombres bougent chaque matin, deux
+crons collectant à 6 h et 6 h 30 : les recompter, jamais les recopier.
 
 **`offers_shortlist` ne montre qu'un représentant par groupe de doublons.**
 `offers_hidden_duplicates` liste la contrepartie — les offres masquées et
-l'exemplaire qui les remplace — pour que rien ne se perde vraiment. Piège à
-connaître : cette vue répond à « qui est le représentant sur **tout** le
-corpus » (`is_primary`), pas à « qu'est-ce qui a disparu de **ma** sélection
-du jour » — depuis que le dédoublonnage se fait dans la sélection elle-même,
-les deux questions n'ont plus toujours la même réponse. La recette exacte
-pour la seconde question est en tête de la migration
-`20260908190000_fix_hidden_duplicates_recipe.sql`, avec les CTE
-`materialized` qui lui sont indispensables : `offers_shortlist` et
-`offers_hidden_duplicates` coûtent chacune environ 3,8 secondes, et sans
-`materialized` une requête qui recombine les deux rejoue ce coût à chaque
-ligne — testé, elle expire après le délai serveur au lieu de répondre en
-quelques secondes.
+l'exemplaire qui les remplace — pour que rien ne se perde vraiment.
+
+Piège à connaître : cette vue répond à « qui est le représentant sur **tout**
+le corpus » (`is_primary`), pas à « qu'est-ce qui a disparu de **ma**
+sélection du jour ». Depuis que le dédoublonnage se fait dans la sélection
+elle-même, les deux questions n'ont plus toujours la même réponse — mesuré :
+2 des 87 lignes affichées ont `is_primary = false`. Voici la seconde
+question, telle qu'elle s'exécute :
+
+```sql
+with elig as materialized (
+  select id, source, title, company_name, url
+  from offers_ranked
+  where red_flags = 0
+    and (core_hits >= 1 or ai_hits >= 1 or trusted_query)
+    and (department in ('13', '83', '84') or remote_label = 'full')
+),
+affichees as materialized (select id from offers_shortlist)
+select * from elig e where e.id not in (select id from affichees);
+```
+
+**`materialized` n'est pas décoratif** : sans lui le planificateur rejoue les
+vues à chaque ligne, et la requête expire au lieu de répondre — c'est
+mesuré, deux fois sur deux. Rendu du 2026-09-08 : 5 offres écartées,
+cohérent avec une sélection qui passe de 92 à 87.
+
+Les coûts ne sont pas du même ordre et ne se lisent pas ensemble :
+`offers_shortlist` met environ **3,7 s**, dont 3,3 s dans
+`offer_lexical_score` — un coût **linéaire** en offres × termes du lexique,
+qui grandira avec le corpus. `offers_hidden_duplicates` met environ
+**0,5 s**, après correction : elle était quadratique et coûtait 3,8 s pour
+un produit cartésien complet.
 
 Les axes réglables sont des **lignes en base**, jamais du code :
 
