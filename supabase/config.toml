@@ -419,3 +419,6 @@ verify_jwt = true
 
 [functions.collect-adzuna]
 verify_jwt = true
+
+[functions.score-offers]
+verify_jwt = true
