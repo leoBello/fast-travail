@@ -185,7 +185,7 @@ collectées, `offers_shortlist` étant une vue.
 **Planifié le 2026-09-08, contre des pages réelles capturées d'abord. Pas
 encore implémenté.** Plan :
 [`plans/2026-09-08-plan-b-scrapers-free-work-collective.md`](superpowers/plans/2026-09-08-plan-b-scrapers-free-work-collective.md),
-onze tâches. Les fixtures — quatre pages Free-Work, une page Collective, deux
+douze tâches. Les fixtures — quatre pages Free-Work, une page Collective, deux
 `robots.txt` — sont commitées sous `supabase/functions/_scrapers/`.
 
 **La reconnaissance a démenti trois affirmations de ce document.**
