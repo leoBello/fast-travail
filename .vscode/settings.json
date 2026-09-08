@@ -1,0 +1,45 @@
+{
+  // Deno n'est activé QUE sur supabase/functions/ et scripts/. Le reste du dépôt
+  // reste en Node/TypeScript classique, pour que le futur dashboard Next.js à la
+  // racine ne soit pas analysé par le serveur Deno.
+  //
+  // scripts/ contient des scripts Deno qui importent le code partagé des Edge
+  // Functions (backfill-remap.ts lit _shared/db.ts et le mapper France Travail) :
+  // sans lui, l'éditeur signalerait sur ces fichiers des erreurs qui n'existent
+  // pas, et `npm run verify` les couvre désormais.
+  "deno.enable": false,
+  "deno.enablePaths": ["supabase/functions", "scripts"],
+  "deno.config": "supabase/functions/deno.json",
+  "deno.lint": true,
+
+  // Sans ces réglages, le serveur TypeScript intégré analyse le code Deno avec
+  // des hypothèses Node et signale des erreurs qui n'existent pas :
+  // « Cannot find name 'Deno' », imports en .ts refusés, import map ignorée.
+  "deno.documentPreloadLimit": 1000,
+  "deno.suggest.imports.hosts": {
+    "https://deno.land": false
+  },
+
+  // Deno formate lui-même les fichiers qu'il possède, avec les guillemets
+  // simples imposés par supabase/functions/deno.json. Prettier ferait l'inverse.
+  "[typescript]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "denoland.vscode-deno"
+  },
+  "editor.formatOnSave": true,
+
+  // Prettier et ESLint sont orientés Node : ils ne doivent pas toucher aux
+  // Edge Functions. Les fichiers d'exclusion à la racine s'en chargent aussi,
+  // pour que la règle tienne hors de VS Code.
+  "prettier.ignorePath": ".prettierignore",
+  "eslint.probe": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
+
+  "files.eol": "\n",
+  "search.exclude": {
+    "**/node_modules": true,
+    "supabase/functions/deno.lock": true,
+    ".superpowers": true
+  }
+}

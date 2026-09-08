@@ -1,0 +1,26 @@
+{
+  "name": "fast-travail",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Veille automatisée d'offres d'emploi dev web — collecte API et scraping",
+  "scripts": {
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "fn:serve": "supabase functions serve --env-file .env.local",
+    "fn:local:ft": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/collect-france-travail/index.ts",
+    "fn:local:adzuna": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/collect-adzuna/index.ts",
+    "fn:deploy:ft": "supabase functions deploy collect-france-travail",
+    "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
+    "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",
+    "fmt": "deno fmt --config supabase/functions/deno.json supabase/functions/ scripts/",
+    "lint": "deno lint --config supabase/functions/deno.json supabase/functions/ scripts/",
+    "fmt:check": "deno fmt --check --config supabase/functions/deno.json supabase/functions/ scripts/",
+    "verify": "npm run fmt:check && npm run lint && npm run check && npm test",
+    "check": "deno check --config supabase/functions/deno.json supabase/functions/ scripts/",
+    "backfill:remap": "deno run --config supabase/functions/deno.json --allow-read --allow-net --allow-env scripts/backfill-remap.ts"
+  },
+  "devDependencies": {
+    "supabase": "^2.117.0"
+  }
+}

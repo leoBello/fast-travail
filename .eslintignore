@@ -1,0 +1,6 @@
+# ESLint est oriente Node et ne connait pas le runtime Deno : il signalerait
+# des erreurs inexistantes sur les Edge Functions. Le linter de ce code est
+# deno lint, lance par npm run lint.
+supabase/functions/
+node_modules/
+.superpowers/

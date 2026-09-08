@@ -25,8 +25,16 @@
 - **Géographie par défaut** : commune INSEE `13055` (Marseille), `distance = 40` km.
 - **Plafond France Travail** : 1 150 résultats par requête, pages de 150 (`range=0-149`).
 - **Isolation des erreurs** : une requête qui échoue n'interrompt jamais le run ; le run se termine en `partial`.
+- **Zéro erreur de lint, zéro erreur de formatage, zéro test rouge.** La porte unique est `npm run verify` (enchaîne `fmt:check`, `lint`, `test`), à faire passer avant chaque commit. **Aucun contournement du linter n'est autorisé** : ni `deno-lint-ignore`, ni `eslint-disable`, ni `@ts-ignore`, ni `@ts-expect-error`, ni `as any`, ni `--no-check`. Si le linter signale quelque chose, le code change, pas la règle. Seule exception : `as unknown as DbClient` dans les fichiers `__tests__/`, pour fabriquer un double de test. Voir `CLAUDE.md`.
 - **Commandes CLI** : toujours `npx supabase …`, jamais `supabase` nu. Le CLI existe aussi en global sur cette machine, mais `npx` résout vers la devDependency, donc la version reste pinnée dans le dépôt et reproductible.
-- **Node** : 26.3.0 (exécute TypeScript nativement). **Supabase CLI** : 2.117.0, présent en global et en devDependency. **Deno** : 2.9.6, installé via winget dans `%LOCALAPPDATA%\Microsoft\WinGet\Links\` mais **absent du PATH des shells déjà ouverts** — redémarrer le terminal avant de commencer.
+- **Node** : 26.3.0 (exécute TypeScript nativement). **Supabase CLI** : 2.117.0, présent en global et en devDependency.
+- **Deno 2.9.6 est installé mais hors du PATH hérité par les shells de cette session.** Toute commande `deno` doit être précédée, dans le même appel shell, de :
+  ```bash
+  export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links"
+  ```
+  L'état du shell ne persiste pas entre les appels : répéter cet `export` dans **chaque** commande qui invoque `deno`, `npm test` inclus.
+- **Orchestration mutualisée** : la boucle de collecte vit dans `_shared/run-collection.ts` et sert les deux sources (et les scrapers du plan B). Les `index.ts` de chaque fonction ne font que lire l'environnement, charger les requêtes et appeler `runCollection`. Ne pas dupliquer la boucle.
+- **`Deno.env` reste hors de `_shared/`** : la lecture de l'environnement (`requireEnv`) appartient à chaque `index.ts`, qui est du code Deno assumé. C'est la frontière qui garde `_shared/` réutilisable par Node.
 
 ## Protocole d'exécution
 
@@ -64,10 +72,11 @@ Chaque tâche est relue avant de passer à la suivante, en deux temps :
 - Une table créée sans `enable row level security` → **rejet**.
 - Un `catch` qui avale une erreur sans l'écrire dans `collection_query_results` → **rejet**. La télémétrie est le seul moyen de savoir qu'une requête a cessé de produire.
 - Un test qui ne fait qu'affirmer le comportement de l'implémentation qu'il accompagne, sans avoir été vu échouer → **rejet**.
+- Un contournement du linter ou du typage — `deno-lint-ignore`, `eslint-disable`, `@ts-ignore`, `@ts-expect-error`, `as any` hors tests — → **rejet**. De même pour un `npm run verify` qui n'a pas été lancé, ou qui échoue.
 
 ### Ordre non négociable
 
-Les tâches 3 et 4 produisent les types et fonctions que toutes les suivantes consomment. Les tâches 5, 6 et 7 sont indépendantes entre elles une fois 3 et 4 faites, mais la tâche 8 les requiert toutes les trois. Ne pas paralléliser 1 et 2 : la tâche 2 insère dans les tables créées par la tâche 1.
+Les tâches 3 et 4 produisent les types et fonctions que toutes les suivantes consomment. Les tâches 5, 6 et 7 sont indépendantes entre elles une fois 3 et 4 faites, mais la tâche 9 les requiert toutes les trois, via la boucle mutualisée de la tâche 8. Ne pas paralléliser 1 et 2 : la tâche 2 insère dans les tables créées par la tâche 1.
 
 ---
 
@@ -85,17 +94,21 @@ Les tâches 3 et 4 produisent les types et fonctions que toutes les suivantes co
 - Consumes: rien.
 - Produces: un dépôt lié au projet Supabase distant, `npx supabase` fonctionnel, `deno` sur le PATH, et l'import map que toutes les tâches suivantes utilisent (`@supabase/supabase-js`, `@std/assert`).
 
-- [ ] **Step 1: Redémarrer le terminal et vérifier Deno**
+- [ ] **Step 1: Vérifier Deno avec le PATH complété**
 
-Deno est installé mais absent du PATH des shells ouverts avant son installation. **Ferme et rouvre le terminal**, puis :
+Deno est installé, mais hors du PATH hérité par les shells de cette session. Il n'y a rien à installer : il suffit de compléter le PATH dans chaque commande qui l'invoque.
 
 ```bash
-deno --version
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno --version
 ```
 
-Expected : `deno 2.9.6` (ou supérieur). Si la commande reste introuvable après redémarrage, ajoute `%LOCALAPPDATA%\Microsoft\WinGet\Links` au PATH utilisateur.
+Expected : `deno 2.9.6` (ou supérieur).
 
-C'est le seul vrai bloquant restant : aucune étape de test de ce plan ne fonctionne sans `deno` sur le PATH.
+L'état du shell ne persiste pas entre deux appels : **répète cet `export` dans chaque commande utilisant `deno`**, y compris `npm test`. Exemple type, utilisé partout dans ce plan :
+
+```bash
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/
+```
 
 - [ ] **Step 2: Vérifier le Supabase CLI (déjà installé)**
 
@@ -122,7 +135,8 @@ Le fichier existe mais ne contient que `devDependencies`. Remplace-le intégrale
     "fn:serve": "supabase functions serve --env-file .env.local",
     "fn:deploy:ft": "supabase functions deploy collect-france-travail",
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna",
-    "test": "deno test --allow-read --allow-env supabase/functions/"
+    "test": "deno test --config supabase/functions/deno.json --allow-read --allow-env supabase/functions/",
+    "fmt": "deno fmt supabase/functions/"
   },
   "devDependencies": {
     "supabase": "^2.117.0"
@@ -157,6 +171,10 @@ Create `supabase/functions/deno.json` :
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
     "@std/assert": "jsr:@std/assert@1"
+  },
+  "fmt": {
+    "singleQuote": true,
+    "lineWidth": 100
   }
 }
 ```
@@ -169,6 +187,9 @@ Create `.env.local.example` :
 # Projet Supabase (Settings -> API)
 SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=
+# La cle anon est publique par nature ; elle sert aux appels curl des Edge
+# Functions (verify_jwt) et a verifier que RLS bloque bien les lectures.
+SUPABASE_ANON_KEY=
 
 # France Travail (francetravail.io -> ton application)
 FT_CLIENT_ID=
@@ -225,7 +246,9 @@ Design : `docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md`
 
     npm run db:push          # applique les migrations sur le projet distant
     npm test                 # tests unitaires Deno
-    npm run fn:serve         # sert les Edge Functions en local
+    npm run fn:local:ft      # lance la fonction FT en local, sur la base DISTANTE
+    npm run fn:local:adzuna  # idem pour Adzuna
+    npm run fn:serve         # ⚠ écrase SUPABASE_* : n'écrit PAS sur le distant
     npm run fn:deploy:ft     # déploie la collecte France Travail
 
 ## Consulter les offres
@@ -684,7 +707,7 @@ delete from offers where external_id = 'TEST-0001';
 
 ```bash
 git add supabase/migrations
-git commit -m "feat(db): données de référence — sources, 19 requêtes FT, lexique CV de 74 termes"
+git commit -m "feat(db): données de référence — sources, 19 requêtes FT, lexique CV de 64 termes"
 ```
 
 ---
@@ -715,7 +738,7 @@ git commit -m "feat(db): données de référence — sources, 19 requêtes FT, l
 Create `supabase/functions/_shared/types.ts` :
 
 ```ts
-// Runtime-neutre : aucun accès à Deno.env ni à node:process ici.
+// Runtime-neutre : aucun accès à l'environnement d'exécution dans ce fichier.
 // Ce fichier est importé par les Edge Functions (Deno) ET par les scrapers (Node).
 
 export type SourceKey =
@@ -758,6 +781,25 @@ export interface NormalizedOffer {
   search_origin_insee: string | null;
   search_radius_km: number | null;
   raw: unknown;
+}
+
+/**
+ * Forme canonique d'une ligne de `collection_query_results`.
+ * Source de vérité unique : run-tracker.ts (écriture) et run-collection.ts
+ * (construction pendant la boucle de collecte) importent ce type d'ici,
+ * pour n'avoir qu'un seul endroit à corriger si la table évolue.
+ */
+export interface QueryReportLine {
+  query_id: number | null;
+  unit_label: string;
+  http_status: number | null;
+  total_available: number | null;
+  fetched: number;
+  new_offers: number;
+  updated_offers: number;
+  truncated: boolean;
+  duration_ms: number;
+  error: string | null;
 }
 
 export interface SearchQueryRow {
@@ -855,7 +897,7 @@ Deno.test('la fenêtre de collecte vaut 3 jours en delta et 31 en backfill', () 
 - [ ] **Step 3: Lancer les tests pour vérifier qu'ils passent**
 
 ```bash
-deno test --allow-read supabase/functions/_shared/__tests__/types_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/types_test.ts
 ```
 
 Expected : `ok | 3 passed`. Si le second test échoue sur le compte de clés, corrige le nombre attendu **après** avoir vérifié qu'aucun champ ne manque dans `emptyOffer`.
@@ -904,7 +946,7 @@ export function log(level: LogLevel, message: string, data?: unknown): void {
 - [ ] **Step 6: Vérifier que tout typecheck**
 
 ```bash
-deno check --config supabase/functions/deno.json supabase/functions/_shared/db.ts supabase/functions/_shared/logger.ts supabase/functions/_shared/types.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/_shared/db.ts supabase/functions/_shared/logger.ts supabase/functions/_shared/types.ts
 ```
 
 Expected : `Check file:///...` sans erreur.
@@ -932,7 +974,7 @@ git commit -m "feat(shared): NormalizedOffer, client DB à config injectée et l
   - `upsertOffers(db: DbClient, offers: NormalizedOffer[]): Promise<UpsertResult>`
   - `startRun(db, args: { source: SourceKey; trigger: RunTrigger; mode: CollectionMode }): Promise<string>` — renvoie l'id du run
   - `finishRun(db, runId: string, args: { status: RunStatus; offersNew: number; offersUpdated: number; error?: string | null }): Promise<void>`
-  - `interface QueryResultRow` et `recordQueryResult(db, runId: string, row: QueryResultRow): Promise<void>`
+  - `recordQueryResult(db, runId: string, row: QueryReportLine): Promise<void>` — `QueryReportLine` est la forme canonique d'une ligne de `collection_query_results`, définie dans `types.ts` (Task 3) et partagée avec `run-collection.ts` (Task 8) pour qu'une colonne ajoutée à la table ne soit à répercuter qu'à un seul endroit
 
 - [ ] **Step 1: Écrire le test de `upsertOffers` avec un faux client**
 
@@ -1033,7 +1075,7 @@ Deno.test('upsertOffers dédoublonne les external_id en doublon dans le même lo
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
 
 ```bash
-deno test --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
 ```
 
 Expected : FAIL — `Module not found "./upsert.ts"`.
@@ -1103,7 +1145,7 @@ export async function upsertOffers(
 - [ ] **Step 4: Lancer le test pour vérifier qu'il passe**
 
 ```bash
-deno test --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/upsert_test.ts
 ```
 
 Expected : `ok | 4 passed`.
@@ -1114,7 +1156,7 @@ Create `supabase/functions/_shared/run-tracker.ts` :
 
 ```ts
 import type { DbClient } from './db.ts';
-import type { CollectionMode, RunStatus, RunTrigger, SourceKey } from './types.ts';
+import type { CollectionMode, QueryReportLine, RunStatus, RunTrigger, SourceKey } from './types.ts';
 
 export async function startRun(
   db: DbClient,
@@ -1154,19 +1196,6 @@ export async function finishRun(
   if (error) throw new Error(`clôture du run : ${error.message}`);
 }
 
-export interface QueryResultRow {
-  query_id?: number | null;
-  unit_label: string;
-  http_status?: number | null;
-  total_available?: number | null;
-  fetched?: number | null;
-  new_offers?: number | null;
-  updated_offers?: number | null;
-  truncated?: boolean | null;
-  duration_ms?: number | null;
-  error?: string | null;
-}
-
 /**
  * Écrit une ligne de télémétrie. N'échoue jamais bruyamment : perdre une ligne
  * de télémétrie ne doit pas faire échouer une collecte réussie.
@@ -1174,7 +1203,7 @@ export interface QueryResultRow {
 export async function recordQueryResult(
   db: DbClient,
   runId: string,
-  row: QueryResultRow,
+  row: QueryReportLine,
 ): Promise<void> {
   const { error } = await db
     .from('collection_query_results')
@@ -1184,10 +1213,15 @@ export async function recordQueryResult(
 }
 ```
 
+> **Ajout après revue** — un fichier `supabase/functions/_shared/__tests__/run-tracker_test.ts`
+> couvre `recordQueryResult` : il vérifie que la fonction n'échoue jamais bruyamment quand
+> l'écriture de télémétrie est refusée par la base. Perdre une ligne de télémétrie ne doit pas
+> faire échouer une collecte par ailleurs réussie.
+
 - [ ] **Step 6: Typecheck**
 
 ```bash
-deno check --config supabase/functions/deno.json supabase/functions/_shared/upsert.ts supabase/functions/_shared/run-tracker.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/_shared/upsert.ts supabase/functions/_shared/run-tracker.ts
 ```
 
 Expected : aucune erreur.
@@ -1301,7 +1335,7 @@ Deno.test('getAccessToken remonte une erreur explicite sur réponse non-2xx', as
 - [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
 ```
 
 Expected : FAIL — `Module not found "../auth.ts"`.
@@ -1373,7 +1407,7 @@ export async function getAccessToken(
 - [ ] **Step 4: Lancer le test pour vérifier qu'il passe**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/auth_test.ts
 ```
 
 Expected : `ok | 4 passed`.
@@ -1634,12 +1668,14 @@ Deno.test('fetchAllPages abandonne sur 403 sans réessayer', async () => {
 - [ ] **Step 3: Lancer les tests pour vérifier qu'ils échouent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
 ```
 
 Expected : FAIL — `Module not found "../client.ts"`.
 
 - [ ] **Step 4: Écrire `client.ts`**
+
+Attention à la boucle de pagination : `FT_MAX_RESULTS` (1150) n'est pas un multiple de `FT_PAGE_SIZE` (150). Une boucle naïve demanderait `1050-1199` en dernière page, au-delà du plafond dur de l'API, et ramènerait 1200 offres au lieu de 1150 — ce que les tests de l'étape 2 détectent. La dernière page est donc recadrée sur `1000-1149`, et le chevauchement qui en résulte est retiré avant concaténation.
 
 Create `supabase/functions/collect-france-travail/client.ts` :
 
@@ -1785,16 +1821,24 @@ export async function fetchAllPages(args: {
   let httpStatus = 200;
 
   for (let start = 0; start < FT_MAX_RESULTS; start += FT_PAGE_SIZE) {
-    const page = await fetchPage({ ...args, rangeStart: start });
+    // FT_MAX_RESULTS n'est pas un multiple de FT_PAGE_SIZE (1150 / 150) : la
+    // dernière page est ramenée à 1000-1149 pour ne jamais demander au-delà
+    // du plafond dur de l'API (range max 1000-1149).
+    const rangeStart = Math.min(start, FT_MAX_RESULTS - FT_PAGE_SIZE);
+    const page = await fetchPage({ ...args, rangeStart });
     httpStatus = page.httpStatus;
 
     if (page.contentRange) totalAvailable = page.contentRange.total;
     else if (page.httpStatus === 204 && totalAvailable === null) totalAvailable = 0;
 
-    collected.push(...page.offers);
+    // Ce recadrage peut faire chevaucher la dernière page avec la précédente
+    // (ex. 900-1049 puis 1000-1149) : on ne réinjecte que les offres neuves.
+    const overlap = Math.max(0, collected.length - rangeStart);
+    collected.push(...page.offers.slice(overlap));
 
     if (page.offers.length === 0) break;
     if (totalAvailable !== null && collected.length >= totalAvailable) break;
+    if (rangeStart !== start) break;
   }
 
   return {
@@ -1811,7 +1855,7 @@ export async function fetchAllPages(args: {
 - [ ] **Step 5: Lancer les tests pour vérifier qu'ils passent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/client_test.ts
 ```
 
 Expected : `ok | 12 passed`.
@@ -2016,7 +2060,7 @@ Deno.test('la fixture réelle se mappe sans exception', async () => {
 - [ ] **Step 4: Lancer les tests pour vérifier qu'ils échouent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
 ```
 
 Expected : FAIL — `Module not found "../mapper.ts"`.
@@ -2111,7 +2155,7 @@ export function mapFtOffer(raw: unknown, provenance: FtProvenance): NormalizedOf
 - [ ] **Step 6: Lancer les tests pour vérifier qu'ils passent**
 
 ```bash
-deno test --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-france-travail/__tests__/mapper_test.ts
 ```
 
 Expected : `ok | 10 passed`. Si le dernier test échoue, un nom de champ diffère dans la fixture réelle : corrige `FtRawOffer` et le mapper.
@@ -2125,32 +2169,537 @@ git commit -m "feat(ft): mapper payload France Travail vers NormalizedOffer, tes
 
 ---
 
-### Task 8: Orchestration `collect-france-travail` et validation en `dryRun`
+### Task 8: Orchestration mutualisée — `_shared/run-collection.ts`
+
+Les deux sources API, puis les quatre scrapers du plan B, partagent exactement la même boucle : parcourir les unités de collecte, isoler les erreurs, écrire la télémétrie, agréger le statut. Cette tâche l'écrit une fois.
+
+**Files:**
+- Create: `supabase/functions/_shared/run-collection.ts`
+- Test: `supabase/functions/_shared/__tests__/run-collection_test.ts`
+
+**Interfaces:**
+- Consumes: `upsertOffers` (Task 4), `startRun` / `finishRun` / `recordQueryResult` (Task 4), `NormalizedOffer` / `SearchQueryRow` / `SourceKey` / `CollectionMode` / `RunTrigger` / `RunStatus` (Task 3), `log` (Task 3).
+- Produces:
+  - `interface FetchResult { offers: unknown[]; totalAvailable: number | null; truncated?: boolean; httpStatus: number }`
+  - `QueryReportLine` est importé de `types.ts` et ré-exporté ici pour les consommateurs de ce module — il n'est pas redéfini
+  - `interface CollectionSummary { runId: string | null; mode: CollectionMode; dryRun: boolean; status: RunStatus; offersNew: number; offersUpdated: number; queries: QueryReportLine[]; preview?: NormalizedOffer[] }`
+  - `runCollection(opts: RunCollectionOptions): Promise<CollectionSummary>` où `RunCollectionOptions = { db, source, mode, trigger, dryRun, queries, fetchAll, map }`, `fetchAll: (query: SearchQueryRow) => Promise<FetchResult>` et `map: (raw: unknown, query: SearchQueryRow) => NormalizedOffer | null`
+
+Ce fichier reste **runtime-neutre** : il ne lit aucune variable d'environnement. `fetchAll` et `map` sont injectés par l'appelant.
+
+- [ ] **Step 1: Écrire le test de `runCollection`**
+
+Create `supabase/functions/_shared/__tests__/run-collection_test.ts` :
+
+```ts
+import { assertEquals } from '@std/assert';
+import { runCollection } from '../run-collection.ts';
+import { emptyOffer, type NormalizedOffer, type SearchQueryRow } from '../types.ts';
+import type { DbClient } from '../db.ts';
+
+function query(id: number, label: string): SearchQueryRow {
+  return {
+    id,
+    source: 'france_travail',
+    label,
+    keywords: label,
+    commune_insee: '13055',
+    radius_km: 40,
+    extra_params: {},
+    published_since_days: 3,
+    priority: 10,
+    enabled: true,
+  };
+}
+
+interface Recorded {
+  runsOpened: number;
+  runsFinished: Record<string, unknown>[];
+  telemetry: Record<string, unknown>[];
+  upserts: unknown[][];
+}
+
+/** Faux client couvrant les seules chaînes d'appels que runCollection déclenche. */
+function fakeDb(
+  knownExternalIds: string[] = [],
+  opts: { failFinishRun?: boolean } = {},
+): { db: DbClient; rec: Recorded } {
+  const rec: Recorded = { runsOpened: 0, runsFinished: [], telemetry: [], upserts: [] };
+
+  const db = {
+    from(table: string) {
+      if (table === 'collection_runs') {
+        return {
+          insert(_row: unknown) {
+            rec.runsOpened += 1;
+            return {
+              select(_c: string) {
+                return { single: () => Promise.resolve({ data: { id: 'run-1' }, error: null }) };
+              },
+            };
+          },
+          update(row: Record<string, unknown>) {
+            rec.runsFinished.push(row);
+            return {
+              eq: () =>
+                opts.failFinishRun
+                  ? Promise.reject(new Error('base indisponible'))
+                  : Promise.resolve({ error: null }),
+            };
+          },
+        };
+      }
+      if (table === 'collection_query_results') {
+        return {
+          insert(row: Record<string, unknown>) {
+            rec.telemetry.push(row);
+            return Promise.resolve({ error: null });
+          },
+        };
+      }
+      // table 'offers'
+      return {
+        select(_c: string) {
+          return {
+            eq(_col: string, _v: string) {
+              return {
+                in(_col2: string, ids: string[]) {
+                  const data = ids
+                    .filter((id) => knownExternalIds.includes(id))
+                    .map((id) => ({ external_id: id }));
+                  return Promise.resolve({ data, error: null });
+                },
+              };
+            },
+          };
+        },
+        upsert(rows: unknown[], _o: unknown) {
+          rec.upserts.push(rows);
+          return Promise.resolve({ error: null });
+        },
+      };
+    },
+  } as unknown as DbClient;
+
+  return { db, rec };
+}
+
+const okFetch = (n: number) => () =>
+  Promise.resolve({
+    offers: Array.from({ length: n }, (_, i) => ({ id: `O${i}` })),
+    totalAvailable: n,
+    truncated: false,
+    httpStatus: 200,
+  });
+
+const mapAll = (raw: unknown): NormalizedOffer =>
+  emptyOffer('france_travail', (raw as { id: string }).id, 'Titre');
+
+Deno.test('runCollection agrège les compteurs sur toutes les requêtes', async () => {
+  const { db, rec } = fakeDb();
+
+  const summary = await runCollection({
+    db,
+    source: 'france_travail',
+    mode: 'delta',
+    trigger: 'manual',
+    dryRun: false,
+    queries: [query(1, 'a'), query(2, 'b')],
+    fetchAll: okFetch(3),
+    map: mapAll,
+  });
+
+  assertEquals(summary.status, 'success');
+  assertEquals(summary.offersNew, 6);
+  assertEquals(summary.offersUpdated, 0);
+  assertEquals(summary.queries.length, 2);
+  assertEquals(rec.runsOpened, 1);
+  assertEquals(rec.telemetry.length, 2);
+  assertEquals(rec.runsFinished.length, 1);
+  assertEquals(rec.runsFinished[0].status, 'success');
+});
+
+Deno.test("runCollection en dryRun n'ouvre aucun run et n'écrit rien", async () => {
+  const { db, rec } = fakeDb();
+
+  const summary = await runCollection({
+    db,
+    source: 'france_travail',
+    mode: 'delta',
+    trigger: 'manual',
+    dryRun: true,
+    queries: [query(1, 'a')],
+    fetchAll: okFetch(5),
+    map: mapAll,
+  });
+
+  assertEquals(summary.runId, null);
+  assertEquals(summary.dryRun, true);
+  assertEquals(summary.offersNew, 0);
+  assertEquals(rec.runsOpened, 0);
+  assertEquals(rec.upserts.length, 0);
+  assertEquals(rec.telemetry.length, 0);
+  // Le preview est plafonné pour ne pas renvoyer des centaines d'offres.
+  assertEquals(summary.preview?.length, 3);
+});
+
+Deno.test('runCollection isole une requête en échec et termine en partial', async () => {
+  const { db, rec } = fakeDb();
+  let call = 0;
+  const flaky = () => {
+    call += 1;
+    if (call === 1) return Promise.reject(new Error('boom'));
+    return okFetch(2)();
+  };
+
+  const summary = await runCollection({
+    db,
+    source: 'france_travail',
+    mode: 'delta',
+    trigger: 'manual',
+    dryRun: false,
+    queries: [query(1, 'qui-echoue'), query(2, 'qui-marche')],
+    fetchAll: flaky,
+    map: mapAll,
+  });
+
+  // La requête suivante doit avoir tourné malgré l'échec de la première.
+  assertEquals(summary.status, 'partial');
+  assertEquals(summary.offersNew, 2);
+  assertEquals(rec.telemetry.length, 2);
+  assertEquals(rec.telemetry[0].error, 'boom');
+  assertEquals(rec.telemetry[0].unit_label, 'qui-echoue');
+  assertEquals(rec.telemetry[1].error, null);
+});
+
+Deno.test('runCollection termine en failed quand toutes les requêtes échouent', async () => {
+  const { db } = fakeDb();
+
+  const summary = await runCollection({
+    db,
+    source: 'france_travail',
+    mode: 'delta',
+    trigger: 'manual',
+    dryRun: false,
+    queries: [query(1, 'a'), query(2, 'b')],
+    fetchAll: () => Promise.reject(new Error('api morte')),
+    map: mapAll,
+  });
+
+  assertEquals(summary.status, 'failed');
+  assertEquals(summary.offersNew, 0);
+});
+
+Deno.test('runCollection remonte la troncature dans la télémétrie', async () => {
+  const { db, rec } = fakeDb();
+
+  await runCollection({
+    db,
+    source: 'france_travail',
+    mode: 'delta',
+    trigger: 'manual',
+    dryRun: false,
+    queries: [query(1, 'a')],
+    fetchAll: () =>
+      Promise.resolve({
+        offers: [{ id: 'O0' }],
+        totalAvailable: 50_000,
+        truncated: true,
+        httpStatus: 206,
+      }),
+    map: mapAll,
+  });
+
+  assertEquals(rec.telemetry[0].truncated, true);
+  assertEquals(rec.telemetry[0].total_available, 50_000);
+});
+
+Deno.test('runCollection écarte les payloads que le mapper refuse', async () => {
+  const { db, rec } = fakeDb();
+
+  const summary = await runCollection({
+    db,
+    source: 'france_travail',
+    mode: 'delta',
+    trigger: 'manual',
+    dryRun: false,
+    queries: [query(1, 'a')],
+    fetchAll: okFetch(4),
+    // Un payload sur deux est inexploitable.
+    map: (raw) => {
+      const id = (raw as { id: string }).id;
+      return id === 'O0' || id === 'O2' ? emptyOffer('france_travail', id, 'T') : null;
+    },
+  });
+
+  assertEquals(summary.offersNew, 2);
+  assertEquals(rec.telemetry[0].fetched, 2);
+});
+
+Deno.test('runCollection distingue les offres déjà connues', async () => {
+  const { db } = fakeDb(['O0', 'O1']);
+
+  const summary = await runCollection({
+    db,
+    source: 'france_travail',
+    mode: 'delta',
+    trigger: 'manual',
+    dryRun: false,
+    queries: [query(1, 'a')],
+    fetchAll: okFetch(3),
+    map: mapAll,
+  });
+
+  assertEquals(summary.offersNew, 1);
+  assertEquals(summary.offersUpdated, 2);
+});
+
+Deno.test(
+  'runCollection renvoie le résumé complet même si la clôture du run échoue',
+  async () => {
+    const { db } = fakeDb([], { failFinishRun: true });
+
+    const summary = await runCollection({
+      db,
+      source: 'france_travail',
+      mode: 'delta',
+      trigger: 'manual',
+      dryRun: false,
+      queries: [query(1, 'a'), query(2, 'b')],
+      fetchAll: okFetch(3),
+      map: mapAll,
+    });
+
+    assertEquals(summary.status, 'success');
+    assertEquals(summary.offersNew, 6);
+    assertEquals(summary.offersUpdated, 0);
+    assertEquals(summary.queries.length, 2);
+  },
+);
+```
+
+- [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
+
+```bash
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/run-collection_test.ts
+```
+
+Expected : FAIL — `Module not found "../run-collection.ts"`.
+
+- [ ] **Step 3: Écrire `run-collection.ts`**
+
+Create `supabase/functions/_shared/run-collection.ts` :
+
+```ts
+import type { DbClient } from './db.ts';
+import { log } from './logger.ts';
+import { finishRun, recordQueryResult, startRun } from './run-tracker.ts';
+import { upsertOffers } from './upsert.ts';
+import type {
+  CollectionMode,
+  NormalizedOffer,
+  QueryReportLine,
+  RunStatus,
+  RunTrigger,
+  SearchQueryRow,
+  SourceKey,
+} from './types.ts';
+
+// Ré-exporté pour ne pas casser un importateur qui prenait ce type d'ici.
+// La forme canonique vit maintenant dans types.ts.
+export type { QueryReportLine } from './types.ts';
+
+/** Nombre d'offres renvoyées en exemple dans une réponse dryRun. */
+const PREVIEW_PER_QUERY = 3;
+
+/** Ce que chaque source doit renvoyer, quelle que soit son API ou son HTML. */
+export interface FetchResult {
+  offers: unknown[];
+  totalAvailable: number | null;
+  truncated?: boolean;
+  httpStatus: number;
+}
+
+export interface CollectionSummary {
+  runId: string | null;
+  mode: CollectionMode;
+  dryRun: boolean;
+  status: RunStatus;
+  offersNew: number;
+  offersUpdated: number;
+  queries: QueryReportLine[];
+  preview?: NormalizedOffer[];
+}
+
+export interface RunCollectionOptions {
+  db: DbClient;
+  source: SourceKey;
+  mode: CollectionMode;
+  trigger: RunTrigger;
+  dryRun: boolean;
+  queries: SearchQueryRow[];
+  fetchAll: (query: SearchQueryRow) => Promise<FetchResult>;
+  map: (raw: unknown, query: SearchQueryRow) => NormalizedOffer | null;
+}
+
+/**
+ * Boucle de collecte commune à toutes les sources.
+ *
+ * Garanties :
+ *  - une unité de collecte en échec n'interrompt jamais les suivantes ;
+ *  - tout échec est écrit dans collection_query_results, jamais avalé ;
+ *  - en dryRun, aucune écriture : ni run, ni offre, ni télémétrie.
+ */
+export async function runCollection(opts: RunCollectionOptions): Promise<CollectionSummary> {
+  const { db, source, mode, trigger, dryRun, queries } = opts;
+
+  const runId = dryRun ? null : await startRun(db, { source, trigger, mode });
+
+  let offersNew = 0;
+  let offersUpdated = 0;
+  let failures = 0;
+  const report: QueryReportLine[] = [];
+  const preview: NormalizedOffer[] = [];
+
+  for (const query of queries) {
+    const startedAt = Date.now();
+    try {
+      const page = await opts.fetchAll(query);
+      const mapped = page.offers
+        .map((raw) => opts.map(raw, query))
+        .filter((offer): offer is NormalizedOffer => offer !== null);
+
+      let counts = { new: 0, updated: 0 };
+      if (dryRun) preview.push(...mapped.slice(0, PREVIEW_PER_QUERY));
+      else counts = await upsertOffers(db, mapped);
+
+      offersNew += counts.new;
+      offersUpdated += counts.updated;
+
+      const line: QueryReportLine = {
+        query_id: query.id,
+        unit_label: query.label,
+        http_status: page.httpStatus,
+        total_available: page.totalAvailable,
+        fetched: mapped.length,
+        new_offers: counts.new,
+        updated_offers: counts.updated,
+        truncated: page.truncated === true,
+        duration_ms: Date.now() - startedAt,
+        error: null,
+      };
+      report.push(line);
+      if (runId) await recordQueryResult(db, runId, line);
+
+      if (line.truncated) {
+        log('warn', 'unité de collecte tronquée par le plafond de la source', {
+          source,
+          label: query.label,
+          total: page.totalAvailable,
+        });
+      }
+    } catch (e) {
+      failures += 1;
+      const message = e instanceof Error ? e.message : String(e);
+      const line: QueryReportLine = {
+        query_id: query.id,
+        unit_label: query.label,
+        http_status: null,
+        total_available: null,
+        fetched: 0,
+        new_offers: 0,
+        updated_offers: 0,
+        truncated: false,
+        duration_ms: Date.now() - startedAt,
+        error: message,
+      };
+      report.push(line);
+      if (runId) await recordQueryResult(db, runId, line);
+      log('error', 'unité de collecte en échec', { source, label: query.label, message });
+    }
+  }
+
+  const status: RunStatus = failures === 0
+    ? 'success'
+    : failures === queries.length
+    ? 'failed'
+    : 'partial';
+
+  if (runId) {
+    try {
+      await finishRun(db, runId, { status, offersNew, offersUpdated });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      log('error', 'clôture du run en échec', { source, runId, message });
+    }
+  }
+
+  return {
+    runId,
+    mode,
+    dryRun,
+    status,
+    offersNew,
+    offersUpdated,
+    queries: report,
+    ...(dryRun ? { preview } : {}),
+  };
+}
+```
+
+- [ ] **Step 4: Lancer le test pour vérifier qu'il passe**
+
+```bash
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/_shared/__tests__/run-collection_test.ts
+```
+
+Expected : `ok | 7 passed`.
+
+> **Correctif après revue** — l'appel final à `finishRun` est encapsulé dans un `try/catch` qui
+> journalise l'échec sans le relancer. Sans cette protection, une base momentanément indisponible
+> faisait perdre à l'appelant un `CollectionSummary` déjà entièrement calculé, et laissait la ligne
+> `collection_runs` bloquée sur `running` sans `finished_at` — un run pourtant terminé apparaissait
+> indéfiniment comme en cours. C'est le même parti que `recordQueryResult`.
+
+- [ ] **Step 5: Vérifier la neutralité runtime de `_shared/`**
+
+```bash
+grep -rn "Deno\.\|node:" supabase/functions/_shared/ --include=*.ts | grep -v "__tests__" || echo "NEUTRE : aucun accès runtime dans _shared/"
+```
+
+Expected : `NEUTRE : aucun accès runtime dans _shared/`.
+
+C'est la condition qui permettra aux scrapers Node du plan B d'importer ces fichiers sans les réécrire. Si la commande renvoie une ligne, corrige-la avant de continuer.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add supabase/functions/_shared
+git commit -m "feat(shared): boucle de collecte mutualisée avec isolation des erreurs par unité"
+```
+
+---
+
+### Task 9: Point d'entrée `collect-france-travail` et validation en `dryRun`
 
 **Files:**
 - Create: `supabase/functions/collect-france-travail/index.ts`
 - Modify: `supabase/config.toml`
 
 **Interfaces:**
-- Consumes: tout ce qui précède.
-- Produces: l'endpoint `POST /functions/v1/collect-france-travail` acceptant `{ mode, dryRun?, queryIds?, trigger? }` et renvoyant `{ runId, status, offersNew, offersUpdated, queries: [...] }`.
+- Consumes: `runCollection` (Task 8), `createDbClient` (Task 3), `getAccessToken` (Task 5), `fetchAllPages` (Task 6), `mapFtOffer` / `provenanceOf` (Task 7).
+- Produces: l'endpoint `POST /functions/v1/collect-france-travail` acceptant `{ mode, dryRun?, queryIds?, trigger? }` et renvoyant un `CollectionSummary`.
 
 - [ ] **Step 1: Écrire `index.ts`**
+
+Le point d'entrée ne contient **aucune** logique d'orchestration : il lit l'environnement, charge les requêtes, obtient le token, puis délègue à `runCollection`.
 
 Create `supabase/functions/collect-france-travail/index.ts` :
 
 ```ts
 import { createDbClient } from '../_shared/db.ts';
-import { log } from '../_shared/logger.ts';
-import { upsertOffers } from '../_shared/upsert.ts';
-import { finishRun, recordQueryResult, startRun } from '../_shared/run-tracker.ts';
-import type {
-  CollectionMode,
-  NormalizedOffer,
-  RunStatus,
-  RunTrigger,
-  SearchQueryRow,
-} from '../_shared/types.ts';
+import { runCollection } from '../_shared/run-collection.ts';
+import type { CollectionMode, RunTrigger, SearchQueryRow } from '../_shared/types.ts';
 import { getAccessToken } from './auth.ts';
 import { fetchAllPages } from './client.ts';
 import { mapFtOffer, provenanceOf } from './mapper.ts';
@@ -2162,6 +2711,7 @@ interface RequestBody {
   queryIds?: number[];
 }
 
+/** Lecture de l'environnement : propre à Deno, donc hors de _shared/. */
 function requireEnv(name: string): string {
   const value = Deno.env.get(name);
   if (!value) throw new Error(`variable d'environnement manquante : ${name}`);
@@ -2188,14 +2738,13 @@ Deno.serve(async (req) => {
 
   if (body.queryIds?.length) queryBuilder = queryBuilder.in('id', body.queryIds);
 
-  const { data: queries, error: queriesError } = await queryBuilder;
-  if (queriesError) {
-    return Response.json({ error: `lecture des requêtes : ${queriesError.message}` }, {
-      status: 500,
-    });
+  const { data, error } = await queryBuilder;
+  if (error) {
+    return Response.json({ error: `lecture des requêtes : ${error.message}` }, { status: 500 });
   }
-  const rows = (queries ?? []) as SearchQueryRow[];
-  if (rows.length === 0) {
+
+  const queries = (data ?? []) as SearchQueryRow[];
+  if (queries.length === 0) {
     return Response.json({ error: 'aucune requête active pour france_travail' }, { status: 400 });
   }
 
@@ -2204,91 +2753,20 @@ Deno.serve(async (req) => {
     clientSecret: requireEnv('FT_CLIENT_SECRET'),
   });
 
-  // En dryRun on n'ouvre pas de run : rien ne doit être écrit en base.
-  const runId = dryRun ? null : await startRun(db, { source: 'france_travail', trigger, mode });
-
-  let offersNew = 0;
-  let offersUpdated = 0;
-  let failures = 0;
-  const report: unknown[] = [];
-  const preview: NormalizedOffer[] = [];
-
-  for (const query of rows) {
-    const startedAt = Date.now();
-    try {
-      const page = await fetchAllPages({ query, mode, token });
-      const mapped = page.offers
-        .map((raw) => mapFtOffer(raw, provenanceOf(query)))
-        .filter((offer): offer is NormalizedOffer => offer !== null);
-
-      let counts = { new: 0, updated: 0 };
-      if (dryRun) preview.push(...mapped.slice(0, 3));
-      else counts = await upsertOffers(db, mapped);
-
-      offersNew += counts.new;
-      offersUpdated += counts.updated;
-
-      const line = {
-        query_id: query.id,
-        unit_label: query.label,
-        http_status: page.httpStatus,
-        total_available: page.totalAvailable,
-        fetched: mapped.length,
-        new_offers: counts.new,
-        updated_offers: counts.updated,
-        truncated: page.truncated,
-        duration_ms: Date.now() - startedAt,
-        error: null,
-      };
-      report.push(line);
-      if (runId) await recordQueryResult(db, runId, line);
-
-      if (page.truncated) {
-        log('warn', 'requête tronquée par le plafond de 1150', {
-          label: query.label,
-          total: page.totalAvailable,
-        });
-      }
-    } catch (e) {
-      // Isolation : une requête en échec n'interrompt jamais le run.
-      failures += 1;
-      const message = (e as Error).message;
-      const line = {
-        query_id: query.id,
-        unit_label: query.label,
-        fetched: 0,
-        new_offers: 0,
-        updated_offers: 0,
-        duration_ms: Date.now() - startedAt,
-        error: message,
-      };
-      report.push(line);
-      if (runId) await recordQueryResult(db, runId, line);
-      log('error', 'requête en échec', { label: query.label, message });
-    }
-  }
-
-  const status: RunStatus = failures === 0
-    ? 'success'
-    : failures === rows.length
-    ? 'failed'
-    : 'partial';
-
-  if (runId) await finishRun(db, runId, { status, offersNew, offersUpdated });
-
-  return Response.json({
-    runId,
+  const summary = await runCollection({
+    db,
+    source: 'france_travail',
     mode,
+    trigger,
     dryRun,
-    status,
-    offersNew,
-    offersUpdated,
-    queries: report,
-    ...(dryRun ? { preview } : {}),
+    queries,
+    fetchAll: (query) => fetchAllPages({ query, mode, token }),
+    map: (raw, query) => mapFtOffer(raw, provenanceOf(query)),
   });
+
+  return Response.json(summary);
 });
 ```
-
 - [ ] **Step 2: Déclarer la fonction dans `config.toml`**
 
 Append to `supabase/config.toml` :
@@ -2303,7 +2781,7 @@ verify_jwt = true
 - [ ] **Step 3: Typecheck l'ensemble**
 
 ```bash
-deno check --config supabase/functions/deno.json supabase/functions/collect-france-travail/index.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/collect-france-travail/index.ts
 ```
 
 Expected : aucune erreur.
@@ -2311,7 +2789,7 @@ Expected : aucune erreur.
 - [ ] **Step 4: Lancer toute la suite de tests**
 
 ```bash
-npm test
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm test
 ```
 
 Expected : tous les tests passent (types, upsert, auth, client, mapper).
@@ -2321,18 +2799,27 @@ Expected : tous les tests passent (types, upsert, auth, client, mapper).
 Dans un premier terminal :
 
 ```bash
-npm run fn:serve
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm run fn:local:ft
 ```
 
-Expected : `Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>`. Laisse tourner.
+Expected : `Listening on http://0.0.0.0:8000/`. Laisse tourner. La fonction lit
+`.env.local` et parle donc bien au **projet distant**.
+
+> **Ne pas utiliser `npm run fn:serve` pour cette validation.**
+> `supabase functions serve` **réserve** les noms `SUPABASE_URL` et
+> `SUPABASE_SERVICE_ROLE_KEY` et ignore **silencieusement** les valeurs de
+> `.env.local` : la fonction écrirait alors dans une Postgres locale
+> éphémère et vide en croyant écrire sur le projet distant. Aucun message
+> d'erreur, aucune ligne en base. Passer par `deno run --env-file=.env.local`
+> sur le point d'entrée, qui n'a pas ce comportement.
 
 - [ ] **Step 6: Appeler la fonction en `dryRun` sur une seule requête**
 
-Dans un second terminal — récupère d'abord ta clé anon dans Settings → API :
+Dans un second terminal. Pas d'en-tête `Authorization` ici : `verify_jwt`
+est appliqué par la plateforme Supabase, pas par `Deno.serve` en local.
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-france-travail' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":true,"queryIds":[1]}' | head -c 3000
 ```
@@ -2354,8 +2841,7 @@ Expected : `offers = 0`, `runs = 0`. Si ce n'est pas le cas, `dryRun` ne court-c
 - [ ] **Step 8: Lancer la collecte réelle en backfill**
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-france-travail' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":false}' | head -c 4000
 ```
@@ -2403,13 +2889,13 @@ git commit -m "feat(ft): orchestration de la collecte avec dryRun et isolation d
 
 ---
 
-### Task 9: Déploiement de `collect-france-travail` et planification cron
+### Task 10: Déploiement de `collect-france-travail` et planification cron
 
 **Files:**
 - Modify: aucun fichier de code. Secrets et SQL exécutés sur le projet distant.
 
 **Interfaces:**
-- Consumes: la fonction validée en local (Task 8).
+- Consumes: la fonction validée en local (Task 9).
 - Produces: la fonction déployée et un job `pg_cron` nommé `ft-daily` qui l'appelle chaque jour à 6 h en `mode: 'delta'`.
 
 - [ ] **Step 1: Pousser les secrets vers le projet distant**
@@ -2548,7 +3034,7 @@ git commit -m "chore(ft): consigne le job cron quotidien de la collecte France T
 
 ---
 
-### Task 10: Collecte Adzuna — client, mapper et orchestration
+### Task 11: Collecte Adzuna — client, mapper et orchestration
 
 **Files:**
 - Create: `supabase/functions/collect-adzuna/client.ts`
@@ -2561,7 +3047,7 @@ git commit -m "chore(ft): consigne le job cron quotidien de la collecte France T
 - Modify: `supabase/config.toml`
 
 **Interfaces:**
-- Consumes: `NormalizedOffer`, `emptyOffer`, `SearchQueryRow`, `WINDOW_DAYS` (Task 3) ; `upsertOffers`, `startRun`, `finishRun`, `recordQueryResult` (Task 4).
+- Consumes: `NormalizedOffer`, `emptyOffer`, `SearchQueryRow`, `WINDOW_DAYS` (Task 3) ; `runCollection` (Task 8).
 - Produces:
   - `const ADZUNA_PAGE_SIZE = 50`
   - `interface AdzunaConfig { appId: string; appKey: string }`
@@ -2578,16 +3064,27 @@ npx supabase migration new seed_adzuna_queries
 ```
 
 ```sql
--- Adzuna : passe locale (where + distance) et passe nationale remote.
--- Le rayon est porté par radius_km comme pour France Travail ; le mapper
--- Adzuna le traduit en paramètre `distance`.
-insert into search_queries (source, label, keywords, commune_insee, radius_km, published_since_days, priority) values
-  ('adzuna', 'adzuna:local:react',      'React',                  '13055', 40, 3, 10),
-  ('adzuna', 'adzuna:local:typescript', 'TypeScript',             '13055', 40, 3, 10),
-  ('adzuna', 'adzuna:local:frontend',   'développeur front-end',  '13055', 40, 3, 20),
-  ('adzuna', 'adzuna:local:fullstack',  'full stack javascript',  '13055', 40, 3, 20),
-  ('adzuna', 'adzuna:remote:react',     'React télétravail',      null,  null, 3, 50),
-  ('adzuna', 'adzuna:remote:nextjs',    'Next.js',                null,  null, 3, 50)
+-- Matrice Adzuna, etablie sur des volumes MESURES le 2026-09-07.
+--
+-- Adzuna indexe les technologies, contrairement a France Travail : React rend
+-- 36 offres a Marseille et 1481 au national sur 31 jours, contre 0 et 27 pour
+-- France Travail. C'est donc la source principale pour ce profil.
+--
+-- Les deux axes restent DELIBEREMENT SEPARES, jamais combines : a Marseille,
+-- `React` seul rend 60 offres, `category=it-jobs` en rend 385, mais leur
+-- intersection seulement 8. 52 des 60 offres React ne sont pas classees
+-- « informatique » par Adzuna : les combiner en perdrait 87 %.
+insert into search_queries (source, label, keywords, commune_insee, radius_km, extra_params, published_since_days, priority) values
+  -- Axe categorie : le filet large. 385 offres / 31 j, 77 / 3 j.
+  ('adzuna', 'adzuna:local:it-jobs',     null,                     '13055', 40, '{"category":"it-jobs"}'::jsonb, 3, 5),
+  -- Axe mot-cle : rattrape les offres tech mal categorisees.
+  ('adzuna', 'adzuna:local:react',       'React',                  '13055', 40, '{}'::jsonb, 3, 10),
+  ('adzuna', 'adzuna:local:typescript',  'TypeScript',             '13055', 40, '{}'::jsonb, 3, 10),
+  ('adzuna', 'adzuna:local:developpeur', 'développeur',            '13055', 40, '{}'::jsonb, 3, 15),
+  -- Passe remote nationale par mot-cle : category=it-jobs au national rend
+  -- 1889 offres en 3 jours, au-dela de ce que la pagination peut ramener.
+  ('adzuna', 'adzuna:remote:react',      'React télétravail',      null, null, '{}'::jsonb, 3, 50),
+  ('adzuna', 'adzuna:remote:typescript', 'TypeScript télétravail', null, null, '{}'::jsonb, 3, 50)
 on conflict (label) do nothing;
 ```
 
@@ -2637,7 +3134,9 @@ Deno.test('buildAdzunaUrl cible la France et met la page dans le chemin', () => 
   assertEquals(url.pathname, '/v1/api/jobs/fr/search/1');
   assertEquals(url.searchParams.get('app_id'), 'app-1');
   assertEquals(url.searchParams.get('app_key'), 'key-1');
-  assertEquals(url.searchParams.get('what'), 'React');
+  // what_and et non what : `what` n'est pas un ET logique.
+  assertEquals(url.searchParams.get('what_and'), 'React');
+  assertEquals(url.searchParams.has('what'), false);
   assertEquals(url.searchParams.get('results_per_page'), String(ADZUNA_PAGE_SIZE));
   assertEquals(url.searchParams.get('max_days_old'), '3');
 });
@@ -2652,6 +3151,32 @@ Deno.test('buildAdzunaUrl omet where et distance sur la passe nationale', () => 
   const url = new URL(buildAdzunaUrl(cfg, remoteQuery, 'delta', 1));
   assertEquals(url.searchParams.has('where'), false);
   assertEquals(url.searchParams.has('distance'), false);
+});
+
+Deno.test('buildAdzunaUrl transmet la catégorie depuis extra_params', () => {
+  // Axe catégorie et axe mot-clé sont deux requêtes distinctes : à Marseille,
+  // React seul rend 60 offres, it-jobs 385, et leur intersection seulement 8.
+  const catQuery: SearchQueryRow = {
+    ...localQuery,
+    id: 102,
+    label: 'adzuna:local:it-jobs',
+    keywords: null,
+    extra_params: { category: 'it-jobs' },
+  };
+  const url = new URL(buildAdzunaUrl(cfg, catQuery, 'delta', 1));
+
+  assertEquals(url.searchParams.get('category'), 'it-jobs');
+  assertEquals(url.searchParams.has('what_and'), false);
+  assertEquals(url.searchParams.get('where'), 'Marseille');
+  assertEquals(url.searchParams.get('distance'), '40');
+});
+
+Deno.test('buildAdzunaUrl groupe les mots-clés multiples dans what_and', () => {
+  const multi: SearchQueryRow = { ...remoteQuery, id: 103, keywords: 'React télétravail' };
+  const url = new URL(buildAdzunaUrl(cfg, multi, 'delta', 1));
+
+  // Le ET logique porte sur les deux mots : 313 offres, contre 1 avec `what`.
+  assertEquals(url.searchParams.get('what_and'), 'React télétravail');
 });
 
 Deno.test('buildAdzunaUrl passe à 31 jours en backfill', () => {
@@ -2733,7 +3258,7 @@ Deno.test('fetchAllAdzunaPages réessaie après un 429', async () => {
 - [ ] **Step 3: Lancer le test pour vérifier qu'il échoue**
 
 ```bash
-deno test --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
 ```
 
 Expected : FAIL — `Module not found "../client.ts"`.
@@ -2783,7 +3308,11 @@ export function buildAdzunaUrl(
     'content-type': 'application/json',
   });
 
-  if (query.keywords) params.set('what', query.keywords);
+  // `what` n'est PAS un ET logique : `what=React télétravail` rend 1 offre la ou
+  // `what_and` en rend 313. Sur un mot unique les deux sont strictement
+  // identiques (React : 1481 dans les deux cas), donc on utilise `what_and`
+  // partout, sans logique conditionnelle.
+  if (query.keywords) params.set('what_and', query.keywords);
 
   if (query.commune_insee) {
     const place = INSEE_TO_PLACE[query.commune_insee];
@@ -2793,6 +3322,8 @@ export function buildAdzunaUrl(
       );
     }
     params.set('where', place);
+    // Sans `distance`, Adzuna retombe sur un rayon d'environ 5 km : mesure a
+    // 36 offres sans le parametre contre 60 avec distance=40.
     if (query.radius_km !== null) params.set('distance', String(query.radius_km));
   }
 
@@ -2857,7 +3388,7 @@ export async function fetchAllAdzunaPages(args: {
 - [ ] **Step 5: Lancer le test pour vérifier qu'il passe**
 
 ```bash
-deno test --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-adzuna/__tests__/client_test.ts
 ```
 
 Expected : `ok | 7 passed`.
@@ -2866,13 +3397,21 @@ Expected : `ok | 7 passed`.
 
 ```bash
 mkdir -p supabase/functions/collect-adzuna/__tests__/fixtures
-curl -s "https://api.adzuna.com/v1/api/jobs/fr/search/1?app_id=$ADZUNA_APP_ID&app_key=$ADZUNA_APP_KEY&what=React&where=Marseille&distance=40&results_per_page=10&max_days_old=31&content-type=application/json" \
+curl -s "https://api.adzuna.com/v1/api/jobs/fr/search/1?app_id=$ADZUNA_APP_ID&app_key=$ADZUNA_APP_KEY&category=it-jobs&where=Marseille&distance=40&results_per_page=10&max_days_old=31&content-type=application/json" \
   -o supabase/functions/collect-adzuna/__tests__/fixtures/adzuna-search-response.json
 
 deno eval "const d = JSON.parse(await Deno.readTextFile('supabase/functions/collect-adzuna/__tests__/fixtures/adzuna-search-response.json')); console.log('count:', d.count); console.log(Object.keys(d.results[0]).join('\n'));"
 ```
 
 Expected : un `count` numérique et la liste des champs. Compare-la aux champs utilisés à l'étape 8 (`id`, `title`, `description`, `redirect_url`, `created`, `company.display_name`, `location.display_name`, `location.area`, `latitude`, `longitude`, `contract_type`, `contract_time`, `salary_min`, `salary_max`). **Si un nom diffère, corrige mapper et test ensemble.**
+
+> **Couverture reelle des champs**, mesuree sur 50 offres `it-jobs` de Marseille :
+> `id`, `title`, `description`, `created`, `company`, `location`, `category` et
+> `redirect_url` a 100 % ; `latitude`/`longitude` a 96 % ; `contract_type` a
+> 68 % ; `salary_min`/`salary_max` a 62 % ; `contract_time` a 44 % seulement.
+> Le mapper traite deja ces champs comme optionnels, donc rien a changer — mais
+> ne compte pas filtrer sur le salaire, il manquera pour pres de quatre offres
+> sur dix.
 
 - [ ] **Step 7: Écrire le test du mapper Adzuna**
 
@@ -3062,27 +3601,21 @@ export function mapAdzunaOffer(
 - [ ] **Step 9: Lancer les tests du mapper**
 
 ```bash
-deno test --allow-read supabase/functions/collect-adzuna/__tests__/mapper_test.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno test --config supabase/functions/deno.json --allow-read supabase/functions/collect-adzuna/__tests__/mapper_test.ts
 ```
 
 Expected : `ok | 7 passed`.
 
 - [ ] **Step 10: Écrire `index.ts`**
 
+Comme pour France Travail, le point d'entrée ne contient aucune orchestration : il délègue à `runCollection` (Task 8). C'est la raison pour laquelle ce fichier fait 60 lignes et non 130 — et pourquoi corriger la télémétrie ou l'isolation des erreurs se fera désormais en un seul endroit.
+
 Create `supabase/functions/collect-adzuna/index.ts` :
 
 ```ts
 import { createDbClient } from '../_shared/db.ts';
-import { log } from '../_shared/logger.ts';
-import { upsertOffers } from '../_shared/upsert.ts';
-import { finishRun, recordQueryResult, startRun } from '../_shared/run-tracker.ts';
-import type {
-  CollectionMode,
-  NormalizedOffer,
-  RunStatus,
-  RunTrigger,
-  SearchQueryRow,
-} from '../_shared/types.ts';
+import { runCollection } from '../_shared/run-collection.ts';
+import type { CollectionMode, RunTrigger, SearchQueryRow } from '../_shared/types.ts';
 import { fetchAllAdzunaPages } from './client.ts';
 import { mapAdzunaOffer, provenanceOf } from './mapper.ts';
 
@@ -3093,6 +3626,7 @@ interface RequestBody {
   queryIds?: number[];
 }
 
+/** Lecture de l'environnement : propre à Deno, donc hors de _shared/. */
 function requireEnv(name: string): string {
   const value = Deno.env.get(name);
   if (!value) throw new Error(`variable d'environnement manquante : ${name}`);
@@ -3124,90 +3658,28 @@ Deno.serve(async (req) => {
 
   if (body.queryIds?.length) queryBuilder = queryBuilder.in('id', body.queryIds);
 
-  const { data: queries, error: queriesError } = await queryBuilder;
-  if (queriesError) {
-    return Response.json({ error: `lecture des requêtes : ${queriesError.message}` }, {
-      status: 500,
-    });
+  const { data, error } = await queryBuilder;
+  if (error) {
+    return Response.json({ error: `lecture des requêtes : ${error.message}` }, { status: 500 });
   }
-  const rows = (queries ?? []) as SearchQueryRow[];
-  if (rows.length === 0) {
+
+  const queries = (data ?? []) as SearchQueryRow[];
+  if (queries.length === 0) {
     return Response.json({ error: 'aucune requête active pour adzuna' }, { status: 400 });
   }
 
-  const runId = dryRun ? null : await startRun(db, { source: 'adzuna', trigger, mode });
-
-  let offersNew = 0;
-  let offersUpdated = 0;
-  let failures = 0;
-  const report: unknown[] = [];
-  const preview: NormalizedOffer[] = [];
-
-  for (const query of rows) {
-    const startedAt = Date.now();
-    try {
-      const page = await fetchAllAdzunaPages({ cfg, query, mode });
-      const mapped = page.offers
-        .map((raw) => mapAdzunaOffer(raw, provenanceOf(query)))
-        .filter((offer): offer is NormalizedOffer => offer !== null);
-
-      let counts = { new: 0, updated: 0 };
-      if (dryRun) preview.push(...mapped.slice(0, 3));
-      else counts = await upsertOffers(db, mapped);
-
-      offersNew += counts.new;
-      offersUpdated += counts.updated;
-
-      const line = {
-        query_id: query.id,
-        unit_label: query.label,
-        http_status: page.httpStatus,
-        total_available: page.totalAvailable,
-        fetched: mapped.length,
-        new_offers: counts.new,
-        updated_offers: counts.updated,
-        truncated: false,
-        duration_ms: Date.now() - startedAt,
-        error: null,
-      };
-      report.push(line);
-      if (runId) await recordQueryResult(db, runId, line);
-    } catch (e) {
-      failures += 1;
-      const message = (e as Error).message;
-      const line = {
-        query_id: query.id,
-        unit_label: query.label,
-        fetched: 0,
-        new_offers: 0,
-        updated_offers: 0,
-        duration_ms: Date.now() - startedAt,
-        error: message,
-      };
-      report.push(line);
-      if (runId) await recordQueryResult(db, runId, line);
-      log('error', 'requête Adzuna en échec', { label: query.label, message });
-    }
-  }
-
-  const status: RunStatus = failures === 0
-    ? 'success'
-    : failures === rows.length
-    ? 'failed'
-    : 'partial';
-
-  if (runId) await finishRun(db, runId, { status, offersNew, offersUpdated });
-
-  return Response.json({
-    runId,
+  const summary = await runCollection({
+    db,
+    source: 'adzuna',
     mode,
+    trigger,
     dryRun,
-    status,
-    offersNew,
-    offersUpdated,
-    queries: report,
-    ...(dryRun ? { preview } : {}),
+    queries,
+    fetchAll: (query) => fetchAllAdzunaPages({ cfg, query, mode }),
+    map: (raw, query) => mapAdzunaOffer(raw, provenanceOf(query)),
   });
+
+  return Response.json(summary);
 });
 ```
 
@@ -3223,19 +3695,34 @@ verify_jwt = true
 - [ ] **Step 12: Lancer toute la suite et typechecker**
 
 ```bash
-npm test
-deno check --config supabase/functions/deno.json supabase/functions/collect-adzuna/index.ts
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm test
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && deno check --config supabase/functions/deno.json supabase/functions/collect-adzuna/index.ts
 ```
 
 Expected : tous les tests passent, aucune erreur de type.
 
 - [ ] **Step 13: Valider en local en `dryRun` puis en réel**
 
-Avec `npm run fn:serve` actif dans un autre terminal :
+> **Ne pas utiliser `npm run fn:serve` pour cette validation.**
+> `supabase functions serve` **réserve** les noms `SUPABASE_URL` et
+> `SUPABASE_SERVICE_ROLE_KEY` et ignore **silencieusement** les valeurs de
+> `.env.local` : la fonction écrirait alors dans une Postgres locale
+> éphémère et vide en croyant écrire sur le projet distant. Aucun message
+> d'erreur, aucune ligne en base. Passer par `deno run --env-file=.env.local`
+> sur le point d'entrée, qui n'a pas ce comportement.
+
+Avec, dans un autre terminal :
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-adzuna' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+export PATH="$PATH:/c/Users/Léo/AppData/Local/Microsoft/WinGet/Links" && npm run fn:local:adzuna
+```
+
+Expected : `Listening on http://0.0.0.0:8000/`. Puis, sans en-tête
+`Authorization` — `verify_jwt` est appliqué par la plateforme, pas par
+`Deno.serve` en local :
+
+```bash
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":true}' | head -c 3000
 ```
@@ -3245,8 +3732,7 @@ Expected : `"dryRun": true`, 6 entrées dans `queries`, des offres dans `preview
 Puis en réel :
 
 ```bash
-curl -s -X POST 'http://127.0.0.1:54321/functions/v1/collect-adzuna' \
-  -H "Authorization: Bearer <TA_CLE_ANON>" \
+curl -s -X POST 'http://127.0.0.1:8000/' \
   -H 'Content-Type: application/json' \
   -d '{"mode":"backfill","dryRun":false}' | head -c 3000
 ```
@@ -3277,13 +3763,13 @@ git commit -m "feat(adzuna): client, mapper et orchestration de la collecte Adzu
 
 ---
 
-### Task 11: Déploiement Adzuna et planification cron
+### Task 12: Déploiement Adzuna et planification cron
 
 **Files:**
 - Create: `supabase/cron/adzuna-daily.sql`
 
 **Interfaces:**
-- Consumes: la fonction Adzuna validée en local (Task 10), le secret Vault `service_key` (Task 9).
+- Consumes: la fonction Adzuna validée en local (Task 11), le secret Vault `service_key` (Task 10).
 - Produces: la fonction déployée et un job `adzuna-daily` à 6 h 30.
 
 - [ ] **Step 1: Pousser les secrets Adzuna**
@@ -3394,7 +3880,7 @@ git commit -m "chore(adzuna): déploiement et job cron quotidien décalé"
 
 Le système collecte quotidiennement depuis deux API, sans intervention, PC éteint. Les offres sont scorées contre le lexique dérivé du CV, consultables en une requête SQL.
 
-**Deux actions de réglage à mener après quelques jours de collecte**, à partir des requêtes de la Task 11 Step 7 :
+**Deux actions de réglage à mener après quelques jours de collecte**, à partir des requêtes de la Task 12 Step 7 :
 
 1. **Désactiver les requêtes improductives** — `update search_queries set enabled = false where label = '…'`
 2. **Traiter les requêtes tronquées** — réduire `published_since_days`, ou découper la requête en ajoutant un `typeContrat` dans `extra_params`
