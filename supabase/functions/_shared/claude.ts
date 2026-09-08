@@ -112,6 +112,10 @@ export async function callClaudeStructured<T>(
     throw new ClaudeApiError(`reponse Claude illisible : ${String(cause)}`, response.status);
   }
 
+  // Mesure du 2026-09-08 sur claude-sonnet-5 : la reponse peut porter un bloc
+  // `thinking` AVANT le bloc `text` dans `content`. On selectionne donc par
+  // son `type`, jamais par sa position (`content[0].text` casserait le
+  // scoring en silence des qu'un appel pense avant de repondre).
   const textBlock = payload.content?.find((block) => block.type === 'text');
   if (textBlock === undefined) {
     throw new ClaudeApiError('reponse Claude sans bloc de texte', response.status);

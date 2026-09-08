@@ -56,7 +56,7 @@ Deno.test('les competences partent avec leur posture et leur recence', () => {
 
 Deno.test('le prompt interdit de rejeter sur un texte tronque', () => {
   const text = buildSystemBlocks(profile, skills).map((b) => b.text).join('\n');
-  assertStringIncludes(text, 'tronqu');
+  assertStringIncludes(text.toLowerCase(), 'tronqu');
   assert(/jamais|interdit|ne (pas|jamais)/i.test(text));
 });
 

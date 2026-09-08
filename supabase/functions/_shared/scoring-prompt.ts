@@ -2,31 +2,60 @@ import type { SystemBlock } from './claude.ts';
 import type { CandidateProfileRow, OfferToScore, ProfileSkillRow } from './scoring-types.ts';
 
 /**
- * Toute modification du texte ci-dessous DOIT changer cette version : c'est
- * elle qui decide quelles offres seront rejouees, et donc repayees. La laisser
- * inchangee apres avoir modifie le prompt melangerait deux jugements
- * differents dans une meme colonne, sans aucun signal.
+ * Toute modification du texte ci-dessous DOIT changer cette version, mais
+ * seulement a partir du moment ou un jugement existe deja en base : c'est
+ * cette colonne ecrite qui melangerait deux jugements differents sans aucun
+ * signal si la version ne changeait pas. Avant la premiere ecriture, le
+ * prompt est encore en cours de redaction et peut bouger sans renumeroter.
  */
 export const PROMPT_VERSION = 'scoring-v1-2026-09-08';
 
-/** Schema de sortie. `additionalProperties: false` est ce qui rend la sortie sure. */
+/**
+ * Schema de sortie. `additionalProperties: false` est ce qui rend la sortie
+ * sure.
+ *
+ * Formes mesurees le 2026-09-08 contre l'API reelle (HTTP 400 sinon) :
+ * - un `integer` ne peut pas porter `minimum`/`maximum` — la borne de
+ *   fit_score est donc portee par le texte des consignes, pas par le schema.
+ * - une enumeration nullable ne peut pas s'ecrire `type: [..., 'null']` avec
+ *   `null` dans `enum` : il faut `anyOf: [{ enum: [...sans null] }, { type: 'null' }]`.
+ * - un nullable SANS enumeration (`type: [T, 'null']` seul) est accepte tel quel.
+ * - `maxLength` sur une chaine est accepte.
+ */
 export const JUDGEMENT_SCHEMA: Record<string, unknown> = {
   type: 'object',
   properties: {
-    fit_score: { type: 'integer', minimum: 0, maximum: 100 },
+    fit_score: { type: 'integer' },
     verdict: { type: 'string', maxLength: 300 },
     extraction: {
       type: 'object',
       properties: {
         stack: { type: 'array', items: { type: 'string' } },
         seniority: {
-          type: ['string', 'null'],
-          enum: ['junior', 'confirme', 'senior', 'lead', null],
+          anyOf: [
+            { type: 'string', enum: ['junior', 'confirme', 'senior', 'lead'] },
+            { type: 'null' },
+          ],
         },
-        work_mode: { type: ['string', 'null'], enum: ['full_remote', 'hybride', 'sur_site', null] },
-        engagement: { type: ['string', 'null'], enum: ['freelance', 'cdi', 'cdd', 'autre', null] },
+        work_mode: {
+          anyOf: [
+            { type: 'string', enum: ['full_remote', 'hybride', 'sur_site'] },
+            { type: 'null' },
+          ],
+        },
+        engagement: {
+          anyOf: [
+            { type: 'string', enum: ['freelance', 'cdi', 'cdd', 'autre'] },
+            { type: 'null' },
+          ],
+        },
         duration_months: { type: ['integer', 'null'] },
-        compensation_kind: { type: ['string', 'null'], enum: ['tjm', 'salaire', null] },
+        compensation_kind: {
+          anyOf: [
+            { type: 'string', enum: ['tjm', 'salaire'] },
+            { type: 'null' },
+          ],
+        },
         compensation_min: { type: ['number', 'null'] },
         compensation_max: { type: ['number', 'null'] },
         agentic_ai: { type: 'boolean' },
@@ -58,8 +87,9 @@ export const JUDGEMENT_SCHEMA: Record<string, unknown> = {
 const CONSIGNES = `Tu evalues l'adequation entre un CV et une offre d'emploi.
 
 Tu produis TROIS choses, et rien d'autre :
-1. fit_score : de 0 a 100, la correspondance des COMPETENCES entre le CV et
-   l'offre. C'est un fait objectif sur l'offre.
+1. fit_score : un entier de 0 a 100 inclus, jamais en dehors de ces bornes,
+   mesurant la correspondance des COMPETENCES entre le CV et l'offre. C'est un
+   fait objectif sur l'offre.
 2. verdict : une seule phrase, en francais, disant pourquoi ce score.
 3. extraction : les faits de l'offre, tels qu'ils y figurent.
 
@@ -78,7 +108,7 @@ profil React, par exemple) merite un score MOYEN, pas un score bas.
 
 REGLE SUR LES TEXTES TRONQUES — elle prime sur tout le reste.
 Certaines offres arrivent avec une description coupee a 500 caracteres. Elles
-sont signalees par « DESCRIPTION TRONQUEE » (un texte tronque). Dans ce cas il t'est INTERDIT de
+sont signalees par « DESCRIPTION TRONQUEE ». Dans ce cas il t'est INTERDIT de
 conclure au rejet : tu ne sais pas ce que contient la partie manquante, et la
 pile technique figure presque toujours plus loin dans le texte. Note alors sur
 ce que tu as — l'intitule, l'entreprise, la requete qui a trouve l'offre, la

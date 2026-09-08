@@ -21,7 +21,8 @@
     "verify": "npm run fmt:check && npm run lint && npm run check && npm test",
     "check": "deno check --config supabase/functions/deno.json supabase/functions/ scripts/",
     "backfill:remap": "deno run --config supabase/functions/deno.json --allow-read --allow-net --allow-env scripts/backfill-remap.ts",
-    "claude:smoke": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/claude-smoke.ts"
+    "claude:smoke": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/claude-smoke.ts",
+    "claude:schema-check": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/claude-schema-check.ts"
   },
   "devDependencies": {
     "supabase": "^2.117.0"
