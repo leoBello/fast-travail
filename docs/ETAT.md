@@ -3,6 +3,8 @@
 **Dernière mise à jour** : 2026-09-08
 **Branche de travail** : `dedoublonnage`
 
+Reste à faire, priorités et coûts : [`RESTE-A-FAIRE.md`](RESTE-A-FAIRE.md)
+
 Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUDE.md`](../CLAUDE.md)
 
 ---
@@ -718,16 +720,30 @@ mode de travail.
 Sans effet sur `offers_shortlist`, qui ne retient que `full` ou le département
 local. À affiner seulement si la distinction hybride devient utile.
 
-### P3 — Défaut de pagination latent (France Travail)
+### ~~P3 — Défaut de pagination latent (France Travail)~~ *(résolu)*
 
-La boucle de `fetchAllPages` avance par pas fixes de 150 sans tenir compte du
+La boucle de `fetchAllPages` avançait par pas fixes de 150 sans tenir compte du
 nombre d'offres réellement reçues. Si l'API renvoyait une page intermédiaire plus
-courte sans que le total soit atteint, des offres seraient perdues **en
-silence**.
+courte sans que le total soit atteint, des offres auraient été perdues **en
+silence** — jamais déclenché sur les collectes réelles, mais latent.
 
-Non déclenché sur les collectes réelles — `fetched` égalait `total_available`
-sur les 24 requêtes, et de nouveau sur le run du cron — mais le défaut reste
-dans le code. Le client Adzuna, lui, renseigne désormais `truncated`.
+**Corrigé** : la position suivante demandée est désormais `collected.length`
+(le nombre d'offres réellement collectées), pas un pas fixe — auto-correcteur
+face à une page courte. Le recadrage de la dernière fenêtre (1000-1149) et son
+`break` sont préservés ; une garde anti-boucle-infinie a été ajoutée, car le
+pas fixe garantissait la terminaison par construction et ce n'est plus le cas
+avec un pas variable (voir M4 ci-dessous, désormais caduc).
+
+Un test rouge a d'abord reproduit la perte silencieuse (page 0-99 suivie d'une
+redemande à 150-299 au lieu de 100-249, perdant les offres 100-149) puis un
+test de la garde anti-boucle. Les deux passent après correction, ainsi que la
+suite complète (`npm run verify`, 221 tests).
+
+**Vérifié en conditions réelles** le 2026-09-08 (`npm run fn:local:ft` contre
+la base distante) : run `d8e1d27f-b4c1-4b3a-9be0-f23869c7f6d1`, 24 requêtes,
+`fetched = total_available` sur les 22 requêtes qui ont abouti (les 2 restantes
+ont échoué sur un HTTP 500 France Travail, sans rapport avec la pagination).
+Le client Adzuna, lui, renseigne déjà `truncated`.
 
 ### ~~P8 — La sélection était étouffée : 3 retenues sur 76 full remote~~ *(résolu)*
 
@@ -1042,7 +1058,7 @@ jugés non bloquants, et laissés en l'état délibérément.
 | M1 | `upsert_test.ts` : ternaire mort `offer ? [offer] : []` |
 | M2 | `upsertOffers` déduit la source de `rows[0]` et suppose un lot monosource. L'invariant tient par construction, l'écriture est protégée par l'`onConflict` composé, mais le comptage de télémétrie serait faussé si l'invariant sautait. Une garde explicite manque |
 | M3 | Correspondance des clés du payload `upsert` aux colonnes réelles : non vérifiable par le typage, `DbClient` n'étant pas typé sur le schéma |
-| M4 | `client.ts` France Travail : le `break` sur `rangeStart !== start` est mathématiquement redondant et son commentaire évoque à tort un risque de boucle infinie |
+| ~~M4~~ | *(caduc, voir P3)* `client.ts` France Travail : depuis la correction de P3, la position suivante à demander est `collected.length` et non plus un pas fixe. Le `break` sur `rangeStart !== start` n'est donc plus redondant — c'est lui qui termine proprement la dernière page recadrée — et le risque de boucle infinie qu'évoquait son commentaire est devenu réel : une garde explicite (`collected.length` qui n'avance pas) a été ajoutée pour le couvrir |
 | M6 | `runCollection` renvoie `success` sur une liste de requêtes vide. Cohérent avec la formule, mais masquerait une configuration où toutes les requêtes d'une source sont désactivées |
 | M7 | Le champ `fetched` de la télémétrie compte les offres **après** mapping, pas le brut renvoyé par la source. Nommage trompeur |
 | M11 | `published_since_days` est semé en base mais **lu par personne** : la fenêtre vient de `WINDOW_DAYS[mode]`. Colonne morte pour les deux sources |
@@ -1118,10 +1134,12 @@ comme pre-filtre decidant quelles offres meritent un appel payant, or ce
 contrat bougeait encore. Il est stable depuis ce chantier, et son cout est
 enfin chiffrable.
 
-**Peuvent se glisser n'importe quand**, aucune collision avec le plan B :
-P3 (pagination latente de France Travail, qui perdrait des offres en silence)
-et P1 (geocodage par `commune_insee`, pour regler le rayon au kilometre plutot
-qu'au departement).
+**P3 est fait** (2026-09-08) : la pagination avançait par pas fixes et
+perdait des offres en silence — un test l'a chiffré à 50 offres manquantes
+sur 370. Corrigé et prouvé par une collecte réelle.
+
+**Le reste est consigné dans [`RESTE-A-FAIRE.md`](RESTE-A-FAIRE.md)**, avec
+pour chaque entrée ce qu'elle coûte, ce qu'elle rapporte et quand la faire.
 
 ## Decisions en attente
 

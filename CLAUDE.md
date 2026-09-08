@@ -6,6 +6,7 @@ React / TypeScript, zone Marseille / Aix-en-Provence et full-remote national.
 | Document | À quoi il sert |
 |---|---|
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Vision produit, les 5 phases, décisions structurantes et ce que la mesure a démenti |
+| [`docs/RESTE-A-FAIRE.md`](docs/RESTE-A-FAIRE.md) | Ce qui reste, ce que chaque chantier coûte et rapporte, et quand le faire |
 | [`docs/ETAT.md`](docs/ETAT.md) | **Où on en est, ce qui reste, problèmes ouverts priorisés.** À lire en premier pour reprendre le travail |
 | [`docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md`](docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md) | Design détaillé de la phase 1 |
 | [`docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md`](docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md) | Plan d'implémentation, tâche par tâche |
@@ -313,9 +314,11 @@ mesuré, deux fois sur deux. Rendu du 2026-09-08 : 5 offres écartées,
 cohérent avec une sélection qui passe de 92 à 87.
 
 Les coûts ne sont pas du même ordre et ne se lisent pas ensemble :
-`offers_shortlist` met environ **3,7 s**, dont 3,3 s dans
-`offer_lexical_score` — un coût **linéaire** en offres × termes du lexique,
-qui grandira avec le corpus. `offers_hidden_duplicates` met environ
+`offers_shortlist` met environ **0,76 s**, contre 3,7 s avant les migrations
+`20260908230000` et `20260908240000`, qui ont rendu indexables les deux
+branches du lexique — GIN sur `description_tsv` pour les 56 termes `fts`,
+GIN trigramme pour les 11 termes `ilike`. Le coût reste linéaire en offres ×
+termes, avec une constante bien plus petite. `offers_hidden_duplicates` met environ
 **0,27 s** : elle formait un produit cartesien complet et coûtait 3,8 s, en
 deux temps corrigés — d'abord une CTE `materialized`, qui l'a rendue bon
 marché sans la rendre linéaire, puis la suppression de l'auto-jointure au
