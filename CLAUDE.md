@@ -94,8 +94,9 @@ quand le code déplaît au linter.
 
 **`supabase/functions/_shared/` est runtime-neutre.** Aucun `Deno.env`, aucun
 accès `Deno.*`, aucun import `node:` dans ces fichiers — la configuration
-arrive **en paramètre**. Ces fichiers seront importés tels quels par des
-scripts Node (les scrapers de la phase suivante). Contrôle :
+arrive **en paramètre**. Ces fichiers sont importés tels quels par les
+scrapers, des scripts Deno locaux sous `supabase/functions/_scrapers/`, hors
+Edge Functions. Contrôle :
 
 ```bash
 grep -rn "Deno\.\|node:" supabase/functions/_shared/ --include=*.ts | grep -v "__tests__"

@@ -432,8 +432,10 @@ observation. Mesuré : 99 offres à `seen_count = 1`, 6 à `seen_count = 2`
 (revues par une seconde facette). Sur Collective, `needsKnownExternalIds =
 false` : la page de listing porte les missions entières, donc chaque passage
 du scraper rafraîchit `last_seen_at` et incrémente `seen_count` pour **toute**
-offre revue, exactement comme les deux API. Mesuré : 1 235 à `seen_count = 1`,
-37 à `2`, 510 à `3` (offre vue au backfill, puis à deux delta). Conclusion :
+offre revue, exactement comme les deux API. Mesuré : 1 225 à `seen_count = 1`,
+19 à `2`, 40 à `3`, 499 à `4` — quatre runs Collective à ce jour (un delta
+initial, un backfill, puis deux delta), donc la borne à 4 correspond aux
+offres vues aux quatre. Conclusion :
 sur Free-Work, un `seen_count` élevé ne dit rien sur la fraîcheur d'une
 annonce ; sur Collective (et les deux API), il en dit autant que documenté
 plus bas dans ce fichier (« Attention à la sémantique »).
