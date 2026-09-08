@@ -41,7 +41,7 @@ select * from offers_shortlist order by score desc, published_at desc;
 | Requêtes Adzuna actives | 11 sur 11 |
 | Jobs cron actifs | 2 |
 | Termes au lexique | 67 |
-| Tests | 115 verts |
+| Tests | 117 verts |
 
 ---
 
@@ -197,18 +197,32 @@ Travail — ce qui pèse sur la phase 2 et rend P8 prioritaire.
 entre sources. Les deux sources alimentent maintenant la base : le problème
 n'est plus théorique. Première dette à payer en phase 2.
 
-### P9 — La re-revue de la tâche 11 est en cours
+### ~~P9 — La re-revue de la tâche 11~~ *(rendue, approuvée)*
 
-Les six constats de revue ont été corrigés (commit `2c678d5`). Un premier
-relecteur a été coupé par une limite de session avant de rendre son verdict ;
-un second a été relancé sur le même diff,
-`.superpowers/sdd/review-983e858..2c678d5.diff`.
+**Conformité : les six constats traités. Qualité : approuvée**, sans constat
+Critique ni Important. Le relecteur a vérifié chaque point contre le code réel
+et non contre le rapport, recalculé à la main les valeurs attendues du test sur
+fixture, et confronté la liste blanche des paramètres à la matrice réellement
+en base.
 
-Ce qui a été vérifié à la place, par exécution : `verify` vert à 115 tests, et
-neuf contrôles de comportement sur le code réel, dont un appel HTTP véritable.
-Deux réserves du correcteur restent non arbitrées : une conversion
-`as readonly string[]` subsistant dans une garde de type, et l'ordre de la
-fixture reconstruite.
+Ses deux mineurs étaient fondés et sont corrigés (commit `3783854`) :
+
+`what` était admis dans `extra_params` alors que le projet documente, dans le
+même fichier, que ce n'est pas un ET logique — 1 offre contre 313 pour
+`what_and`. La matrice se réglant en SQL, personne n'aurait lu
+l'avertissement : une quatrième catégorie refuse désormais les paramètres
+pièges, avec la mesure qui justifie le refus.
+
+La garde de type sur `RemoteMode` gardait une conversion que le correcteur
+attribuait à une limite de TypeScript. Le relecteur a démontré le contraire en
+compilant l'alternative. Retenu : un `Record<Exclude<RemoteMode, null>, true>`,
+qui supprime la conversion **et** rend la couverture exhaustive — ajouter un
+mode sans l'ajouter là casse la compilation. `Object.hasOwn` plutôt que `in`,
+qui aurait accepté « toString » comme mode de télétravail. Testé.
+
+Il jugeait la seconde réserve du correcteur non fondée : l'ordre de la fixture
+n'affaiblit pas le test, qui asserte aussi `external_id` et `title` — un
+décalage futur échouerait explicitement au lieu de passer en silence.
 
 ### P7 — La Corse s'encode de deux façons
 
