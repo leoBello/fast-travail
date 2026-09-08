@@ -61,9 +61,11 @@ Les liens sont des leurres : ils ne mènent nulle part par construction.
 Trois constats sont sortis du dessin lui-même, en confrontant le vocabulaire
 aux données réelles. Ils sont consignés dans `../ETAT.md`.
 
-1. **`offers_scored` ne dédoublonne pas**, et la clé existante rate 64 paires
+1. **`offers_scored` ne dédoublonne pas**, et la clé existante rate 65 paires
    portant un titre normalisé et une société identiques — dont deux dans les
-   quatorze premières lignes du classement (P23).
+   quatorze premières lignes du classement (P23). *Corrigé le 2026-09-09 : ces
+   deux paires-là échappaient même à cette mesure, les sources suffixant le
+   même intitulé (`(IT)`, `(H/F)`). Voir `../../ETAT.md`, P23.*
 2. **Un doublon doit s'élire par confiance, pas par score**, sans quoi le
    classement met en avant le jugement rendu sur le texte le plus court.
 3. **`stack` vide et confiance basse ont le même total et des ensembles

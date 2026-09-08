@@ -161,8 +161,20 @@ description, puis `final_score`, puis `published_at`, puis `id` pour que
 l'ordre soit total.
 
 Le repli se fait **à l'affichage**, sur titre normalisé + société, sans
-attendre une migration : la clé de dédoublonnage existante rate **64 paires**
-(79 lignes en trop sur 1 269), dont deux dans les quatorze premières lignes.
+attendre une migration : la clé de dédoublonnage existante rate **65 paires**
+(80 lignes en trop sur 1 269), dont deux dans les quatorze premières lignes.
+
+**Le titre se normalise après retrait d'un suffixe d'annotation**, pris dans
+une liste blanche (`h/f`, `f/h`, `it`, `cdi`, `cdd`, `alternance`, `stage`).
+Les sources suffixent le même intitulé chacune à sa façon : Adzuna écrit
+« … obligatoire *(IT)* », France Travail « … *(H/F)* », Free-Work rien.
+
+**Ne jamais retirer « tout parenthétique final »** : le titre Free-Work de
+l'offre Digistrat se termine par un parenthétique porteur de sens —
+« Développeur Full stack REACT/C# *(orienté front React)* ». L'amputer
+produirait une clé différente de celle d'Adzuna, soit exactement l'inverse de
+l'effet recherché. Les sept groupes que ce retrait forme ont été lus un par un :
+aucune fusion abusive.
 
 ### 3.6 Jamais un montant dont l'unité est incertaine
 

@@ -1202,8 +1202,17 @@ maquette avant le code ».
 évidents.** 1 269 lignes pour 1 211 groupes, mais **deux paires manifestes dans
 le top 14** — ALLEGIS GROUP et Digistrat consulting, chacune vue par Adzuna et
 Free-Work, chacune dans son propre groupe avec `dup_count = 1`. Mesuré sur tout
-le périmètre : **64 paires** portent un titre normalisé et une société
-identiques sans être groupées, soit **79 lignes en trop**. Consigné en P23.
+le périmètre : **65 paires** portent un titre normalisé et une société
+identiques sans être groupées, soit **80 lignes en trop**. Consigné en P23.
+
+> **Correction du 2026-09-09** — la première version de ce paragraphe laissait
+> entendre que les deux paires du top 14 faisaient partie des 65. **C'est
+> faux, et je l'avais inféré sans le vérifier.** Les sources ajoutent leur
+> propre suffixe au même intitulé : Adzuna écrit « … obligatoire **(IT)** » là
+> où Free-Work écrit « … obligatoire ». Les deux titres normalisés diffèrent
+> donc, et ces paires **échappaient aussi à la mesure**. C'est la tâche 1 qui
+> l'a trouvé, en essayant de prouver la propagation sur ces deux paires
+> précises. Détail et remède en P23.
 
 **2. Un doublon doit s'élire par confiance, pas par score.** La mission ALLEGIS
 est jugée **deux fois**, et le classement met en tête le jugement le **moins**
@@ -1911,10 +1920,36 @@ classement.
 | ALLEGIS GROUP — « Developpeur React/Node/NestJS » | 90,0 | 86,5 | **distincts**, `dup_count = 1` chacun |
 | Digistrat consulting — « Développeur Full stack REACT/C# » | 94,0 | 85,5 | **distincts**, `dup_count = 1` chacun |
 
-Mesure d'ensemble sur le périmètre jugé : **64 paires** portent un titre
-normalisé et une société identiques sans partager de groupe, soit **79 lignes
+Mesure d'ensemble sur le périmètre jugé : **65 paires** portent un titre
+normalisé et une société identiques sans partager de groupe, soit **80 lignes
 en trop** sur 1 269. Six pour cent du corpus, mais bien davantage en tête de
 liste — et l'écran est la ressource rare.
+
+**Et ces deux paires-là n'étaient même pas dans les 65** *(trouvé en tâche 1,
+le 2026-09-09)*. Les sources suffixent le même intitulé : Adzuna écrit
+« … obligatoire **(IT)** », France Travail « … **(H/F)** », Free-Work rien. Les
+titres normalisés diffèrent donc, et la mesure elle-même les ratait. La clé de
+regroupement d'affichage retire un suffixe d'annotation pris dans une **liste
+blanche** (`h/f`, `f/h`, `it`, `cdi`, `cdd`, `alternance`, `stage`) avant de
+normaliser.
+
+**Pourquoi une liste blanche et non « tout parenthétique final »** : un retrait
+aveugle casse Digistrat, dont le titre Free-Work se termine par un
+parenthétique **porteur de sens** — « Développeur Full stack REACT/C#
+*(orienté front React)* ». L'amputer produirait une clé différente de celle
+d'Adzuna, soit l'inverse de l'effet recherché.
+
+| | Groupes | Lignes repliées | Dont inter-sources |
+|---|---:|---:|---:|
+| Clé simple | 65 | 80 | 23 |
+| Clé avec liste blanche | **66** | **82** | **24** |
+
+Le gain agrégé est petit, et c'est trompeur : les **7 groupes** que seul le
+retrait forme sont précisément ceux qui occupent le haut du classement. Ils ont
+été **lus un par un** — Act Digital France, ALLEGIS GROUP, Boond, Digistrat
+consulting, Letsignit, Mon Consultant Indépendant, Synanto — et **aucun n'est
+une fusion abusive** : chacun est le même intitulé à un suffixe de source près.
+C'est la lecture manuelle que P14 exige avant tout élargissement de clé.
 
 **Deux problèmes distincts, à ne pas confondre** :
 

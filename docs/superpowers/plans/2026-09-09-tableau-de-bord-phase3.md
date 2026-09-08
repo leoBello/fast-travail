@@ -173,11 +173,43 @@ select
   o.id as offer_id,
   coalesce(
     nullif(regexp_replace(lower(coalesce(o.company_name, '')), '[^a-z0-9]', '', 'g'), '')
-      || '|' || regexp_replace(lower(o.title), '[^a-z0-9]', '', 'g'),
+      || '|' ||
+      regexp_replace(
+        lower(regexp_replace(
+          o.title,
+          '(\s*\((h/f|f/h|h-f|it|cdi|cdd|alternance|stage)\))+\s*$', '', 'gi')),
+        '[^a-z0-9]', '', 'g'),
     o.id::text
   ) as display_key
 from offers o;
 ```
+
+  **Le retrait du suffixe d'annotation est mesuré, pas cosmétique.** Les
+  sources ajoutent leur propre suffixe au même intitulé : Adzuna écrit
+  « … obligatoire **(IT)** » là où Free-Work écrit « … obligatoire », et
+  France Travail ajoute « **(H/F)** ». Sans ce retrait, la clé simple rate
+  **7 groupes**, dont les deux paires les plus visibles du classement
+  (ALLEGIS GROUP et Digistrat consulting).
+
+  **Une liste blanche, et non « tout parenthétique final ».** Un retrait
+  aveugle du dernier groupe entre parenthèses casse Digistrat, dont le titre
+  Free-Work **se termine** par un parenthétique porteur de sens :
+  « Développeur Full stack REACT/C# **(orienté front React)** ». L'amputer
+  produirait une clé différente de celle d'Adzuna, donc l'inverse de l'effet
+  recherché. Seuls les jetons de la liste blanche sont retirés.
+
+  **Mesure du 2026-09-09**, sur les 1 269 offres jugées :
+
+  | | Groupes | Lignes repliées | Dont inter-sources |
+  |---|---:|---:|---:|
+  | Clé simple | 65 | 80 | 23 |
+  | Clé avec liste blanche | **66** | **82** | **24** |
+
+  Les **7 groupes** que seul le retrait forme ont été **lus un par un** :
+  Act Digital France, ALLEGIS GROUP, Boond, Digistrat consulting, Letsignit,
+  Mon Consultant Indépendant, Synanto. **Zéro fusion abusive** — chacun est le
+  même intitulé à un suffixe de source près. C'est la lecture manuelle que P14
+  exige avant tout élargissement de clé, et elle a été faite.
 
   **Le `coalesce` extérieur n'est pas décoratif.** Quand `company_name` est
   nul — et il l'est sur une part réelle du corpus — `nullif` rend `NULL`, la
