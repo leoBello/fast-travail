@@ -1,6 +1,14 @@
 # ESLint est oriente Node et ne connait pas le runtime Deno : il signalerait
 # des erreurs inexistantes sur les Edge Functions. Le linter de ce code est
 # deno lint, lance par npm run lint.
+#
+# Depuis ESLint 9 (flat config, eslint.config.js a la racine), ce fichier
+# n'est plus lu :
+# les memes exclusions, plus docs/ et dashboard/dist/, sont dans le tableau
+# `ignores` de eslint.config.js, qui fait foi. Ce fichier reste pour la trace
+# et pour tout outil qui le lirait encore.
 supabase/functions/
 node_modules/
 .superpowers/
+docs/design/maquettes/
+dashboard/dist/

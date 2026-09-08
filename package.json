@@ -21,13 +21,24 @@
     "fmt": "deno fmt --config supabase/functions/deno.json supabase/functions/ scripts/",
     "lint": "deno lint --config supabase/functions/deno.json supabase/functions/ scripts/",
     "fmt:check": "deno fmt --check --config supabase/functions/deno.json supabase/functions/ scripts/",
-    "verify": "npm run fmt:check && npm run lint && npm run check && npm test",
     "check": "deno check --config supabase/functions/deno.json supabase/functions/ scripts/",
+    "verify": "npm run verify:deno && npm run verify:dashboard",
+    "verify:deno": "npm run fmt:check && npm run lint && npm run check && npm test",
+    "verify:dashboard": "npm --prefix dashboard run verify",
+    "dash:dev": "npm --prefix dashboard run dev",
     "backfill:remap": "deno run --config supabase/functions/deno.json --allow-read --allow-net --allow-env scripts/backfill-remap.ts",
     "claude:smoke": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/claude-smoke.ts",
     "claude:schema-check": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/claude-schema-check.ts"
   },
   "devDependencies": {
-    "supabase": "^2.117.0"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
+    "supabase": "^2.117.0",
+    "typescript-eslint": "^8.70.0"
   }
 }
