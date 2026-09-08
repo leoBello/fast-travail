@@ -1109,6 +1109,34 @@ contraignant. Maquettes et statut de leurs données :
 [`design/maquettes/README.md`](design/maquettes/README.md).
 Canvas : <https://claude.ai/code/artifact/be80ac9f-af1b-4490-b2ce-b7813a4ea393>
 
+**Plan d'implémentation écrit le 2026-09-09**, dix tâches :
+[`superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](superpowers/plans/2026-09-09-tableau-de-bord-phase3.md).
+
+| # | Tâche | État |
+|---|---|---|
+| 1 | `offer_applications` + les vues de groupe et de propagation | ⬜ |
+| 2 | Échafaudage `dashboard/`, et `verify` étendu aux deux côtés | ⬜ |
+| 3 | Thème et vocabulaire d'interface, avec les tests de garde-fous | ⬜ |
+| 4 | i18n | ⬜ |
+| 5 | Vue `offers_dashboard` — repli et élection par confiance | ⬜ |
+| 6 | Edge Function `api-dashboard` | ⬜ |
+| 7 | L'écran du matin | ⬜ |
+| 8 | Le détail d'une offre | ⬜ |
+| 9 | Le suivi et la gamification | ⬜ |
+| 10 | Déploiement, mesure, documentation | ⬜ |
+
+**Une décision d'architecture prise en écrivant le plan** : **Vite, pas
+Next.js**. Le `ROADMAP` annonçait Next.js et `.vscode/settings.json` le
+mentionne encore. Il n'y a aucun besoin de rendu serveur — application
+mono-utilisateur servie en local — et le kit repris est celui de prospeo, qui
+est Vite. Next.js aurait ajouté un routeur, un runtime serveur et une build à
+un projet qui n'en a besoin d'aucun. Les deux documents sont corrigés en
+tâche 10.
+
+**Conséquence sur la phase 5** : le suivi des candidatures, que le `ROADMAP`
+plaçait en phase 5, est **absorbé** par celle-ci — le tableau de bord en a
+besoin maintenant. Ce qui reste à la phase 5 sera dit en tâche 10.
+
 ### Les décisions déjà tranchées
 
 | Décision | Ce qui l'a tranchée |
