@@ -19,9 +19,15 @@
 -- france_travail : elles ne passent jamais par ce chemin de code, et leurs
 -- departements viennent d'un autre mapper (`departmentCodeFromName` /
 -- `departmentCodeFromArea`, sur des noms de departement, pas des codes
--- postaux). La divergence Corse 20/2A (probleme ouvert P7, voir ETAT.md)
--- n'est pas non plus concernee : "20" et "2A" sont tous deux deux caracteres
--- et passent la condition ci-dessous sans etre touches.
+-- postaux).
+--
+-- Sur la divergence Corse 20/2A (probleme ouvert P7, voir ETAT.md), soyons
+-- exacts plutot que rassurants : "2A" ne passe PAS la condition ci-dessous et
+-- serait donc mis a null. C'est sans effet, mais pas parce que la condition
+-- l'epargne — parce qu'aucune des deux sources scrapees ne peut produire
+-- "2A". departmentCodeFromCityName ne rend que 13, 83 ou 84, et le seul autre
+-- chemin est la tranche d'un code postal a cinq chiffres. Verifie en base :
+-- zero ligne free_work ou collective avec un departement dans (20, 2A, 2B).
 update offers
    set department = null
  where source in ('free_work', 'collective')

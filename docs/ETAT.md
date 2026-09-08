@@ -758,12 +758,55 @@ d'entrée par `deno run --env-file=.env.local` sur le port 8000, sans en-tête
 `Deno.serve`). Documenté dans `CLAUDE.md` et dans les trois étapes du plan qui
 pointaient encore vers `fn:serve`.
 
+### P12 — Une offre Free-Work vue par trois facettes se paie trois fois
+
+`knownExternalIds` est un instantané pris une seule fois avant la boucle, et il
+n'est jamais complété par les offres découvertes en cours de run. Les facettes
+`react`, `typescript` et `javascript` se recouvrent largement — 196, 180 et 330
+offres — donc une offre listée par trois d'entre elles coûte **trois pages de
+détail** à 3 000 ms chacune, dans le même run. Déjà visible : 6 offres portent
+deux étiquettes de provenance, ce qui est exactement ce chemin.
+
+Sans effet sur les données (l'upsert dédoublonne), mais c'est du temps de
+collecte et de la charge inutiles chez l'hôte. Alimenter l'ensemble au fil des
+requêtes serait un petit changement et un vrai gain de politesse au prochain
+backfill.
+
+### P13 — La provenance ne dit pas la même chose selon la source
+
+Parce que Free-Work saute les offres déjà connues d'un run à l'autre, l'ensemble
+`found_by_query_ids` d'une offre est **figé au run qui l'a découverte** :
+mesuré, 99 des 105 offres Free-Work ne portent qu'une seule étiquette, là où
+France Travail et Adzuna en accumulent jusqu'à cinq. `CLAUDE.md` laisse entendre
+que `found_by_labels` dit *quelles requêtes ont ramené l'offre* ; pour Free-Work
+il dit *quelle facette l'a vue en premier*.
+
+C'est une seconde raison, indépendante de la mesure, pour laquelle le
+déclassement des facettes en `net` était juste : une facette restée `anchored`
+aurait fait dépendre la confiance de l'ordre des runs.
+
+Même cause, même effet sur `last_seen_at`, qui ne se rafraîchit pas pour
+Free-Work : cette colonne ne peut donc pas servir à distinguer une annonce
+encore en ligne d'une annonce retirée, sur cette source. Personne ne s'en sert
+aujourd'hui.
+
 ---
 
 ## Mineurs consignés
 
+Les huit derniers viennent de la revue finale du plan B. Ils ont été vérifiés,
+jugés non bloquants, et laissés en l'état délibérément.
+
 | # | Sujet |
 |---|---|
+| M14 | `PoliteFetcher.requestCount` n'est lu par personne hors de son test, et le plan promet dans la sortie un champ `requests` que `CollectionSummary` n'a jamais eu. Câbler l'un ou supprimer les deux |
+| M15 | `collective/mapper.ts` code l'URL de base en dur pour reconstruire le lien d'une mission, alors que `sources.base_url` la porte déjà et que le client la reçoit en paramètre. Deux vérités pour un même fait |
+| M16 | Le troisième refus de `loadSourceSettings` — `user_agent` absent — est atteignable (la colonne est nullable) mais aucun test ne l'exerce |
+| M17 | Le client Collective ne déduplique pas entre pages, là où celui de Free-Work le fait. Sans effet sur les données, mais `collection_query_results.fetched` est gonflé pour cette source : 1 800 annoncées pour 1 760 lignes réellement écrites, soit les 40 missions ayant changé de page pendant le parcours |
+| M18 | `isPermanentContract === true ? 'CDI' : 'Freelance'` ne distingue pas `false` d'absent : si Collective cessait d'émettre le champ, tout deviendrait Freelance en silence. Mesuré aujourd'hui : 587 CDI, 1 196 Freelance, aucun null |
+| M19 | La sélection de groupe de `robots.txt` compare le jeton d'agent par sous-chaîne de notre agent complet, plus large que la correspondance par jeton de produit du RFC 9309. Aucun `robots.txt` des deux sites ne contient de jeton piège, et l'erreur va dans le sens « collecter moins » |
+| M20 | `contract_label` porte désormais quatre vocabulaires : libellé français (France Travail), temps de travail (Adzuna), énumérations schema.org jointes (Free-Work), rien (Collective). Et côté Free-Work l'ordre de la jointure varie — `CONTRACTOR, FULL_TIME` sur 18 offres, `FULL_TIME, CONTRACTOR` sur 3 — donc la même offre peut porter deux libellés différents. `contract_type`, lui, est cohérent entre les trois sources qui le renseignent |
+| M21 | Le mapper Free-Work laisse tomber un `baseSalary` qui ne porterait qu'un `maxValue`, là où le mapper Adzuna rend « jusqu'à X ». Non exercé par les fixtures |
 | M1 | `upsert_test.ts` : ternaire mort `offer ? [offer] : []` |
 | M2 | `upsertOffers` déduit la source de `rows[0]` et suppose un lot monosource. L'invariant tient par construction, l'écriture est protégée par l'`onConflict` composé, mais le comptage de télémétrie serait faussé si l'invariant sautait. Une garde explicite manque |
 | M3 | Correspondance des clés du payload `upsert` aux colonnes réelles : non vérifiable par le typage, `DbClient` n'étant pas typé sur le schéma |
