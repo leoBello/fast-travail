@@ -40,14 +40,31 @@ besoin précis : `pg_cron` doit tourner même PC éteint.
 | | Sources | Runtime | Déclenchement |
 |---|---|---|---|
 | **API** | France Travail, Adzuna | Edge Functions Deno | `pg_cron` quotidien, PC éteint |
-| **Scrapers** | Free-Work, Codeur.com, Collective.work, Kicklox | Scripts Node locaux | manuel ou Planificateur Windows |
+| **Scrapers** | Free-Work, Collective.work | Scripts Deno locaux | Planificateur Windows quotidien, ou manuel |
+
+**Deux scrapers, pas quatre.** Codeur.com et Kicklox faisaient partie de
+l'intention initiale ; la reconnaissance du 2026-09-08, contre des pages
+réelles, les a écartés sur mesure : Codeur.com ne rend que 4 slugs front-end
+sur 103 projets, un flux WordPress / Webflow / SEO / marketing hors profil ;
+Kicklox n'a **aucune** mission publique, `app.kicklox.com/missions` étant une
+coquille SPA de 3 955 octets derrière un login. Free-Work et Collective.work,
+eux, mesurent une vraie surface : 196 offres React sur Free-Work contre 5 chez
+Adzuna et 0 chez France Travail, 6 544 missions sur Collective. Détail des mesures et des pistes écartées : [`ETAT.md`](ETAT.md), section
+« Phase 1 — Plan B ».
+
+**Scripts Deno, pas Node.** La contrainte réelle est « hors Edge Functions »,
+pas « Node » : le brief initial supposait Node sans raison technique. Deno
+coûte un outillage en moins — `npm run verify` (format, lint, typecheck,
+tests) couvre déjà tout `supabase/functions/`, scrapers compris, par la même
+porte que les deux API. Un second outillage Node aurait dupliqué cette
+chaîne pour deux scripts.
 
 Les Edge Functions du free tier sont limitées à 150 s de wall clock et **2 s de
 CPU** par requête, et n'embarquent aucun Chromium. Parser des pages HTML avec
 des délais de politesse n'y tient pas. Le code partagé
 (`supabase/functions/_shared/`) est donc **runtime-neutre** : il ne lit jamais
-l'environnement, la configuration lui est injectée, et les scripts Node
-l'importent tel quel.
+l'environnement, la configuration lui est injectée, et les scripts Deno des
+scrapers l'importent tel quel.
 
 **Trois axes réglables, tous en données** — rayon géographique, matrice de
 requêtes, lexique de compétences. Les ajuster est un `UPDATE`, jamais un
@@ -64,9 +81,12 @@ Alimenter la base en offres, avec dédoublonnage et télémétrie par requête.
 - **Plan A — les 2 API** : France Travail et Adzuna, en Edge Functions avec cron.
   Design : [`specs/2026-09-07-collecte-offres-phase1-design.md`](superpowers/specs/2026-09-07-collecte-offres-phase1-design.md).
   Plan : [`plans/2026-09-07-collecte-api-france-travail-adzuna.md`](superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md).
-- **Plan B — les 4 scrapers** : à écrire quand le plan A tourne, contre des
-  fixtures HTML réelles qu'il faudra d'abord capturer. Découpage assumé : un
-  plan écrit trop tôt contre des pages inconnues serait périmé avant exécution.
+- **Plan B — deux scrapers, et non quatre** : Free-Work et Collective.work,
+  écrit quand le plan A tournait, contre des fixtures HTML réelles capturées
+  d'abord. Découpage assumé : un plan écrit trop tôt contre des pages inconnues
+  serait périmé avant exécution. Codeur.com et Kicklox faisaient partie de
+  l'intention initiale (« les 4 scrapers ») ; la reconnaissance les a écartés
+  sur mesure, pas sur intuition — détail ci-dessus et dans `ETAT.md`.
 
 Le scoring lexical, gratuit et déterministe, est déjà livré dans cette phase.
 Il n'était pas prévu au brief initial comme filtre principal — la mesure l'a
@@ -161,6 +181,20 @@ exploitable est national et full remote.
 seulement sont en full remote, contre 190 en hybride. La passe nationale ramène
 donc beaucoup de bruit pour très peu d'exploitable, et le rayon marseillais
 compte bien plus que prévu.
+
+**Free-Work rend à la description entière son rôle de filtre, et ouvre un
+champ que ni France Travail ni Adzuna ne donnaient.** Mesuré le 2026-09-08,
+en clôture du plan B : la description Free-Work fait **1 315 caractères** de
+médiane, contre 500 chez Adzuna (troncature systématique, jamais un
+caractère de plus). Conséquence directe sur le lexique : `core_hits >= 1`
+touche **59 offres Free-Work sur 105**, contre 7 sur 557 chez Adzuna. Comme
+sur France Travail, texte intégral disponible = lexique filtre principal ;
+c'est pourquoi les facettes Free-Work sont restées `net` et non `anchored`
+(aucune n'a fait entrer d'offre par la seule confiance de requête — voir
+`ETAT.md`). Free-Work est aussi la première source du projet à porter un TJM
+**structuré** en JSON-LD : `rate_raw`, colonne morte depuis le début du
+projet faute de source la renseignant, cesse de l'être — 34 offres sur 105 en
+portent un.
 
 ---
 
