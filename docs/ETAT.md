@@ -36,23 +36,33 @@ pas les 12, 31 ou 66 des étapes précédentes.
 select * from offers_shortlist order by score desc, published_at desc;
 ```
 
+Recompté en base le 2026-09-08 en fin de chantier. **Ces nombres bougent
+chaque matin** : deux crons collectent à 6 h et 6 h 30. Les recompter plutôt
+que les recopier — c'est une requête, pas une archive.
+
 | Indicateur | Valeur |
 |---|---:|
-| Offres collectées | 1 253 |
-| — dont France Travail | 700 |
-| — dont Adzuna | 553 |
-| Offres retenues (`offers_shortlist`) | **64** |
-| — dont locales (13, 83, 84) | 40 |
+| Offres collectées | 1 296 |
+| — dont France Travail | 739 |
+| — dont Adzuna | 557 |
+| Offres retenues (`offers_shortlist`) | **65** |
+| — dont locales (13, 83, 84) | 41 |
 | — dont full remote national | 24 |
-| Mentionnant React / TypeScript / Next.js, **sur les 1 253 collectées** | 54 |
-| — dont, **restreint aux 64 retenues** | 12 |
-| Mentionnant LLM / IA / agents, **sur les 1 253 collectées** | 63 |
-| — dont, **restreint aux 64 retenues** | 21 |
+| — entrant **uniquement** par la confiance par requête | **34** |
+| Mentionnant React / TypeScript / Next.js, **sur les 1 296 collectées** | 60 |
+| — dont, **restreint aux 65 retenues** | 12 |
+| Mentionnant LLM / IA / agents, **sur les 1 296 collectées** | 65 |
+| — dont, **restreint aux 65 retenues** | 21 |
 | Requêtes France Travail actives | 24 sur 38 |
 | Requêtes Adzuna actives | 11 sur 11 |
 | Jobs cron actifs | 2 |
 | Termes au lexique | 67 |
 | Tests | 128 verts |
+
+La ligne qui compte est la quatrième depuis le bas du bloc de sélection :
+**34 des 65 offres retenues n'ont ni `core_hits` ni `ai_hits`**. Sans la
+confiance par requête, elles seraient invisibles — c'est plus de la moitié de
+la liste quotidienne.
 
 ---
 
@@ -601,10 +611,73 @@ from collection_query_results where truncated
 order by total_available desc;
 ```
 
+### Surveiller la confiance par requête — la seule chose qui remesure
+
+`trusted_query` court-circuite **tout** le lexique : seul `red_flags` reste
+éliminatoire. Sa sûreté ne repose que sur un classement à la main de 38 offres,
+fait une fois le 2026-09-08. Rien ne le remesure tout seul. Voici de quoi le
+faire, à lancer après quelques jours de cron.
+
+**Ce qu'on regarde** : la contribution *marginale* de chaque requête ancrée —
+les offres dont elle est la **seule** étiquette de confiance responsable de
+l'entrée. Le décompte brut ne vaut rien : deux requêtes ancrées qui se
+recouvrent se partagent un mérite qu'aucune n'a seule.
+
+```sql
+with marginales as (
+  select o.id, o.title, o.company_name, o.score,
+         (select array_agg(sq.label order by sq.label)
+            from search_queries sq
+           where sq.id = any (o.found_by_query_ids)
+             and sq.trust = 'anchored' and sq.enabled) as ancrees
+  from offers_shortlist o
+  where o.core_hits = 0 and o.ai_hits = 0   -- entrées UNIQUEMENT par la confiance
+)
+select ancrees[1] as requete, count(*) as dont_elle_est_seule_responsable
+from marginales
+where array_length(ancrees, 1) = 1
+group by 1 order by 2 desc;
+```
+
+Remplacer les deux dernières lignes par `select requete, title, company_name,
+score from marginales where array_length(ancrees, 1) = 1 order by 1, score desc;`
+donne les intitulés, seul moyen de juger.
+
+**Ce qu'on en fait** : une requête ne se déclasse que si elle fait entrer une
+**majorité** de hors-sujet *et* que son déclassement ne coûte aucune offre
+pertinente ou adjacente. Le critère n'est pas « zéro bruit » : une offre hors
+sujet en bas d'une liste triée par score coûte peu, une offre pertinente jamais
+affichée coûte cher. C'est exactement ce raisonnement qui a fait déclasser
+`fr-react` et `fr-js` — coût nul — et **maintenir** `adzuna:local:javascript`
+malgré 7 hors-sujet sur 12, ses 5 adjacentes n'ayant aucune autre voie d'entrée.
+Compter les **annonces**, pas les lignes : le défaut P10 en triple certaines.
+
+Relevé du 2026-09-08 en fin de chantier, pour servir de point de comparaison :
+`adzuna:local:javascript` 13, `adzuna:remote:fr-ts` 12,
+`adzuna:local:typescript` 3, les autres 0.
+
+Corriger un classement passe par une **migration**, jamais par un `UPDATE` :
+c'est une donnée de référence, et la migration porte la mesure qui la justifie.
+
 Désactiver une requête : `update search_queries set enabled = false where label = '…';`
 Ajuster un poids : `update skill_lexicon set weight = … where term = '…';`
 Dans les deux cas, l'effet est immédiat sur les offres déjà collectées — le score
 est une vue.
+
+Désactiver une requête ancrée lui retire aussi sa **confiance** : depuis la
+migration `20260908080000`, `trusted_query` ne compte que les requêtes encore
+actives. Ce n'était pas le cas à la livraison du plan — la vue ignorait
+`enabled`, et le remède documenté ici n'aurait rien changé aux offres déjà
+entrées. En revanche `found_by_labels` continue d'afficher la requête
+désactivée : « elle a trouvé cette offre » reste un fait vrai.
+
+**Désactiver, jamais supprimer.** `found_by_query_ids` est un `int[]`, qui ne
+peut pas porter de clé étrangère : supprimer la ligne de `search_queries`
+retirerait son étiquette en silence et pourrait faire **sortir** une offre de
+la sélection. Et ne jamais réécrire les `keywords` d'une requête `anchored` —
+créer une nouvelle étiquette : l'id survit à la redéfinition, donc les offres
+déjà estampillées resteraient dignes de confiance sur la foi d'un texte de
+requête disparu, sans aucun signal.
 
 Régler la confiance d'une requête (`search_queries.trust`, `'anchored'` ou
 `'net'`) : **par migration seulement**, à la différence des deux réglages
@@ -615,6 +688,20 @@ sur `offers_shortlist`, une fois la migration poussée.
 
 **Ordre d'écriture, à ne pas confondre avec un ordre d'importance** : `priority`
 croissante décide de l'ordre d'exécution, et comme l'upsert écrase, **la
-dernière requête à voir une offre fixe ses colonnes** — provenance et
-`remote_label` compris. Les requêtes les plus informatives doivent donc passer
-en dernier.
+dernière requête à voir une offre fixe ses colonnes scalaires** —
+`remote_label`, `search_origin_insee`, `search_radius_km`. Les requêtes les
+plus informatives doivent donc passer en dernier.
+
+**Attention à un mot qui porte deux sens dans ce dépôt.** Le code appelle
+« provenance » deux choses différentes, et elles ne s'écrivent pas de la même
+façon :
+
+| Ce que le code nomme ainsi | Ce que c'est | Comment ça s'écrit |
+|---|---|---|
+| `provenanceOf()`, `FtProvenance`, `AdzunaProvenance` (mappers) | la commune INSEE et le rayon de la requête | **dernier écrivain gagne** |
+| `UpsertProvenance` (`_shared/upsert.ts`) | l'**id de la requête** qui a ramené l'offre | **union**, jamais écrasée |
+
+La phrase ci-dessus ne vaut donc que pour la première. `found_by_query_ids`
+échappe entièrement à l'ordre d'exécution : c'est tout l'objet de la décision
+de conception « un ensemble, pas un scalaire » — la relire plus haut dans ce
+document avant de toucher aux `priority` en croyant déplacer la confiance.
