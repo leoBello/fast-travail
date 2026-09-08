@@ -1824,6 +1824,18 @@ zéro sur les cinq appels, le cache ne prend pas : vérifier que le bloc systèm
 porte bien `cache_control` et qu'il dépasse ~1 024 tokens. Ne pas poursuivre
 l'amorçage avant d'avoir tranché ce point — il décide du coût réel.
 
+**Déjà vérifié en tâche 6, avec deux nuances mesurées** : un essai local a rendu
+`cacheReadTokens: 8640`, donc le cache **prend bien** — le risque numéro un du
+design est écarté. Mais (a) la durée de vie du cache est de **5 minutes**, or
+le cron tourne une fois par jour : le cache sera donc **froid à chaque
+exécution quotidienne**, et seul l'amorçage, dont les lots s'enchaînent, en
+profite pleinement ; (b) avec une concurrence de N, les **N premiers** appels
+d'une vague partent tous sur un cache vide et paient la prime d'écriture — une
+entrée n'est lisible qu'une fois la première réponse commencée. Sur 41 offres
+à concurrence 4, cela fait 4 écritures et ~37 lectures, pas 1 et 40. Un
+`cacheReadTokens` à zéro sur un **premier** appel isolé est donc normal et ne
+prouve rien : c'est sur les appels suivants qu'il faut le lire.
+
 - [ ] **Étape 2 : lire quelques jugements à la main**
 
 ```bash
@@ -1865,6 +1877,28 @@ Le jeton est la clé **anon**, lue depuis Vault, comme les deux crons existants 
 le job n'a besoin que de franchir `verify_jwt`, la fonction recevant sa propre
 clé `service_role` de Supabase. Moindre privilège.
 
+**Trois faits mesurés en tâche 6, à connaître avant d'écrire cette migration :**
+
+1. **Le corps du cron est `{"limit":60,"concurrency":4}`**, pas 120. Mesuré :
+   4,71 s par appel, donc 120 offres à concurrence 4 font 141 s contre un
+   plafond de 150 s. Le code borne désormais `limit` à `concurrency * 25` —
+   un `{"limit":120}` serait **silencieusement rabattu à 100**, et l'opérateur
+   croirait en avoir demandé 120. Avec 60, on tient en ~70 s, deux fois la
+   marge, et le flux quotidien réel (~41 offres) passe largement.
+2. **Un `500` de la fonction ne fera PAS échouer le job `pg_cron`.**
+   `net.http_post` est asynchrone : il rend un identifiant de requête et
+   réussit quelle que soit la réponse HTTP, donc `cron.job_run_details`
+   affichera « succeeded » même sur une erreur. Le statut réel n'atterrit que
+   dans `net._http_response`. La fonction répond bien 500 quand des jugements
+   payés n'ont pas pu être écrits (`writeFailures > 0`) — mais pour le voir,
+   il faut relire `net._http_response.status_code`. La recette de surveillance
+   de la tâche 9 doit le faire.
+3. **`timeout_milliseconds` de `pg_net` vaut 5 000 ms par défaut**, alors que
+   le scoring quotidien prendra ~70 s. Comme pour les collectes actuelles,
+   l'appel partira et la fonction s'exécutera jusqu'au bout, mais la réponse ne
+   sera pas enregistrée — donc `writeFailures` serait invisible. Passer un
+   `timeout_milliseconds` explicite dans l'appel.
+
 ```sql
 select cron.schedule(
   'score-daily',
@@ -1876,7 +1910,8 @@ select cron.schedule(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets where name = 'cron_auth_key')
     ),
-    body := '{"limit":120,"concurrency":4}'::jsonb
+    body := '{"limit":60,"concurrency":4}'::jsonb,
+    timeout_milliseconds := 120000
   );
   $$
 );
