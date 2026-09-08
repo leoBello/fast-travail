@@ -66,9 +66,13 @@ des délais de politesse n'y tient pas. Le code partagé
 l'environnement, la configuration lui est injectée, et les scripts Deno des
 scrapers l'importent tel quel.
 
-**Trois axes réglables, tous en données** — rayon géographique, matrice de
-requêtes, lexique de compétences. Les ajuster est un `UPDATE`, jamais un
-redéploiement ni une re-collecte.
+**Cinq axes réglables, tous en données** — rayon géographique, matrice de
+requêtes, lexique de compétences, et depuis la phase 2 les poids de
+préférence (`scoring_weights`) et les compétences du profil
+(`profile_skills`). Les ajuster est un `UPDATE`, jamais un redéploiement ni
+une re-collecte — avec **une exception qui compte** : toucher
+`profile_skills` change le CV envoyé au modèle, donc impose de faire évoluer
+`profile_version` et **repaie** les offres. Détail dans [`../CLAUDE.md`](../CLAUDE.md).
 
 ---
 
@@ -92,15 +96,37 @@ Le scoring lexical, gratuit et déterministe, est déjà livré dans cette phase
 Il n'était pas prévu au brief initial comme filtre principal — la mesure l'a
 promu à ce rôle (voir « Ce que la mesure a démenti »).
 
-### Phase 2 — Scoring IA
+### Phase 2 — Scoring IA *(livrée le 2026-09-08)*
 
-Faire lire chaque offre retenue par Claude Haiku, pour juger l'adéquation au CV
-au-delà des correspondances de mots. Le score lexical ne disparaît pas : il
-devient le **pré-filtre qui décide quelles offres méritent un appel payant**.
-Bien régler les poids en phase 1 réduit donc directement le coût de la phase 2.
+Chaque offre du **périmètre géographique** est lue par `claude-sonnet-5`, qui
+juge une seule chose : la **correspondance de compétences** avec le CV. Ce
+verdict est écrit une fois dans `offer_ai_scores` et n'est jamais recalculé.
+Les préférences — freelance, télétravail, TJM, durée, agentique, technos non
+désirées, fraîcheur — sont quatorze lignes de `scoring_weights` appliquées par
+la vue `offers_scored`.
 
-Introduit une table de profil / CV structuré, délibérément absente de la phase 1
-puisqu'elle n'y aurait servi à rien.
+**Ce partage est le principe de la phase**, et il découle du coût : un verdict
+d'IA est figé au moment de l'appel, le reproduire coûte de l'argent ; une
+préférence change d'avis gratuitement. Les mélanger dans un seul score aurait
+rendu tout ajustement payant. Régler un poids reclasse donc tout le corpus par
+un `UPDATE`, comme le rayon et le lexique en phase 1 — c'est le même principe
+« score en vue, pas en colonne » appliqué à une matière qu'on ne peut pas
+recalculer.
+
+La table de profil / CV structuré, absente de la phase 1 puisqu'elle n'y aurait
+servi à rien, arrive ici : `candidate_profile` (CV expurgé de toute coordonnée)
+et `profile_skills` (16 compétences, `core` / `adjacent` / `unwanted`).
+
+Design : [`specs/2026-09-08-scoring-ia-phase2-design.md`](superpowers/specs/2026-09-08-scoring-ia-phase2-design.md).
+Plan : [`plans/2026-09-08-scoring-ia-phase2.md`](superpowers/plans/2026-09-08-scoring-ia-phase2.md).
+Mesures, décisions et défauts trouvés en revue : [`ETAT.md`](ETAT.md), section
+« Phase 2 — Scoring IA ».
+
+**Ce que ce document affirmait, et que la mesure a démenti** — voir ci-dessous,
+« Le pré-filtre lexical n'avait pas de raison d'être ». Deux autres corrections
+au passage : le modèle n'est pas Haiku mais Sonnet 5 (l'écart mesuré était de
+4 €/mois, un prix dérisoire pour un jugement nuancé sur du français ambigu), et
+le coût réel est de **~12 €/mois, pas 6** — voir « Ce que la mesure a démenti ».
 
 ### Phase 3 — Tableau de bord
 
@@ -126,9 +152,12 @@ entre la veille et la candidature.
 
 ## Ce que la mesure a démenti
 
-Deux suppositions du design initial se sont révélées fausses face à l'API
-réelle. Elles sont consignées ici parce qu'elles orientent toute décision
-future sur les sources.
+Plusieurs suppositions de ce document se sont révélées fausses face au réel.
+Elles sont consignées ici parce qu'elles orientent toute décision future — et
+parce que certaines démentent ce que ce document affirmait lui-même. Elles
+portent sur les sources, sauf les **deux dernières**, qui portent sur le
+scoring IA de la phase 2 et sont les plus coûteuses des deux points de vue —
+l'une en offres jamais lues, l'autre en euros.
 
 **`motsCles` de France Travail n'indexe pas les technologies.** Mesuré à
 Marseille, rayon 40 km, 31 jours : `React` 0 offre, `TypeScript` 0, `Next.js` 0,
@@ -196,6 +225,47 @@ c'est pourquoi les facettes Free-Work sont restées `net` et non `anchored`
 projet faute de source la renseignant, cesse de l'être — 34 offres sur 105 en
 portent un.
 
+**Le pré-filtre lexical n'avait pas de raison d'être, et ce document le
+prescrivait.** La phase 2 était décrite ici ainsi : « le score lexical devient
+le pré-filtre qui décide quelles offres méritent un appel payant ». Cette
+phrase reposait sur une prémisse — l'appel est cher — qui n'a jamais été
+mesurée avant d'être écrite.
+
+Mesurée le 2026-09-08, elle est fausse. Faire lire **tout** le périmètre
+géographique par Sonnet 5 coûte de l'ordre de 12 € par mois, et l'amorçage
+complet de 1 269 offres a coûté **11,70 € une fois**, soit **1 centime par
+offre**. À ce prix, le pré-filtre n'économise rien qui vaille son inconvénient
+— et son inconvénient était grave : sur les 1 269 offres du périmètre
+géographique, `offers_shortlist` n'en retenait que 87. **1 182 offres à portée
+n'étaient lues par personne.** C'était le seul endroit du système où le critère
+fondateur du dépôt (« une offre jamais affichée est perdue ») était violé, et
+il l'était en silence.
+
+Le jugement a posteriori tranche : **6 des 19 offres notées 70 ou plus, et 53
+des 81 notées plus de 50, ne sont pas dans `offers_shortlist`**. Sous l'ancien
+contrat, elles n'auraient jamais été lues. Le lexique n'a pas disparu — il
+reste un signal de tri, et il gouverne toujours `offers_shortlist` — mais il a
+cessé d'être une **porte**. Le périmètre de lecture de l'IA est
+`department in ('13','83','84') or remote_label = 'full'`.
+
+Corollaire de méthode, qui vaut au-delà de cette phase : **un pré-filtre ne se
+justifie que par un coût mesuré**. Celui-ci a été prescrit sur une intuition de
+prix, et il a coûté au projet exactement ce qu'il prétendait protéger — de la
+visibilité sur des offres pertinentes.
+
+**Le coût annoncé était le double dans l'autre sens : 6 €/mois prévus, ~12 €
+réels.** Cette fois c'est le design de la phase 2 qui s'est trompé, et la cause
+mérite d'être retenue parce qu'elle se reproduira. Le volume était bien estimé ;
+c'est la **sortie** qui a doublé — 434 tokens par offre au lieu des ~250
+prévus, parce que `claude-sonnet-5` émet un bloc de réflexion **facturé en
+sortie**. Sur les 12,68 $ de l'amorçage, 8,26 $ sont de la sortie, contre
+2,79 $ d'entrée fraîche et 1,64 $ de cache : **la sortie pèse 65 % de la
+facture**, là où l'estimation regardait surtout l'entrée. Toute estimation
+future sur un modèle qui raisonne doit budgéter le raisonnement.
+
+Le cache de prompt, lui, a tenu sa promesse : **85 % de l'entrée servie à un
+dixième du tarif**. C'était le risque numéro un du design.
+
 ---
 
 ## Décisions structurantes, et leur raison
@@ -208,8 +278,11 @@ portent un.
 | Données de référence par migration, pas `seed.sql` | Il n'y a pas de base locale, `seed.sql` ne s'exécuterait jamais |
 | Payload brut conservé en `jsonb` | Permet de rétro-classer l'historique sans re-collecter — déjà utilisé une fois |
 | Score en **vue**, pas en colonne | Modifier un poids recalcule tout, sans re-collecte |
+| Jugement IA **figé** en table, préférences **réglables** en vue | Un verdict d'IA se repaie, une préférence non. Les mélanger aurait rendu tout ajustement payant |
+| L'IA juge la **compétence seule**, jamais le télétravail ni le TJM | Ce sont des préférences, elles changent d'avis. Vérifié sur les verdicts réels : aucun ne les mentionne |
+| Périmètre de lecture **géographique**, pas lexical | Le pré-filtre lexical écartait 1 182 offres à portée pour économiser un coût d'un centime par offre |
 | Département plutôt que distance pour filtrer | Les coordonnées manquent trop souvent ; le département est déductible du libellé |
-| `java` et `angular` en contexte (+1), pas en signal rouge | Un rouge écarterait les offres « React + Java Spring », un vrai marché. Et une offre Java pure a zéro `core_hits`, donc déjà hors filtre |
+| `java` et `angular` en contexte (+1), pas en signal rouge | Un rouge écarterait les offres « React + Java Spring », un vrai marché. Et une offre Java pure a zéro `core_hits`, donc déjà hors filtre. **⚠ La phase 2 contredit partiellement cette décision** : `profile_skills` classe `java` en `unwanted` et lui retire 15 points. Mesuré, une offre à `fit_score` 80 tombe à 38 — voir P15 dans [`ETAT.md`](ETAT.md) |
 | RLS activé partout, zéro policy | Sans lui, la clé `anon`, publique par nature, lirait toute la base |
 
 ---

@@ -20,8 +20,21 @@ Mesuré le 2026-09-08, sur la base réelle :
 | Offres franchissant le filtre **géographique** mais écartées par le lexique | **1 182** |
 | Flux en régime permanent (retenues par jour de publication, 13 jours) | **4 à 5 / jour** |
 | Flux géographiquement éligible | **~41 / jour** |
-| Coût mensuel Sonnet 5 sur le périmètre géographique, cache compris | **~6 €/mois** |
-| Coût d'amorçage, une fois | **~6 €** |
+| Coût mensuel Sonnet 5 sur le périmètre géographique, cache compris | ~~**~6 €/mois**~~ **~12 €/mois** *(corrigé, voir ci-dessous)* |
+| Coût d'amorçage, une fois | ~~**~6 €**~~ **11,70 € mesurés** |
+
+> **Corrigé le 2026-09-08, après l'amorçage réel : ces deux estimations étaient
+> la moitié du coût réel.** L'amorçage de 1 269 offres a coûté **12,68 $ ≈
+> 11,70 €**, soit 1 centime par offre — 929 337 tokens d'entrée fraîche,
+> 5 456 160 lus en cache, **550 520 en sortie**. Le volume estimé ici était
+> juste ; c'est la **sortie** qui a doublé : **434 tokens par offre au lieu des
+> ~250 prévus**, parce que `claude-sonnet-5` émet un bloc de réflexion
+> **facturé en sortie**. Décomposition : 8,26 $ de sortie contre 2,79 $
+> d'entrée fraîche et 1,64 $ de cache — la sortie pèse **65 %** de la facture,
+> là où cette estimation regardait surtout l'entrée. Leçon pour toute
+> estimation future : **sur un modèle qui raisonne, budgéter le raisonnement.**
+> Le cache, lui, a tenu sa promesse — 85,4 % de l'entrée servie à un dixième
+> du tarif. Détail dans [`../../ETAT.md`](../../ETAT.md), section « Phase 2 ».
 
 **Conséquence : le pré-filtre lexical perd sa raison d'être comme porte.**
 Il écarte aujourd'hui 1 182 offres à portée géographique que personne n'a
