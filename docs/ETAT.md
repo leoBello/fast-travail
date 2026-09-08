@@ -586,12 +586,62 @@ la base plutôt que le fichier.
 
 ---
 
-## Décisions en attente
+## Ordre de travail decide (2026-09-08)
 
-Aucune. Les dernières tranchées : matrice Adzuna en requêtes précises avec full
-remote garanti par la requête, `category=it-jobs` conservé comme filet en
-première position d'écriture, `angular` et `java` à +1 en contexte, `cobol` en
-signal rouge.
+**1. Le dedoublonnage (P10 + P6), des que le chantier plan B est termine.**
+Les deux se concoivent ensemble : c'est le meme probleme vu de deux cotes,
+la meme annonce sous deux `external_id` dans une source, et la meme annonce
+vue par deux sources.
+
+Mesure du 2026-09-08 sur 1 399 offres, casse et suffixes « (H/F) »
+normalises :
+
+| | Groupes | Offres | En exces |
+|---|---:|---:|---:|
+| **Intra**-source (P10) | 57 | 139 | 82 |
+| **Inter**-sources (P6) | 21 | 49 | — |
+
+Repartition des groupes inter-sources par paire : **adzuna + france_travail
+14**, adzuna + free_work 4, france_travail + free_work 3.
+
+Ce dernier chiffre corrige une impression du document : P6 n'attendait pas
+l'arrivee des scrapers pour etre reel. **Les deux API se recouvrent deja sur
+14 annonces**, et personne ne l'avait mesure — la meme offre d'ESN publiee sur
+les deux canaux. L'arrivee de Free-Work n'ajoute que 7 groupes pour l'instant,
+mais elle republie beaucoup d'annonces d'ESN qui paraissent aussi sur France
+Travail : le gisement grossira quand Collective entrera. La tache 12 du plan B
+le chiffrera, on partira d'un nombre et non d'une intuition.
+
+Ces nombres gonflent a chaque collecte : **les remesurer au demarrage, ne pas
+les recopier.**
+
+Cette tache a un **ordre impose**, seule de la liste : elle touche
+`_shared/upsert.ts`, que les scrapers du plan B importeront. La faire avant
+que trois sources de plus s'y branchent coute nettement moins cher que de la
+retrofiter sur six.
+
+**2. La phase 2, le scoring IA — precedee d'un brainstorming.**
+Leo a des changements prevus sur cette phase : **ne pas partir du ROADMAP tel
+quel**, refaire un brainstorming d'abord. Ce qui est acquis en revanche, c'est
+que la phase 2 n'etait pas lancable avant : elle consomme `offers_shortlist`
+comme pre-filtre decidant quelles offres meritent un appel payant, or ce
+contrat bougeait encore. Il est stable depuis ce chantier, et son cout est
+enfin chiffrable.
+
+**Peuvent se glisser n'importe quand**, aucune collision avec le plan B :
+P3 (pagination latente de France Travail, qui perdrait des offres en silence)
+et P1 (geocodage par `commune_insee`, pour regler le rayon au kilometre plutot
+qu'au departement).
+
+## Decisions en attente
+
+Aucune. Les dernieres tranchees : matrice Adzuna en requetes precises avec full
+remote garanti par la requete, `category=it-jobs` conserve comme filet en
+premiere position d'ecriture, `angular` et `java` a +1 en contexte, `cobol` en
+signal rouge. Et pour ce chantier : un ensemble de requetes plutot qu'un
+scalaire, `adzuna:local:javascript` maintenue `anchored` malgre sa majorite de
+hors sujet, son declassement coutant 5 offres adjacentes sans autre voie
+d'entree.
 
 ---
 
