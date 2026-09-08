@@ -53,3 +53,47 @@ Deno.test('les jokers et la règle du motif le plus long sont respectés', () =>
 Deno.test('un fichier vide autorise tout', () => {
   assert(parseRobots('', UA).allows('/quoi-que-ce-soit'));
 });
+
+Deno.test('un motif ancré par $ ne matche que le chemin exact', () => {
+  const rules = parseRobots(['User-agent: *', 'Disallow: /foo$'].join('\n'), UA);
+  assertEquals(rules.allows('/foo'), false);
+  assert(rules.allows('/foo/bar'));
+});
+
+Deno.test("Allow l'emporte sur Disallow à motif de même longueur", () => {
+  // « /a*c » et « /abc » ont tous deux 4 caractères. Les deux matchent
+  // « /abc » : à égalité de longueur, Allow doit l'emporter.
+  const rules = parseRobots(
+    ['User-agent: *', 'Disallow: /a*c', 'Allow: /abc'].join('\n'),
+    UA,
+  );
+  assert(rules.allows('/abc'));
+});
+
+Deno.test("plusieurs User-agent: empilées s'appliquent toutes au même groupe", () => {
+  const rules = parseRobots(
+    [
+      `User-agent: ${UA}`,
+      'User-agent: SomeOtherBot',
+      'Disallow: /private',
+    ].join('\n'),
+    UA,
+  );
+  assertEquals(rules.allows('/private'), false);
+  assert(rules.allows('/public'));
+});
+
+Deno.test('une directive intercalée entre deux User-agent: ferme la liste en cours', () => {
+  // Le Crawl-delay clôt le groupe de fast-travail avant que SomeOtherBot ne
+  // démarre le sien : notre agent ne doit pas hériter du Disallow ci-dessous.
+  const rules = parseRobots(
+    [
+      `User-agent: ${UA}`,
+      'Crawl-delay: 5',
+      'User-agent: SomeOtherBot',
+      'Disallow: /private',
+    ].join('\n'),
+    UA,
+  );
+  assert(rules.allows('/private'));
+});

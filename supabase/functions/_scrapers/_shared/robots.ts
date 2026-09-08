@@ -15,11 +15,14 @@ interface Rule {
 }
 
 function toRegExp(pattern: string): RegExp {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\?]/g, '\\$&');
+  // Le `$` de fin d'ancrage doit être détecté sur le motif BRUT, avant tout
+  // échappement : une fois échappé, il devient les deux caractères `\$` et
+  // n'est plus reconnaissable comme ancre par `endsWith`.
+  const endAnchored = pattern.endsWith('$');
+  const body = endAnchored ? pattern.slice(0, -1) : pattern;
+  const escaped = body.replace(/[.+^${}()|[\]\\?]/g, '\\$&');
   const withWildcards = escaped.replace(/\*/g, '.*');
-  const anchored = withWildcards.endsWith('$')
-    ? `^${withWildcards.slice(0, -1)}$`
-    : `^${withWildcards}`;
+  const anchored = endAnchored ? `^${withWildcards}$` : `^${withWildcards}`;
   return new RegExp(anchored);
 }
 
@@ -53,8 +56,8 @@ export function parseRobots(text: string, userAgent: string): RobotsRules {
       continue;
     }
 
-    if (field !== 'allow' && field !== 'disallow') continue;
     expectingAgents = false;
+    if (field !== 'allow' && field !== 'disallow') continue;
     if (currentTargets === null) continue;
     // « Disallow: » vide veut dire « rien n'est interdit » : on ignore la ligne.
     if (field === 'disallow' && value === '') continue;
