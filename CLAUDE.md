@@ -10,6 +10,8 @@ React / TypeScript, zone Marseille / Aix-en-Provence et full-remote national.
 | [`docs/ETAT.md`](docs/ETAT.md) | **Où on en est, ce qui reste, problèmes ouverts priorisés.** À lire en premier pour reprendre le travail |
 | [`docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md`](docs/superpowers/specs/2026-09-07-collecte-offres-phase1-design.md) | Design détaillé de la phase 1 |
 | [`docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md`](docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md) | Plan d'implémentation, tâche par tâche |
+| [`docs/superpowers/specs/2026-09-08-scoring-ia-phase2-design.md`](docs/superpowers/specs/2026-09-08-scoring-ia-phase2-design.md) | Design de la phase 2, le scoring IA |
+| [`docs/superpowers/plans/2026-09-08-scoring-ia-phase2.md`](docs/superpowers/plans/2026-09-08-scoring-ia-phase2.md) | Plan de la phase 2, tâche par tâche |
 
 **Tenir `ETAT.md` à jour** fait partie du travail : chaque tâche terminée, chaque
 problème découvert et chaque décision prise y sont consignés. C'est le document
@@ -325,6 +327,99 @@ marché sans la rendre linéaire, puis la suppression de l'auto-jointure au
 profit d'une fonction de fenêtrage, qui a fait tomber le produit de
 719 879 lignes filtrées à 703.
 
+## Consulter les offres jugées par l'IA
+
+C'est la recette à préférer depuis la phase 2 : `offers_shortlist` répond à
+« qu'est-ce que le lexique a reconnu », `offers_scored` à « qu'est-ce qui
+correspond au CV ». Les deux ne se recouvrent pas — remesuré le 2026-09-08 au
+soir, après les correctifs de la revue finale, **5 des 17** offres notées 70 ou
+plus et **33 des 61** notées plus de 50 sont **absentes** d'`offers_shortlist`.
+Ces quatre nombres bougent à chaque collecte *et* à chaque migration qui touche
+au barème (`20260909040000` a changé les `final_score` eux-mêmes) : les
+recompter, jamais les recopier — la recette est dans `docs/ETAT.md`.
+
+```sql
+select title, company_name, city, final_score, fit_score, engagement, work_mode,
+       compensation_min, compensation_max, duration_months, agentic_ai,
+       confidence, truncated_input, verdict
+from offers_scored
+order by final_score desc, published_at desc
+limit 40;
+```
+
+`final_score` **combine deux natures de chose**, et c'est le seul point à
+comprendre avant de s'en servir :
+
+| | Qui le produit | Nature | Coût d'un changement d'avis |
+|---|---|---|---|
+| `fit_score` et `verdict` | `claude-sonnet-5`, une fois, à l'écriture | **Figé** | Repaie les offres concernées |
+| Les bonus et malus (`bonus_remote`, `malus_technos`…) | La vue, en lisant `scoring_weights` | **Réglable** | `UPDATE`, gratuit, rétroactif |
+
+L'IA ne juge que la **correspondance de compétences**. Elle ne sait rien de vos
+préférences sur le télétravail, le TJM ou la durée — c'est vérifiable dans les
+verdicts, qui n'en parlent jamais. Ces sept préférences sont quatorze lignes de
+`scoring_weights`, appliquées par la vue.
+
+**`confidence = 'basse'` signale une offre jugée sur un texte tronqué**, pas
+une offre douteuse. Adzuna coupe toute description à 500 caractères et refuse
+le scraping de la page d'origine (403 sur tout, `robots.txt` compris) : le
+modèle reçoit donc la mention explicite que le texte est incomplet, et il doit
+répondre `basse` **au lieu de rejeter**. Mesuré le 2026-09-08 : 539 offres sur
+1 269 en confiance basse, et `truncated_input` vaut vrai sur exactement les 557
+offres Adzuna du périmètre. Une offre en confiance basse avec un bon
+`final_score` mérite qu'on aille lire l'annonce, pas qu'on l'écarte.
+
+**Ce qu'un `UPDATE` coûte, et ce qu'il ne coûte pas** — la distinction qui fait
+toute la valeur du dispositif :
+
+| Ce qu'on change | Ce qu'il faut faire | Ce que ça coûte |
+|---|---|---|
+| Un poids de préférence | `UPDATE scoring_weights` | **Rien.** Tout le corpus est reclassé au prochain `select` |
+| Les consignes de jugement | Éditer le prompt **et** incrémenter `PROMPT_VERSION` | **Repaie** toutes les offres, ~1 centime pièce |
+| Le CV ou `profile_skills` | Migration **et** nouveau `profile_version` | **Repaie** toutes les offres |
+
+La sélection des candidates se fait sur `(prompt_version, profile_version)` :
+une offre déjà jugée sous les versions courantes n'est jamais rappelée. Changer
+l'une des deux versions **sans** vouloir repayer est donc impossible, et c'est
+délibéré — un corpus jugé sous deux prompts différents ne se compare pas.
+Éditer le prompt **sans** faire évoluer `PROMPT_VERSION` est le piège inverse,
+et le pire des deux : les anciens jugements restent, les nouveaux arrivent sous
+d'autres consignes, et rien ne distingue les deux populations.
+
+**Le piège de réglage, mesuré** : `final_score` est écrêté par
+`least(100, …)`, et le plafond **absorbe** les réglages sur les offres déjà
+fortes. Monter un poids ne change rien à une offre déjà à 100 — mesuré le
+2026-09-08, 3 offres y sont exactement, et les 8 offres à 90 ou plus ne
+portent que 5 valeurs distinctes. **Juger l'effet d'un poids sur les rangs, ou
+sur les colonnes de détail, jamais sur la moyenne** : un attendu du type
+« après > avant » conclurait à tort à un échec. La bonne sonde :
+
+```sql
+select title, final_score, bonus_remote, bonus_remuneration, malus_technos,
+       rank() over (order by final_score desc) as rang
+from offers_scored order by final_score desc limit 20;
+```
+
+**Coût de la vue** : environ **26 ms** (`explain analyze`, deux `Hash Join`,
+`loops=1`), contre ~0,76 s pour `offers_shortlist`. Le jugement est déjà
+matérialisé en table ; il n'y a plus de recherche plein texte dans le chemin.
+On peut donc la recombiner sans les précautions `materialized` qu'exigent les
+vues de la phase 1.
+
+**Une offre dont le jugement a échoué n'apparaît nulle part.** Elle écrit sa
+ligne dans `offer_ai_scores` avec `fit_score` nul — c'est voulu, sans quoi elle
+reviendrait indéfiniment dans la file et serait re-payée — mais `offers_scored`
+l'exclut et aucune vue ne la signale. Le seul moyen de savoir :
+
+```sql
+select s.offer_id, o.title, s.error, s.scored_at
+from offer_ai_scores s join offers o on o.id = s.offer_id
+where s.error is not null order by s.scored_at desc;
+```
+
+Cette requête doit rendre **0 ligne**. Elle en a rendu 75 pendant l'amorçage,
+et personne ne l'aurait su sans aller la poser (voir P16 dans `ETAT.md`).
+
 Les axes réglables sont des **lignes en base**, jamais du code :
 
 | Axe | Où | Comment l'ajuster |
@@ -332,13 +427,26 @@ Les axes réglables sont des **lignes en base**, jamais du code :
 | Rayon | `search_queries.radius_km` | `UPDATE` |
 | Matrice de requêtes | `search_queries` | `UPDATE`, mais voir ci-dessous |
 | Lexique | `skill_lexicon` | `UPDATE` |
+| **Poids de préférence** | `scoring_weights` | `UPDATE`, gratuit et rétroactif |
 | **Confiance par requête** | `search_queries.trust` | **migration** |
+| **Compétences du profil** | `profile_skills` | **migration**, et ça **repaie** |
 
-Les trois premiers s'ajustent par un `UPDATE`, sans redéploiement ni
-re-collecte : le score est une vue. Le quatrième est une **donnée de
-référence** au même titre que la matrice, et un reclassement se justifie par
-une mesure : il passe donc par une migration, qui porte cette mesure en
-commentaire. Deux requêtes ont déjà été déclassées ainsi.
+Les quatre premiers s'ajustent par un `UPDATE`, sans redéploiement ni
+re-collecte : le score est une vue. `scoring_weights` est le seul de ce
+chantier à coûter zéro — c'est pour ça que les préférences y ont été mises
+plutôt que dans le prompt.
+
+`search_queries.trust` est une **donnée de référence** au même titre que la
+matrice, et un reclassement se justifie par une mesure : il passe donc par une
+migration, qui porte cette mesure en commentaire. Deux requêtes ont déjà été
+déclassées ainsi.
+
+`profile_skills` est le seul axe **payant**. Ses 16 termes partent dans le
+prompt avec le CV : les modifier change ce que le modèle a lu, donc impose de
+faire évoluer `profile_version`, donc **repaie les 1 269 offres** (~1 centime
+pièce). Ne pas faire évoluer la version serait pire que de payer : le corpus
+porterait deux populations jugées sur deux profils différents, sans rien pour
+les distinguer.
 
 Deux pièges de manipulation, tous deux sans garde-fou en base :
 

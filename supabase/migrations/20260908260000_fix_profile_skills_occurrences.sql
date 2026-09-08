@@ -1,0 +1,29 @@
+-- Correctif de deux comptes faux dans profile_skills, semee par la migration
+-- 20260908250000_candidate_profile.sql, trouve en revue et reverifie contre
+-- docs/profil/CV_Leo_Bello_Front-End_Senior.pdf le 2026-09-08.
+--
+-- METHODE (celle qui donne les comptes deja confirmes : react 7, typescript
+-- 6, angular 1, java 2, python 0) : occurrences = nombre d'experiences
+-- professionnelles DATEES (8 au total dans le CV) ou le terme apparait
+-- litteralement, pas le nombre d'occurrences textuelles brutes.
+--
+-- node.js : 3 -> 2. Le terme n'apparait litteralement que dans deux des 8
+-- experiences : Yooz (mai 2022 - mai 2023, titre "React / Node.js" et corps
+-- "React, TypeScript et Node.js") et la mission freelance (octobre 2021 -
+-- mai 2022, titre "React / Node.js" et corps "React, TypeScript et
+-- Node.js"). L'experience Saisoneo en cours (fevrier 2026 - aujourd'hui) dit
+-- son back-end en Next.js, jamais litteralement "Node.js" : elle ne compte
+-- pas.
+--
+-- next.js : 2 -> 1. Le terme n'apparait litteralement que dans une seule
+-- experience datee : Saisoneo (fevrier 2026 - aujourd'hui), a la fois dans
+-- son titre ("Developpeur Full Stack React / Next.js / TypeScript") et dans
+-- son corps ("back-end Next.js avec Supabase et PostgreSQL"). Ces deux
+-- mentions sont dans la MEME experience ; la methode compte des experiences
+-- distinctes, pas des occurrences de texte, d'ou 1 et non 2.
+--
+-- Ecriture idempotente : un UPDATE conditionne sur l'ancienne valeur fausse
+-- ne fait rien s'il est rejoue, ou si la ligne a deja ete corrigee par
+-- ailleurs.
+update profile_skills set occurrences = 2 where term = 'node.js' and occurrences = 3;
+update profile_skills set occurrences = 1 where term = 'next.js' and occurrences = 2;
