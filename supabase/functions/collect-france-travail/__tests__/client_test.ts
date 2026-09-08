@@ -299,27 +299,27 @@ function stuckPaginationFetch(calls: { count: number; ranges: string[] }): typeo
 }
 
 Deno.test(
-  "fetchAllPages échoue plutôt que de boucler indéfiniment quand une page ne renvoie plus d'offre neuve",
+  'fetchAllPages termine ET garde ses offres quand une page ne renvoie plus rien de neuf',
   async () => {
     const calls = { count: 0, ranges: [] as string[] };
 
-    let message = '';
-    try {
-      await fetchAllPages({
-        query: localQuery,
-        mode: 'delta',
-        token: 'tok',
-        fetchImpl: stuckPaginationFetch(calls),
-        sleepImpl: noSleep,
-      });
-    } catch (e) {
-      message = (e as Error).message;
-    }
+    const result = await fetchAllPages({
+      query: localQuery,
+      mode: 'delta',
+      token: 'tok',
+      fetchImpl: stuckPaginationFetch(calls),
+      sleepImpl: noSleep,
+    });
 
-    // La garde doit arrêter la boucle dès la page sans offre neuve, pas après
-    // un nombre indéterminé d'itérations : la preuve de terminaison est que
-    // seuls deux appels ont eu lieu.
+    // Deux appels : la preuve de terminaison. Une boucle non bornée en ferait
+    // un nombre indéterminé.
     assertEquals(calls.count, 2);
-    assertEquals(message.length > 0, true);
+
+    // Et surtout : les 1 100 offres déjà obtenues sont RENDUES, pas jetees.
+    // C'est le coeur du choix `break` plutot qu'exception — le decrochage
+    // n'arrive qu'après un millier d'offres reelles, et le cout de ce projet
+    // est asymetrique : une offre jamais affichee coute cher.
+    assertEquals(result.offers.length, 1100);
+    assertEquals(result.totalAvailable, 5000);
   },
 );

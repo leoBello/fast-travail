@@ -1134,10 +1134,12 @@ comme pre-filtre decidant quelles offres meritent un appel payant, or ce
 contrat bougeait encore. Il est stable depuis ce chantier, et son cout est
 enfin chiffrable.
 
-**Peuvent se glisser n'importe quand**, aucune collision avec le plan B :
-P3 (pagination latente de France Travail, qui perdrait des offres en silence)
-et P1 (geocodage par `commune_insee`, pour regler le rayon au kilometre plutot
-qu'au departement).
+**P3 est fait** (2026-09-08) : la pagination avançait par pas fixes et
+perdait des offres en silence — un test l'a chiffré à 50 offres manquantes
+sur 370. Corrigé et prouvé par une collecte réelle.
+
+**Le reste est consigné dans [`RESTE-A-FAIRE.md`](RESTE-A-FAIRE.md)**, avec
+pour chaque entrée ce qu'elle coûte, ce qu'elle rapporte et quand la faire.
 
 ## Decisions en attente
 

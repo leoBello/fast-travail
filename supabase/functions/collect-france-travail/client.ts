@@ -170,11 +170,26 @@ export async function fetchAllPages(args: {
     // maintenant que la position suivante dépend de `collected.length` — si
     // une page ne renvoie que du recouvrement (aucune offre neuve), cette
     // position n'avance plus et la même requête se répéterait indéfiniment.
-    if (collected.length === collectedBefore) {
-      throw new Error(
-        `France Travail : pagination bloquée, aucune offre neuve reçue — ${args.query.label}`,
-      );
-    }
+    //
+    // Honnêteté sur sa portée, vérifiée en déroulant les cas à la main : avec
+    // les constantes actuelles cette garde n'est PAS atteignable. Tant que
+    // `start <= FT_MAX_RESULTS - FT_PAGE_SIZE`, le recadrage est neutre, donc
+    // `overlap` vaut 0 et toute page non vide fait avancer `collected`. Au
+    // delà, le recadrage mord et le `break` sur `rangeStart !== start`, juste
+    // en dessous, sort de toute façon. La garde est donc une ceinture, pas
+    // un correctif : elle existe pour qu'un changement de constantes, ou une
+    // API qui renverrait des positions incohérentes, ne transforme pas ce
+    // `while` en boucle infinie. Elle ne se teste pas isolément pour cette
+    // raison même.
+    //
+    // On sort par un `break` et non par une exception, parce que le coût de
+    // ce projet est asymétrique : le décrochage n'est atteignable qu'après
+    // avoir accumulé un millier d'offres réelles, et les jeter coûterait bien
+    // plus cher que de les rendre. C'est d'ailleurs le même signal qu'une page
+    // vide — la source n'avance plus — et celle-ci sort déjà par un `break`
+    // qui garde tout. L'anomalie reste visible sans exception : `fetched` sera
+    // inférieur à `total_available` dans `collection_query_results`.
+    if (collected.length === collectedBefore) break;
 
     if (rangeStart !== start) break;
     start = collected.length;
