@@ -60,6 +60,41 @@ export class ClaudeApiError extends Error {
   }
 }
 
+/**
+ * Un echec est-il REJOUABLE, c'est-a-dire raisonnablement imputable a
+ * l'environnement plutot qu'a cette offre-ci ?
+ *
+ * La distinction n'est pas cosmetique : l'appelant ecrit une ligne d'erreur
+ * pour un echec PERMANENT — ce qui sort l'offre de `offers_ai_candidates`
+ * jusqu'au prochain changement de version, donc potentiellement pour toujours
+ * — et n'ecrit RIEN pour un echec rejouable, laissant l'offre candidate au
+ * prochain passage. Se tromper dans un sens perd une offre definitivement ;
+ * se tromper dans l'autre coute un centime et un tour de plus.
+ *
+ * La regle : un echec est PERMANENT quand il est attribuable au contenu de
+ * l'offre ou a l'appel lui-meme — un 4xx autre que 429 (schema refuse, requete
+ * malformee, cle revoquee), ou une reponse HTTP 200 qu'on n'a pas su lire
+ * (JSON tronque, sortie structuree illisible). Tout le reste est rejouable :
+ *
+ *   * 429 : quota ou limite de debit. Rejouable par definition.
+ *   * 5xx (500, 502, 503, 529 de surcharge) : panne cote API.
+ *   * statut 0 : aucun echange HTTP n'a eu lieu (configuration absente).
+ *   * n'importe quelle exception qui n'est PAS une ClaudeApiError : `fetch`
+ *     qui echoue sur une coupure reseau, un DNS, un abandon. Rien n'a ete
+ *     juge, donc rien ne justifie de condamner l'offre.
+ *
+ * Le repli par defaut est donc « rejouable », qui est le cote sur : au pire
+ * l'offre revient et coute un appel de plus ; les fusibles de `run-backfill`
+ * arretent de toute facon une boucle qui n'avance pas.
+ */
+export function isRetryableFailure(cause: unknown): boolean {
+  if (!(cause instanceof ClaudeApiError)) return true;
+  if (cause.status === 429) return true;
+  if (cause.status >= 500) return true;
+  if (cause.status === 0) return true;
+  return false;
+}
+
 interface AnthropicContentBlock {
   type: string;
   text?: string;

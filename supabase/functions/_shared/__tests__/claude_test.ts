@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from '@std/assert';
-import { callClaudeStructured, ClaudeApiError } from '../claude.ts';
+import { callClaudeStructured, ClaudeApiError, isRetryableFailure } from '../claude.ts';
 
 const cfg = {
   apiKey: 'cle-de-test',
@@ -180,3 +180,29 @@ Deno.test(
     assertEquals(error.message.includes('sortie structuree illisible'), true);
   },
 );
+
+Deno.test('isRetryableFailure : 429 et 5xx sont rejouables, un 4xx ne l est pas', () => {
+  assertEquals(isRetryableFailure(new ClaudeApiError('quota', 429)), true);
+  assertEquals(isRetryableFailure(new ClaudeApiError('surcharge', 529)), true);
+  assertEquals(isRetryableFailure(new ClaudeApiError('panne', 500)), true);
+  assertEquals(isRetryableFailure(new ClaudeApiError('schema refuse', 400)), false);
+  assertEquals(isRetryableFailure(new ClaudeApiError('clef revoquee', 401)), false);
+});
+
+Deno.test('isRetryableFailure : un echec sans echange HTTP est rejouable', () => {
+  // Statut 0 : configuration absente, aucun appel n'est parti. Condamner
+  // l'offre pour ça la sortirait de la file sur un probleme qui n'est pas le
+  // sien.
+  assertEquals(isRetryableFailure(new ClaudeApiError('apiKey manquant', 0)), true);
+  // Coupure reseau : `fetch` leve un TypeError, pas une ClaudeApiError.
+  assertEquals(isRetryableFailure(new TypeError('error sending request')), true);
+  assertEquals(isRetryableFailure('une chaine'), true);
+});
+
+Deno.test('isRetryableFailure : un HTTP 200 illisible est PERMANENT', () => {
+  // Le JSON tronque ou malforme porte le statut de la reponse, soit 200. Ce
+  // n'est pas rejouable : l'offre doit sortir de la file, sans quoi un
+  // jugement irrecuperable la ferait repayer a chaque passage.
+  assertEquals(isRetryableFailure(new ClaudeApiError('sortie illisible', 200)), false);
+  assertEquals(isRetryableFailure(new ClaudeApiError('reponse tronquee', 200)), false);
+});

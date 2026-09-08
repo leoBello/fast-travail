@@ -9,6 +9,8 @@ function lot(over: Partial<ScoringSummary> = {}): ScoringSummary {
     candidates: 50,
     scored: 50,
     failed: 0,
+    failedPermanent: 0,
+    failedRetryable: 0,
     inputTokens: 1000,
     outputTokens: 100,
     cacheReadTokens: 5000,
@@ -22,6 +24,8 @@ const fileVide: ScoringSummary = {
   candidates: 0,
   scored: 0,
   failed: 0,
+  failedPermanent: 0,
+  failedRetryable: 0,
   inputTokens: 0,
   outputTokens: 0,
   cacheReadTokens: 0,
@@ -99,7 +103,11 @@ Deno.test('arret sur une perte PARTIELLE au troisieme lot (seuil strict)', async
 Deno.test('arret quand TOUT un lot echoue au jugement, sans perte d ecriture', async () => {
   // Le mode d'echec de la clef morte : writeFailures reste a 0, donc la garde
   // d'ecriture ne voit rien, et chaque offre sort de la file marquee en erreur.
-  const f = faux([lot({ scored: 0, failed: 50, outputTokens: 0, cacheReadTokens: 0 })]);
+  // Une clef morte rend un 401 : echec PERMANENT, donc une ligne d'erreur par
+  // offre, et le lot entier sort de la file.
+  const f = faux([
+    lot({ scored: 0, failed: 50, failedPermanent: 50, outputTokens: 0, cacheReadTokens: 0 }),
+  ]);
   const j = journal();
 
   const err = await assertRejects(
@@ -108,6 +116,25 @@ Deno.test('arret quand TOUT un lot echoue au jugement, sans perte d ecriture', a
   );
   assertStringIncludes(err.message, 'lot 1');
   assertStringIncludes(err.message, 'ANTHROPIC_API_KEY');
+  assertStringIncludes(err.message, '50 permanent(s), 0 rejouable(s)');
+  assertEquals(f.appels(), 1);
+});
+
+Deno.test('un lot entierement REJOUABLE arrete aussi l amorcage, sans condamner d offre', async () => {
+  // API en panne : rien n'est ecrit, aucune offre ne sort de la file — mais la
+  // boucle n'avance pas non plus, et elle DEPENSE. Le fusible doit se
+  // declencher sur `failed`, pas sur `failedPermanent` seul.
+  const f = faux([
+    lot({ scored: 0, failed: 50, failedRetryable: 50, outputTokens: 0, cacheReadTokens: 0 }),
+  ]);
+  const j = journal();
+
+  const err = await assertRejects(
+    () => runBackfill({ runScoring: f.runScoring, log: j.log, maxBatches: 60 }),
+    Error,
+  );
+  assertStringIncludes(err.message, '0 permanent(s), 50 rejouable(s)');
+  assertStringIncludes(err.message, 'restent candidates');
   assertEquals(f.appels(), 1);
 });
 

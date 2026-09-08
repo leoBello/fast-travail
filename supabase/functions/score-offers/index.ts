@@ -2,15 +2,26 @@ import { createDbClient } from '../_shared/db.ts';
 import { runScoring } from '../_shared/run-scoring.ts';
 
 /**
- * Le flux quotidien mesure ~41 offres, donc 60 suffit largement a l'absorber.
+ * Defaut d'un appel SANS corps. Le cron, lui, demande explicitement 100 (voir
+ * la migration 20260909050000) : ce defaut n'est donc PAS le reglage du regime
+ * quotidien, et il ne faut pas le lire comme tel.
  *
- * Le plafond d'execution d'une Edge Function est de 150 s. Un appel au modele
- * mesure 4,71 s (cache chaud). A concurrence 4, 60 offres font 15 tours, soit
- * ~71 s : plus du double de marge. Le defaut precedent, 120, faisait 30 tours
- * = ~141 s pour 150 s de plafond — 6 % de marge, et le commentaire qui
- * affirmait « 120 laisse de la marge » etait donc faux. Un premier appel du
- * cron sur un arriere aurait deborde, perdant jusqu'a 24 jugements PAYES
- * restes dans le tampon d'ecriture.
+ * ATTENTION — le « ~41 offres par jour » qui justifiait ce 60 etait FAUX. Il
+ * venait d'une moyenne sur 31 jours, biaisee : les sources retirent les
+ * annonces expirees, donc les journees anciennes sont sous-representees.
+ * Remesure du 2026-09-08 sur le perimetre geographique : 40,0/jour sur 31
+ * jours, mais 64,9 sur 13 jours et 77,6 sur 7 jours, avec un MAXIMUM
+ * journalier de 141. 60 ne tient pas le flux ; c'est le cron qui a ete
+ * corrige, pas ce defaut.
+ *
+ * Ce qui reste vrai et gouverne la valeur : le plafond d'execution d'une Edge
+ * Function est de 150 s, un appel au modele mesure 4,71 s (cache chaud), donc
+ * a concurrence 4, 60 offres font 15 tours = ~71 s. Le defaut d'avant, 120,
+ * faisait 30 tours = ~141 s pour 150 s de plafond — 6 % de marge, et le
+ * commentaire qui affirmait « 120 laisse de la marge » etait deja faux. Un
+ * appel manuel sans corps reste donc volontairement conservateur ; demander
+ * davantage se fait dans le corps, et `runScoring` avertit quand le lot est
+ * plein.
  */
 const DEFAULT_LIMIT = 60;
 
@@ -20,9 +31,11 @@ const DEFAULT_LIMIT = 60;
  * sont separees de 24 h. Avec une concurrence de N, les N PREMIERS appels
  * d'une vague partent donc tous sur un cache vide et paient chacun la prime
  * d'ecriture : une entree de cache ne devient lisible qu'une fois la premiere
- * reponse commencee, pas des l'emission de la requete. Sur ~41 offres a
- * concurrence 4, cela fait 4 ecritures et ~37 lectures — pas 1 et 40. Monter
- * la concurrence augmente donc lineairement le nombre d'ecritures de cache.
+ * reponse commencee, pas des l'emission de la requete. Sur un lot de N offres
+ * a concurrence 4, cela fait 4 ecritures et N-4 lectures — pas 1 et N-1.
+ * Monter la concurrence augmente donc lineairement le nombre d'ecritures de
+ * cache. (Le « ~41 offres » qui illustrait ce calcul etait faux, voir
+ * DEFAULT_LIMIT ; la forme du calcul ne depend pas du volume.)
  * (Pour l'amorçage local, le sujet est negligeable : les lots s'enchainent et
  * le cache reste chaud d'un lot a l'autre.)
  */

@@ -1,6 +1,11 @@
 import type { DbClient } from './db.ts';
 import { log } from './logger.ts';
-import { callClaudeStructured, type ClaudeConfig, type ClaudeResult } from './claude.ts';
+import {
+  callClaudeStructured,
+  type ClaudeConfig,
+  type ClaudeResult,
+  isRetryableFailure,
+} from './claude.ts';
 import {
   buildOfferText,
   buildSystemBlocks,
@@ -39,7 +44,22 @@ export interface ScoringDeps {
 export interface ScoringSummary {
   candidates: number;
   scored: number;
+  /** Total des echecs de jugement : `failedPermanent + failedRetryable`. */
   failed: number;
+  /**
+   * Echecs attribuables a l'offre ou a l'appel (4xx hors 429, sortie
+   * illisible). Une ligne d'erreur a ete ecrite pour chacun : l'offre SORT de
+   * `offers_ai_candidates` jusqu'au prochain changement de version, ce qui est
+   * voulu — sans cela un echec permanent bloquerait la file indefiniment.
+   */
+  failedPermanent: number;
+  /**
+   * Echecs rejouables (429, 5xx, reseau). AUCUNE ligne n'a ete ecrite : les
+   * offres restent candidates et repasseront au prochain cron. C'est le
+   * contraire d'une perte — mais c'est aussi du travail non fait, donc un
+   * nombre eleve merite un regard sur l'etat de l'API.
+   */
+  failedRetryable: number;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -147,11 +167,32 @@ export async function runScoring(deps: ScoringDeps): Promise<ScoringSummary> {
     candidates: candidates.length,
     scored: 0,
     failed: 0,
+    failedPermanent: 0,
+    failedRetryable: 0,
     inputTokens: 0,
     outputTokens: 0,
     cacheReadTokens: 0,
     writeFailures: 0,
   };
+
+  // Saturation. La selection est `order by published_at desc limit N` : un lot
+  // plein signifie qu'il restait PEUT-ETRE des candidats, et ceux qui restent
+  // sont toujours les PLUS ANCIENS. La file est donc un LIFO — le lendemain,
+  // les offres du jour passent devant le reliquat, qui recule un peu plus a
+  // chaque tour au lieu d'etre rattrape. Sans cette ligne, rien ne distingue
+  // « 60 candidats, tous juges » d'une journee ou 141 offres attendaient : le
+  // resume est identique, et la reponse reste un HTTP 200.
+  if (summary.candidates > 0 && summary.candidates === deps.limit) {
+    log('warn', 'lot plein : des offres attendent peut-etre encore', {
+      limit: deps.limit,
+      candidates: summary.candidates,
+      quoiFaire:
+        'relancer la fonction pour vider le reliquat, ou relever `limit` dans le corps du ' +
+        'cron `score-daily` (plafonne a concurrency * 25 par le point d entree). Les offres ' +
+        'non traitees sont les plus anciennes et reculent a chaque nouvelle collecte.',
+    });
+  }
+
   if (candidates.length === 0) return summary;
 
   const systemBlocks = buildSystemBlocks(profile, skills);
@@ -234,10 +275,31 @@ export async function runScoring(deps: ScoringDeps): Promise<ScoringSummary> {
         });
       } catch (cause) {
         summary.failed += 1;
-        log('warn', 'offre non jugee', { offerId: offer.id, cause: String(cause) });
-        // La ligne est ecrite quand meme : sans elle, l'offre reviendrait a
-        // chaque passage et un echec permanent bloquerait la file. Avec elle,
-        // l'offre sort de la selection jusqu'au prochain changement de version.
+        // Ecrire une ligne d'erreur porte les versions COURANTES de prompt et
+        // de profil : l'offre sort alors de `offers_ai_candidates` jusqu'au
+        // prochain changement de version, donc en pratique pour toujours.
+        // C'est ce qu'il faut pour un echec PERMANENT — sans quoi une offre
+        // irrecuperable reviendrait a chaque passage et bloquerait la file.
+        // C'est une perte seche pour un echec REJOUABLE : une surcharge de
+        // trois secondes a concurrence 4 condamnait quatre offres qui
+        // n'avaient jamais ete jugees, sans le moindre appel. Ne rien ecrire
+        // les laisse candidates ; elles repasseront au prochain cron, ce qui
+        // coute un centime et respecte le critere fondateur du depot (« une
+        // offre jamais affichee est perdue »).
+        const retryable = isRetryableFailure(cause);
+        if (retryable) {
+          summary.failedRetryable += 1;
+          log('warn', 'offre non jugee, echec rejouable : elle reste candidate', {
+            offerId: offer.id,
+            cause: String(cause),
+          });
+          continue;
+        }
+        summary.failedPermanent += 1;
+        log('warn', 'offre non jugee, echec permanent : ligne d erreur ecrite', {
+          offerId: offer.id,
+          cause: String(cause),
+        });
         pushRow({
           ...base,
           fit_score: null,

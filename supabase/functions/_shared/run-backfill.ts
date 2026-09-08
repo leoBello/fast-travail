@@ -9,6 +9,10 @@ export interface BackfillTotals {
   batches: number;
   scored: number;
   failed: number;
+  /** Echecs ayant ecrit une ligne d'erreur : ces offres sortent de la file. */
+  failedPermanent: number;
+  /** Echecs rejouables, sans ecriture : ces offres restent candidates. */
+  failedRetryable: number;
   writeFailures: number;
   inputTokens: number;
   outputTokens: number;
@@ -48,6 +52,8 @@ export async function runBackfill(deps: BackfillDeps): Promise<BackfillTotals> {
     batches: 0,
     scored: 0,
     failed: 0,
+    failedPermanent: 0,
+    failedRetryable: 0,
     writeFailures: 0,
     inputTokens: 0,
     outputTokens: 0,
@@ -61,6 +67,8 @@ export async function runBackfill(deps: BackfillDeps): Promise<BackfillTotals> {
     totals.batches += 1;
     totals.scored += summary.scored;
     totals.failed += summary.failed;
+    totals.failedPermanent += summary.failedPermanent;
+    totals.failedRetryable += summary.failedRetryable;
     totals.writeFailures += summary.writeFailures;
     totals.inputTokens += summary.inputTokens;
     totals.outputTokens += summary.outputTokens;
@@ -106,14 +114,23 @@ export async function runBackfill(deps: BackfillDeps): Promise<BackfillTotals> {
     // ---- Fusible 2 : arret quand TOUT un lot echoue au jugement. ----
     //
     // Symetrique du precedent, pour le mode d'echec qu'il ne voit pas. Avec
-    // une `ANTHROPIC_API_KEY` invalide, chaque offre echoue : `writeFailures`
-    // vaut 0 (les lignes d'ERREUR, elles, s'ecrivent tres bien) et le fusible
-    // 1 ne se declenche jamais. Or ces lignes portent les versions courantes
-    // de prompt et de profil, donc les offres SORTENT definitivement de
-    // `offers_ai_candidates` jusqu'a un changement de version : un amorçage
-    // lance avec une clef morte marquerait les ~1 269 offres « en erreur » en
-    // ~26 lots, afficherait « amorcage termine » et sortirait en 0. Un succes
-    // rapporte sur une base cassee — exactement ce que le fusible 1 visait.
+    // une `ANTHROPIC_API_KEY` invalide, chaque offre echoue sur un 401 —
+    // permanent : `writeFailures` vaut 0 (les lignes d'ERREUR, elles,
+    // s'ecrivent tres bien) et le fusible 1 ne se declenche jamais. Or ces
+    // lignes portent les versions courantes de prompt et de profil, donc les
+    // offres SORTENT definitivement de `offers_ai_candidates` jusqu'a un
+    // changement de version : un amorçage lance avec une clef morte
+    // marquerait les ~1 269 offres « en erreur » en ~26 lots, afficherait
+    // « amorcage termine » et sortirait en 0. Un succes rapporte sur une base
+    // cassee — exactement ce que le fusible 1 visait.
+    //
+    // Le seuil reste `summary.failed`, TOUS echecs confondus, et non
+    // `failedPermanent` seul. Un lot entier en echec REJOUABLE (API en panne,
+    // reseau coupe) n'ecrit rien et ne condamne aucune offre, mais il ne fait
+    // pas non plus avancer la file : sans ce fusible, l'amorçage tournerait
+    // jusqu'a `maxBatches` en repayant le meme lot. Le detail du journal
+    // (`failedPermanent` / `failedRetryable`) dit lequel des deux cas s'est
+    // produit, et donc s'il y a quelque chose a reparer en base.
     //
     // Seuil retenu : `failed === candidates`, PAS `failed > candidates / 2`.
     //   - Des echecs isoles sont NORMAUX et deja geres (jugement malforme, 529
@@ -133,15 +150,19 @@ export async function runBackfill(deps: BackfillDeps): Promise<BackfillTotals> {
       deps.log('error', `arret au lot ${totals.batches} : aucune offre du lot n'a ete jugee`, {
         lot: totals.batches,
         failedDuLot: summary.failed,
+        permanentsDuLot: summary.failedPermanent,
+        rejouablesDuLot: summary.failedRetryable,
         candidatsDuLot: summary.candidates,
         totals,
       });
       throw new Error(
-        `lot ${totals.batches} : les ${summary.failed} offres du lot ont echoue au jugement. ` +
-          `Une ligne d'erreur a ete ecrite pour chacune, donc elles sortent de ` +
-          `offers_ai_candidates jusqu'a un changement de version de prompt ou de profil. ` +
-          `Cause systemique probable : verifier ANTHROPIC_API_KEY, ANTHROPIC_WORKSPACE_ID, le ` +
-          `nom du modele et le journal des offres non jugees avant de relancer.`,
+        `lot ${totals.batches} : les ${summary.failed} offres du lot ont echoue au jugement ` +
+          `(${summary.failedPermanent} permanent(s), ${summary.failedRetryable} rejouable(s)). ` +
+          `Les echecs permanents ont ecrit une ligne d'erreur, donc ces offres sortent de ` +
+          `offers_ai_candidates jusqu'a un changement de version de prompt ou de profil ; les ` +
+          `rejouables n'ont rien ecrit et restent candidates. Cause systemique probable : ` +
+          `verifier ANTHROPIC_API_KEY, ANTHROPIC_WORKSPACE_ID, le nom du modele et le journal ` +
+          `des offres non jugees avant de relancer.`,
       );
     }
 

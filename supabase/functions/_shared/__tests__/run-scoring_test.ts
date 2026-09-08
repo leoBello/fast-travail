@@ -1,7 +1,8 @@
 import { assertEquals, assertRejects } from '@std/assert';
 import { runScoring, WRITE_CHUNK_SIZE } from '../run-scoring.ts';
 import type { DbClient } from '../db.ts';
-import type { ClaudeResult } from '../claude.ts';
+import { ClaudeApiError, type ClaudeResult } from '../claude.ts';
+import type { LogLevel } from '../logger.ts';
 import type { OfferJudgement, OfferToScore } from '../scoring-types.ts';
 
 function candidate(id: string, over: Partial<OfferToScore> = {}): OfferToScore {
@@ -155,7 +156,7 @@ Deno.test('score chaque candidat et cumule l usage', async () => {
   assertEquals(rec.upserts[0][0].fit_score, 80);
 });
 
-Deno.test('une offre en echec est comptee et porte son erreur, sans arreter le lot', async () => {
+Deno.test('un echec PERMANENT est compte et porte son erreur, sans arreter le lot', async () => {
   const { db, rec } = fakeDb([candidate('a'), candidate('b')]);
   let appels = 0;
   const summary = await runScoring({
@@ -167,16 +168,133 @@ Deno.test('une offre en echec est comptee et porte son erreur, sans arreter le l
     callClaude: () => {
       appels += 1;
       return appels === 1
-        ? Promise.reject(new Error('529 surcharge'))
+        ? Promise.reject(new ClaudeApiError('sortie structuree illisible', 200))
         : Promise.resolve(judgement(70));
     },
   });
 
   assertEquals(summary.scored, 1);
   assertEquals(summary.failed, 1);
+  assertEquals(summary.failedPermanent, 1);
+  assertEquals(summary.failedRetryable, 0);
   const enEchec = rec.upserts[0].find((r) => r.error !== null);
   assertEquals(typeof enEchec?.error, 'string');
   assertEquals(enEchec?.fit_score, null);
+});
+
+Deno.test('un echec REJOUABLE n ecrit AUCUNE ligne : l offre reste candidate', async () => {
+  // Le defaut corrige : une ligne d'erreur porte les versions courantes, ce
+  // qui sort l'offre de offers_ai_candidates pour toujours. Une surcharge de
+  // trois secondes condamnait donc definitivement les offres en vol.
+  const { db, rec } = fakeDb([candidate('a'), candidate('b')]);
+  let appels = 0;
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: 10,
+    concurrency: 1,
+    dryRun: false,
+    callClaude: () => {
+      appels += 1;
+      return appels === 1
+        ? Promise.reject(new ClaudeApiError('Claude a repondu 529 : surcharge', 529))
+        : Promise.resolve(judgement(70));
+    },
+  });
+
+  assertEquals(summary.scored, 1);
+  assertEquals(summary.failed, 1);
+  assertEquals(summary.failedRetryable, 1);
+  assertEquals(summary.failedPermanent, 0);
+  // Une seule ligne ecrite : celle qui a ete jugee. Rien pour l'offre en echec.
+  const lignes = rec.upserts.flat();
+  assertEquals(lignes.length, 1);
+  assertEquals(lignes[0].offer_id, 'b');
+});
+
+Deno.test('un echec reseau (pas une ClaudeApiError) est traite comme rejouable', async () => {
+  const { db, rec } = fakeDb([candidate('a')]);
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: 10,
+    concurrency: 1,
+    dryRun: false,
+    callClaude: () => Promise.reject(new TypeError('error sending request')),
+  });
+
+  assertEquals(summary.failedRetryable, 1);
+  assertEquals(summary.failedPermanent, 0);
+  assertEquals(rec.upserts.length, 0);
+});
+
+Deno.test('un 400 est PERMANENT : la ligne est ecrite pour ne pas bloquer la file', async () => {
+  const { db, rec } = fakeDb([candidate('a')]);
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: 10,
+    concurrency: 1,
+    dryRun: false,
+    callClaude: () => Promise.reject(new ClaudeApiError('Claude a repondu 400 : schema', 400)),
+  });
+
+  assertEquals(summary.failedPermanent, 1);
+  assertEquals(summary.failedRetryable, 0);
+  assertEquals(rec.upserts.flat().length, 1);
+});
+
+Deno.test('un lot PLEIN journalise un avertissement de saturation', async () => {
+  // `candidates === limit` : il en restait peut-etre, et le reliquat est
+  // toujours fait des offres les PLUS ANCIENNES, que la collecte du lendemain
+  // repousse encore. Sans ce signal, le resume est indiscernable d'une
+  // journee entierement traitee.
+  const lignes: { level: LogLevel; message: string }[] = [];
+  const original = console.warn;
+  console.warn = (text: string) => {
+    lignes.push(JSON.parse(text) as { level: LogLevel; message: string });
+  };
+  try {
+    const { db } = fakeDb([candidate('a'), candidate('b')]);
+    const summary = await runScoring({
+      db,
+      claude,
+      limit: 2,
+      concurrency: 2,
+      dryRun: false,
+      callClaude: () => Promise.resolve(judgement(80)),
+    });
+    assertEquals(summary.candidates, 2);
+  } finally {
+    console.warn = original;
+  }
+
+  const saturation = lignes.filter((l) => l.message.includes('lot plein'));
+  assertEquals(saturation.length, 1);
+  assertEquals(saturation[0].level, 'warn');
+});
+
+Deno.test('un lot NON plein ne journalise aucun avertissement de saturation', async () => {
+  const lignes: { message: string }[] = [];
+  const original = console.warn;
+  console.warn = (text: string) => {
+    lignes.push(JSON.parse(text) as { message: string });
+  };
+  try {
+    const { db } = fakeDb([candidate('a')]);
+    await runScoring({
+      db,
+      claude,
+      limit: 60,
+      concurrency: 2,
+      dryRun: false,
+      callClaude: () => Promise.resolve(judgement(80)),
+    });
+  } finally {
+    console.warn = original;
+  }
+
+  assertEquals(lignes.filter((l) => l.message.includes('lot plein')).length, 0);
 });
 
 Deno.test('dryRun n ecrit rien', async () => {
