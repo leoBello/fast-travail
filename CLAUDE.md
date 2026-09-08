@@ -209,14 +209,52 @@ national** — 63 offres sur 31 jours contre 9 pour France Travail sur 699.
 ## Consulter les offres
 
 ```sql
-select source, title, company_name, city,
+select source, title, company_name, city, acces,
        coalesce(rate_raw, salary_raw) as remu,
-       score, matched_terms, distance_marseille_km
-from offers_ranked
-where red_flags = 0 and core_hits >= 1
+       score, matched_terms, found_by_labels, trusted_query,
+       distance_marseille_km
+from offers_shortlist
 order by score desc, published_at desc;
 ```
 
-Les trois axes réglables — rayon, matrice de requêtes, lexique — sont des
-**lignes en base**, jamais du code. Les ajuster est un `UPDATE`, sans
-redéploiement ni re-collecte.
+**Interroger `offers_shortlist`, jamais `offers_ranked` avec une clause écrite
+à la main.** La vue encode la règle complète — signal rouge éliminatoire, puis
+`core_hits` **ou** `ai_hits` **ou** une requête de confiance, puis
+l'accessibilité géographique — et cette règle a changé deux fois. La recette
+précédente de ce fichier filtrait sur `core_hits >= 1` : mesurée le
+2026-09-08, elle rendait 32 lignes là où la sélection réelle en compte 65, et
+**12 seulement** des 65 ont un `core_hits`. Elle cachait donc 53 offres, dont
+exactement le gisement full-remote — Adzuna tronquant à 500 caractères, une
+offre y est retenue par la requête qui l'a trouvée, pas par son texte.
+
+`found_by_labels` dit **quelle requête** a ramené l'offre, et `trusted_query`
+si l'une d'elles est ancrée à une technologie. Sur les 65 offres retenues, 34
+n'entrent **que** par ce chemin : elles n'ont ni `core_hits` ni `ai_hits`, et
+sans lui elles seraient invisibles.
+
+Les axes réglables sont des **lignes en base**, jamais du code :
+
+| Axe | Où | Comment l'ajuster |
+|---|---|---|
+| Rayon | `search_queries.radius_km` | `UPDATE` |
+| Matrice de requêtes | `search_queries` | `UPDATE`, mais voir ci-dessous |
+| Lexique | `skill_lexicon` | `UPDATE` |
+| **Confiance par requête** | `search_queries.trust` | **migration** |
+
+Les trois premiers s'ajustent par un `UPDATE`, sans redéploiement ni
+re-collecte : le score est une vue. Le quatrième est une **donnée de
+référence** au même titre que la matrice, et un reclassement se justifie par
+une mesure : il passe donc par une migration, qui porte cette mesure en
+commentaire. Deux requêtes ont déjà été déclassées ainsi.
+
+Deux pièges de manipulation, tous deux sans garde-fou en base :
+
+- **Désactiver, jamais supprimer** une ligne de `search_queries`.
+  `found_by_query_ids` est un `int[]`, qui ne peut pas porter de clé
+  étrangère : supprimer une requête retirerait silencieusement son étiquette
+  et pourrait faire **sortir** une offre de la sélection. `enabled = false`
+  est propre et rétroactif — il retire aussi la confiance.
+- **Ne jamais réécrire les `keywords` d'une requête `anchored`** : créer une
+  nouvelle étiquette. L'id survit à la redéfinition, donc toutes les offres
+  déjà estampillées resteraient dignes de confiance à vie sur la foi d'un
+  texte de requête qui n'existe plus, sans le moindre signal.
