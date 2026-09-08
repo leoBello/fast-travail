@@ -2063,8 +2063,12 @@ Deno.test('mission freelance : contrat, TJM et télétravail', () => {
 Deno.test('la description est du texte, pas du HTML', () => {
   const offer = mapFreeWorkOffer(rawFromFixture('job-contractor-tjm.html', CONTRACTOR_PATH));
   assert(offer?.description);
-  // Mesuré sur la fixture : 1 267 caractères une fois les balises retirées.
-  assertEquals(offer.description.length, 1267);
+  // Mesuré sur la fixture : 1 269 une fois les balises retirées. Ce nombre
+  // compte des UNITÉS UTF-16, ce que rend `String.length`, et non des points
+  // de code : la description porte deux emoji hors du plan multilingue de base
+  // (🛠 et 🧩) qui pèsent deux unités chacun. Un comptage par point de code
+  // rendrait 1 267 — c'est la même chaîne, pas une autre mesure.
+  assertEquals(offer.description.length, 1269);
   assertEquals(offer.description.includes('<'), false);
   assertEquals(offer.description.includes('&nbsp;'), false);
 });
