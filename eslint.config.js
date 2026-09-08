@@ -15,10 +15,16 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
+    // Mêmes chemins que .prettierignore : supabase/functions/ et scripts/
+    // sont linté(e)s par `deno lint`, docs/design/maquettes/ est la capture
+    // d'un outil de design (pas du code du projet), dashboard/dist/ est de
+    // la sortie de build. node_modules/** est déjà ignoré par défaut par
+    // ESLint ; listé ici quand même pour que ce tableau reste la liste
+    // complète et lisible d'un coup d'œil.
     ignores: [
       'supabase/functions/**',
       'scripts/**',
-      'docs/**',
+      'docs/design/maquettes/**',
       'node_modules/**',
       '.superpowers/**',
       'dashboard/dist/**',
@@ -41,5 +47,10 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
-  eslintConfigPrettier,
+  // Désactive les règles de style ESLint qui feraient double emploi avec
+  // Prettier. Restreint à dashboard/**, comme le reste de ce fichier : sans
+  // `files`, ce bloc s'appliquerait à tout objet ciblé par ESLint, y compris
+  // ce fichier de config lui-même — sans effet ici puisqu'il ne fait que
+  // désactiver des règles, mais la portée doit rester lisible.
+  { ...eslintConfigPrettier, files: ['dashboard/**/*.{ts,tsx}'] },
 );

@@ -267,6 +267,27 @@ couvre désormais les deux côtés du dépôt.
 - [ ] Créer `dashboard/` avec React 18, TypeScript, Vite, Vitest, jsdom,
       Testing Library, Base UI, Framer Motion. Versions **pinnées**, alignées
       sur celles de prospeo là où elles existent.
+
+      **Exception tranchée le 2026-09-09 : Vite et Vitest ne suivent pas
+      prospeo.** Ses pins (`vite@5.4.10`, `vitest@2.1.9`) portent cinq
+      vulnérabilités, mesurées par `npm audit` :
+
+      | Paquet | Gravité | Atteignable ici ? |
+      |---|---|---|
+      | `vitest` | **critique** | **Non** — exige que le serveur UI écoute ; on lance `vitest run`, sans UI |
+      | `vite` | **haute** | **Oui** — trois volets spécifiques à Windows : hash NTLMv2 divulgué par chemin UNC, contournement de `server.fs.deny` sur chemins alternatifs, traversée dans les *optimized deps* |
+      | `esbuild`, `@vitest/mocker`, `vite-node` | modérée | serveur de développement et mocker |
+
+      Le poste de travail est **sous Windows** et le serveur de développement
+      tournera quotidiennement : les volets « haute » sont les seuls qui
+      exposent réellement, et ils suffisent à décider. Vite passe en **8.x**,
+      Vitest en **5.x**.
+
+      **Ce que l'alignement sur prospeo devait protéger est intact** : ce
+      qu'on reprend est le **kit** — `theme.css`, les tokens, l'anatomie du
+      `Badge`, React 18, Base UI, CSS Modules. Rien de tout cela ne dépend de
+      la version majeure d'un serveur de développement ni d'un lanceur de
+      tests. C'est la lettre de l'alignement qui bouge, pas son esprit.
 - [ ] Installer et configurer Prettier et ESLint **à la racine** — les fichiers
       `.prettierignore` et `.eslintignore` les attendent depuis la phase 1 et
       excluent déjà `supabase/functions/`.
