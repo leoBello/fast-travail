@@ -27,6 +27,8 @@ interface FakeState {
   updates: Array<Record<string, unknown>>;
   queries: SearchQueryRow[];
   knownIds: string[];
+  /** Chaque `eq(column, value)` reçu par le double search_queries, dans l'ordre. */
+  filters: Array<{ column: string; value: unknown }>;
 }
 
 /**
@@ -69,9 +71,14 @@ function fakeDb(state: FakeState): DbClient {
         };
       }
       // search_queries : select().eq().eq().order() et, avec --query, un eq() de plus.
+      // eq() enregistre chaque paire (colonne, valeur) : la chaîne d'appels ne
+      // suffit pas à prouver qu'un filtre porte sur la bonne colonne.
       const builder = {
         select: () => builder,
-        eq: () => builder,
+        eq: (column: string, value: unknown) => {
+          state.filters.push({ column, value });
+          return builder;
+        },
         order: () => Promise.resolve({ data: state.queries, error: null }),
         then: undefined,
       };
@@ -123,7 +130,13 @@ Deno.test('une variable d’environnement manquante arrête tout', async () => {
 });
 
 Deno.test('une source désactivée en base ne collecte rien', async () => {
-  const state: FakeState = { enabled: false, updates: [], queries: [QUERY], knownIds: [] };
+  const state: FakeState = {
+    enabled: false,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
   let called = false;
 
   const code = await runScraperMain(
@@ -147,7 +160,13 @@ Deno.test('une source désactivée en base ne collecte rien', async () => {
 });
 
 Deno.test('un robots.txt qui refuse arrête la collecte et consigne le verdict', async () => {
-  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
   let called = false;
 
   const code = await runScraperMain(
@@ -173,7 +192,13 @@ Deno.test('un robots.txt qui refuse arrête la collecte et consigne le verdict',
 });
 
 Deno.test('robots.txt est lu à chaque exécution, et son verdict écrit même à blanc', async () => {
-  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
   const seen: string[] = [];
 
   await runScraperMain(scraper(), host(['--dry-run']), {
@@ -188,7 +213,13 @@ Deno.test('robots.txt est lu à chaque exécution, et son verdict écrit même �
 });
 
 Deno.test('une répétition à blanc ne marque aucun run', async () => {
-  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
 
   const code = await runScraperMain(scraper(), host(['--dry-run']), {
     createDb: () => fakeDb(state),
@@ -200,7 +231,13 @@ Deno.test('une répétition à blanc ne marque aucun run', async () => {
 });
 
 Deno.test('le delta précharge les identifiants connus, le backfill les ignore', async () => {
-  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: ['deja-vu'] };
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: ['deja-vu'],
+    filters: [],
+  };
   const seenSizes: number[] = [];
   const spy = scraper({
     fetchAll: (ctx) => {
@@ -222,7 +259,13 @@ Deno.test('le delta précharge les identifiants connus, le backfill les ignore',
 });
 
 Deno.test('une source qui n’en a pas besoin ne paie pas le préchargement', async () => {
-  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: ['deja-vu'] };
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: ['deja-vu'],
+    filters: [],
+  };
   let size = -1;
 
   await runScraperMain(
@@ -246,7 +289,13 @@ Deno.test('une source qui n’en a pas besoin ne paie pas le préchargement', as
 });
 
 Deno.test('la fenêtre suit le mode', async () => {
-  const state: FakeState = { enabled: true, updates: [], queries: [QUERY], knownIds: [] };
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
   const windows: number[] = [];
   const spy = scraper({
     fetchAll: (ctx) => {
@@ -268,7 +317,7 @@ Deno.test('la fenêtre suit le mode', async () => {
 });
 
 Deno.test('aucune requête active est une erreur, pas un succès silencieux', async () => {
-  const state: FakeState = { enabled: true, updates: [], queries: [], knownIds: [] };
+  const state: FakeState = { enabled: true, updates: [], queries: [], knownIds: [], filters: [] };
 
   await assertRejects(
     () =>
@@ -278,5 +327,124 @@ Deno.test('aucune requête active est une erreur, pas un succès silencieux', as
       }),
     Error,
     'free_work',
+  );
+});
+
+Deno.test('--mode fautif (« backfil ») échoue et nomme la valeur en cause', async () => {
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
+
+  const err = await assertRejects(
+    () =>
+      runScraperMain(scraper(), host(['--dry-run', '--mode', 'backfil']), {
+        createDb: () => fakeDb(state),
+        createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+      }),
+    Error,
+  );
+
+  assert(err.message.includes('backfil'), `le message doit nommer « backfil » : ${err.message}`);
+  assert(err.message.includes('delta'), `le message doit lister « delta » : ${err.message}`);
+  assert(
+    err.message.includes('backfill'),
+    `le message doit lister « backfill » : ${err.message}`,
+  );
+});
+
+Deno.test('--mode sans valeur (dernier argument) échoue plutôt que de retomber sur delta', async () => {
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
+
+  await assertRejects(
+    () =>
+      runScraperMain(scraper(), host(['--dry-run', '--mode']), {
+        createDb: () => fakeDb(state),
+        createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+      }),
+    Error,
+  );
+});
+
+Deno.test('--trigger fautif échoue et nomme la valeur en cause', async () => {
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
+
+  const err = await assertRejects(
+    () =>
+      runScraperMain(scraper(), host(['--dry-run', '--trigger', 'automatique']), {
+        createDb: () => fakeDb(state),
+        createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+      }),
+    Error,
+  );
+
+  assert(
+    err.message.includes('automatique'),
+    `le message doit nommer « automatique » : ${err.message}`,
+  );
+  assert(err.message.includes('manual'), `le message doit lister « manual » : ${err.message}`);
+  assert(err.message.includes('cron'), `le message doit lister « cron » : ${err.message}`);
+});
+
+Deno.test('--query applique le filtre label, en plus de source et enabled', async () => {
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
+
+  await runScraperMain(scraper(), host(['--dry-run', '--query', 'fw:skill:react']), {
+    createDb: () => fakeDb(state),
+    createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+  });
+
+  assert(
+    state.filters.some((f) => f.column === 'source' && f.value === 'free_work'),
+    `filtre source manquant : ${JSON.stringify(state.filters)}`,
+  );
+  assert(
+    state.filters.some((f) => f.column === 'enabled' && f.value === true),
+    `filtre enabled manquant : ${JSON.stringify(state.filters)}`,
+  );
+  assert(
+    state.filters.some((f) => f.column === 'label' && f.value === 'fw:skill:react'),
+    `filtre label manquant : ${JSON.stringify(state.filters)}`,
+  );
+});
+
+Deno.test('sans --query, aucun filtre label n’est appliqué', async () => {
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
+
+  await runScraperMain(scraper(), host(['--dry-run']), {
+    createDb: () => fakeDb(state),
+    createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+  });
+
+  assert(
+    state.filters.every((f) => f.column !== 'label'),
+    `aucun filtre label n'était attendu : ${JSON.stringify(state.filters)}`,
   );
 });

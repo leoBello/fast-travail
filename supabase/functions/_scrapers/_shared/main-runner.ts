@@ -72,9 +72,44 @@ function flag(args: string[], name: string): boolean {
   return args.includes(`--${name}`);
 }
 
+/**
+ * Valeur d'un `--flag`, ou `null` si le flag est absent. Un flag *présent*
+ * mais sans valeur — dernier argument, ou suivi immédiatement d'un autre
+ * `--flag` — est une faute de frappe, pas une demande de valeur par défaut :
+ * ça doit échouer bruyamment plutôt que de se comporter comme si le flag
+ * n'avait jamais été donné (voir CLAUDE.md, la règle contre le faux succès).
+ */
 function option(args: string[], name: string): string | null {
   const index = args.indexOf(`--${name}`);
-  return index >= 0 && index + 1 < args.length ? args[index + 1] : null;
+  if (index < 0) return null;
+  const value = index + 1 < args.length ? args[index + 1] : undefined;
+  if (value === undefined || value.startsWith('--')) {
+    throw new Error(`--${name} exige une valeur`);
+  }
+  return value;
+}
+
+/**
+ * Comme `option`, mais la valeur doit appartenir à `accepted` — sinon échec
+ * bruyant nommant la valeur fautive et les valeurs acceptées. Un `--mode`
+ * ou un `--trigger` mal orthographié ne doit jamais retomber silencieusement
+ * sur la valeur par défaut : c'est exactement le genre d'erreur qui a déjà
+ * fait tourner une collecte silencieusement fausse sur ce projet.
+ */
+function enumOption<T extends string>(
+  args: string[],
+  name: string,
+  accepted: readonly T[],
+  fallback: T,
+): T {
+  const value = option(args, name);
+  if (value === null) return fallback;
+  if (!accepted.includes(value as T)) {
+    throw new Error(
+      `--${name} invalide : « ${value} » n'est pas reconnu ; attendu ${accepted.join(' ou ')}`,
+    );
+  }
+  return value as T;
 }
 
 function requireEnv(host: ScraperEnvironment, name: string): string {
@@ -88,8 +123,18 @@ export async function runScraperMain(
   host: ScraperEnvironment,
   deps: ScraperDependencies = {},
 ): Promise<number> {
-  const mode: CollectionMode = option(host.args, 'mode') === 'backfill' ? 'backfill' : 'delta';
-  const trigger: RunTrigger = option(host.args, 'trigger') === 'cron' ? 'cron' : 'manual';
+  const mode: CollectionMode = enumOption(
+    host.args,
+    'mode',
+    ['delta', 'backfill'] as const,
+    'delta',
+  );
+  const trigger: RunTrigger = enumOption(
+    host.args,
+    'trigger',
+    ['manual', 'cron'] as const,
+    'manual',
+  );
   const dryRun = flag(host.args, 'dry-run');
   const onlyLabel = option(host.args, 'query');
 
