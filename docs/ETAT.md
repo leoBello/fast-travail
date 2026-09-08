@@ -1114,7 +1114,7 @@ Canvas : <https://claude.ai/code/artifact/be80ac9f-af1b-4490-b2ce-b7813a4ea393>
 
 | # | Tâche | État |
 |---|---|---|
-| 1 | `offer_applications` + les vues de groupe et de propagation | ⬜ |
+| 1 | `offer_applications` + les vues de groupe et de propagation | ✅ |
 | 2 | Échafaudage `dashboard/`, et `verify` étendu aux deux côtés | ⬜ |
 | 3 | Thème et vocabulaire d'interface, avec les tests de garde-fous | ⬜ |
 | 4 | i18n | ⬜ |
@@ -1275,6 +1275,49 @@ d'école du §3.3 des règles de conception.
 ### Ce qui reste à trancher
 
 Voir « Décisions en attente » en bas de ce document.
+
+### Tâche 1 livrée le 2026-09-09 — `offer_applications` et les deux vues
+
+Migration `20260910000000_offer_applications.sql` : la table `offer_applications`
+(clé sur `offer_id` réel, quatre contraintes `check`, RLS activé sans policy,
+deux index), la vue `offer_display_groups` (clé de regroupement d'affichage) et
+la vue `offer_application_state` (propagation de l'état à tout le groupe,
+colonne `heritee`). SQL repris verbatim du brief de tâche.
+
+**Coût mesuré, `explain analyze` × 3** :
+
+| Vue | État de la table | Temps d'exécution |
+|---|---|---:|
+| `offer_display_groups` | — (4 146 offres, `Seq Scan`) | 50,4 / 50,6 / 50,7 ms |
+| `offer_application_state` | `offer_applications` vide | 0,31 / 0,33 / 0,35 ms |
+| `offer_application_state` | `offer_applications` à 1 ligne | 60,0 / 60,1 / 61,7 ms |
+
+Bien sous le seuil de 200 ms fixé par le brief : aucun index d'expression
+posé. `offer_application_state` scanne `offers` **deux fois** (les deux
+`offer_display_groups` du merge join), d'où un coût environ double de
+`offer_display_groups` seule une fois la table peuplée — cohérent avec le
+plan, pas juste avec l'intuition.
+
+**Propagation vérifiée** sur une vraie paire cross-source (Experis France,
+« Data analyst (F/H) », vue par `adzuna` et `free_work`) : une ligne posée sur
+l'offre Adzuna avec `status = 'retenue'` apparaît sous les deux `offer_id` dans
+`offer_application_state`, `heritee = false` côté Adzuna et `heritee = true`
+côté Free-Work. Sonde supprimée ensuite, table revérifiée vide.
+
+**Constat non prévu par le brief** : les deux paires citées comme exemples
+(ALLEGIS GROUP, Digistrat consulting) **ne se groupent pas** sous la clé
+verbatim du brief. Adzuna suffixe ces deux titres de `(IT)`
+(`"...obligatoire (IT)"` côté Adzuna contre `"...obligatoire"` côté Free-Work),
+et le `regexp_replace` ne fait qu'ôter la ponctuation — il garde le `it`, donc
+les deux clés diffèrent d'un fragment de texte. Vérifié en lisant
+`offer_display_groups` sur les quatre `offer_id` des deux paires. La vérification
+de propagation ci-dessus a donc été faite sur une paire de substitution
+(Experis France) qui, elle, se groupe correctement — la mécanique est prouvée,
+mais ces deux paires précises resteront non regroupées tant que la clé ne
+tolère pas ce genre de suffixe. Pas corrigé ici : la tâche demandait le SQL
+verbatim, et élargir la clé sans mesure est exactement la mise en garde de P14
+que le brief rappelle lui-même. À consigner comme limite connue de la clé
+actuelle, pas comme un défaut de cette migration.
 
 ---
 
