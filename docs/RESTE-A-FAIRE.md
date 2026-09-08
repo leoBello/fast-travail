@@ -61,7 +61,7 @@ une occasion de bouger quelque chose.
 
 ## Fait avant la phase 2
 
-### Perf d'`offers_shortlist` — divisée par deux, le 2026-09-08
+### Perf d'`offers_shortlist` — divisée par cinq, le 2026-09-08
 
 La liste quotidienne mettait **3,7 s**, et ce coût grandissait avec le corpus.
 Le profil, mesuré : `offer_lexical_score` faisait une boucle imbriquée de
@@ -74,19 +74,38 @@ la condition de jointure : un `case` qui mélange deux opérateurs incompatibles
 n'est pas indexable, donc les **56 termes `fts` sur 67** étaient évalués ligne
 à ligne alors qu'ils étaient indexables.
 
-Séparer les deux modes par une union rend la branche `fts` indexable :
-`offer_lexical_score` passe de **5 832 à 1 781 ms**, et `offers_shortlist` de
-**3,7 à 1,94 s**. Résultat prouvé identique — jointure externe complète entre
-les deux formulations : 3 085 lignes de chaque côté, **zéro divergence**.
+Séparer les deux modes par une union rend la branche `fts` indexable, et un
+index GIN **trigramme** rend la branche `ilike` indexable à son tour.
+`offer_lexical_score` passe de **5 832 à 454 ms**, et `offers_shortlist` de
+**3,7 à 0,76 s**.
 
-**Une vue matérialisée a été écartée**, alors qu'elle aurait été plus rapide
-encore : `CLAUDE.md` promet que régler le lexique a un effet **immédiat** sur
-les offres déjà collectées, parce que le score est une vue. Matérialiser
-romprait cette promesse, et l'on réglerait à l'aveugle.
+**Il a fallu deux passes, et la revue a corrigé mon raisonnement entre les
+deux.** La première ne traitait que la branche `fts` et écartait l'index
+trigramme au motif que « onze balayages restent bon marché ». Mesuré : la
+branche `fts` coûtait alors 37,8 ms et la branche `ilike` de 1 611 à 4 007 ms
+— soit **92 à 98 % du temps restant**. Ce n'était pas bon marché, et ce
+n'était pas un risque futur mais le goulot présent.
 
-Le coût reste linéaire en offres × termes, avec une constante bien plus
-petite. Si le corpus décuple encore, c'est la branche `ilike` — onze termes,
-non indexable telle quelle — qu'il faudra regarder en premier.
+L'erreur de raisonnement mérite d'être retenue : j'avais refusé une **vue
+matérialisée** parce qu'elle romprait la promesse de `CLAUDE.md` — régler le
+lexique a un effet **immédiat**, le score étant une vue. Cet argument est bon
+pour une vue matérialisée ; il ne vaut **rien** pour un index, qui ne diffère
+aucun calcul. J'avais transporté un argument valide vers un cas où il ne
+s'applique pas. La vue matérialisée reste écartée, l'index a été posé.
+
+**Identité du résultat, avec sa réserve** : sur `offer_id`, `score`,
+`core_hits`, `ai_hits` et `red_flags`, jointure externe complète — 3 085
+lignes de chaque côté, **zéro divergence**, et la sélection garde les 87
+mêmes offres, empreinte identique. En revanche `matched_terms` a bien changé
+d'ordre sur 1 160 des 3 085 lignes : un `array_agg(term order by weight desc)`
+sans départage n'a **jamais** été déterministe, l'union a seulement changé
+l'ordre d'arrivée. Corrigé à la racine par un second critère `, term` : l'ordre
+est désormais total, donc stable pour toujours.
+
+**Limite à connaître** : un index trigramme n'aide qu'à partir de trois
+caractères. Un seul terme `ilike` est plus court — `c#` — et retombe sur un
+balayage. Si le lexique gagnait beaucoup de termes très courts en `ilike`, le
+gain fondrait : c'est le premier endroit où regarder si la vue ralentit.
 
 ## Après la phase 2, ou plus tard
 

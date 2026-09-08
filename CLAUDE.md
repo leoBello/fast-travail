@@ -314,10 +314,11 @@ mesuré, deux fois sur deux. Rendu du 2026-09-08 : 5 offres écartées,
 cohérent avec une sélection qui passe de 92 à 87.
 
 Les coûts ne sont pas du même ordre et ne se lisent pas ensemble :
-`offers_shortlist` met environ **1,9 s**, dont l'essentiel dans
-`offer_lexical_score` — un coût **linéaire** en offres × termes du lexique,
-qui grandira avec le corpus. Il était de 3,7 s avant la migration
-`20260908230000`, qui a rendu la branche `fts` du lexique indexable. `offers_hidden_duplicates` met environ
+`offers_shortlist` met environ **0,76 s**, contre 3,7 s avant les migrations
+`20260908230000` et `20260908240000`, qui ont rendu indexables les deux
+branches du lexique — GIN sur `description_tsv` pour les 56 termes `fts`,
+GIN trigramme pour les 11 termes `ilike`. Le coût reste linéaire en offres ×
+termes, avec une constante bien plus petite. `offers_hidden_duplicates` met environ
 **0,27 s** : elle formait un produit cartesien complet et coûtait 3,8 s, en
 deux temps corrigés — d'abord une CTE `materialized`, qui l'a rendue bon
 marché sans la rendre linéaire, puis la suppression de l'auto-jointure au
