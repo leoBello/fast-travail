@@ -448,3 +448,52 @@ Deno.test('sans --query, aucun filtre label n’est appliqué', async () => {
     `aucun filtre label n'était attendu : ${JSON.stringify(state.filters)}`,
   );
 });
+
+Deno.test('un throw après le chargement des réglages marque quand même la source en échec', async () => {
+  const state: FakeState = {
+    enabled: true,
+    updates: [],
+    queries: [QUERY],
+    knownIds: [],
+    filters: [],
+  };
+  // fakeDb sert normalement `state.queries` via order() ; on le fait échouer
+  // ici pour simuler ce que tout throw survenant après le chargement des
+  // réglages (robots.txt en 404, lecture de search_queries…) provoquait :
+  // aucune ligne collection_runs, sources.last_status figé sur la veille.
+  const db = fakeDb(state);
+  const originalFrom = db.from.bind(db);
+  const failingDb = {
+    ...db,
+    from(table: string) {
+      if (table === 'search_queries') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => Promise.resolve({ data: null, error: { message: 'panne réseau' } }),
+              }),
+            }),
+          }),
+        };
+      }
+      return originalFrom(table);
+    },
+  } as unknown as DbClient;
+
+  const err = await assertRejects(
+    () =>
+      runScraperMain(scraper(), host([]), {
+        createDb: () => failingDb,
+        createFetcher: fakeFetcherFactory(ROBOTS_OK, []),
+      }),
+    Error,
+    'panne réseau',
+  );
+  assert(err, 'une erreur était attendue');
+
+  assert(
+    state.updates.some((u) => u.last_status === 'failed'),
+    `la source doit être marquée en échec : ${JSON.stringify(state.updates)}`,
+  );
+});

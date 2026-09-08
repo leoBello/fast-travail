@@ -15,6 +15,27 @@ REM verifie avec : cmd /c "where deno" apres avoir pose ce PATH.
 setlocal
 set PATH=%PATH%;C:\Users\LO1A5A~1\AppData\Local\Microsoft\WinGet\Links
 cd /d "%~dp0.."
+
 call npm run scrape:free-work -- --mode delta --trigger cron
+set FW_STATUS=%ERRORLEVEL%
+
+REM Collective tourne toujours, meme si Free-Work vient d'echouer : un site
+REM casse ne doit jamais faire taire l'autre.
 call npm run scrape:collective -- --mode delta --trigger cron
-endlocal
+set COLLECTIVE_STATUS=%ERRORLEVEL%
+
+REM Task Scheduler ne voit que LE code de sortie final de ce script. Sans
+REM capturer les deux ERRORLEVEL separement, un Free-Work casse restait
+REM invisible des que Collective, lance juste apres, rendait 0 a son tour :
+REM le planificateur ne voyait alors que ce dernier code, silencieusement.
+set EXIT_CODE=0
+if not "%FW_STATUS%"=="0" (
+  echo scrape-daily : Free-Work a echoue, code %FW_STATUS%
+  set EXIT_CODE=%FW_STATUS%
+)
+if not "%COLLECTIVE_STATUS%"=="0" (
+  echo scrape-daily : Collective a echoue, code %COLLECTIVE_STATUS%
+  set EXIT_CODE=%COLLECTIVE_STATUS%
+)
+
+endlocal & exit /b %EXIT_CODE%

@@ -150,60 +150,84 @@ export async function runScraperMain(
     return 0;
   }
 
-  const fetcher = deps.createFetcher
-    ? deps.createFetcher(settings)
-    : new PoliteFetcher({ userAgent: settings.userAgent, minDelayMs: settings.minDelayMs });
+  // À partir d'ici, la source est connue (`settings` a été lu avec succès) :
+  // tout throw qui suit — robots.txt en échec de fetch, lecture de
+  // search_queries, la collecte elle-même — doit laisser une trace en base
+  // plutôt que de faire mourir le process sur un rejet non rattrapé. Sans ce
+  // filet, `sources.last_status` restait figé sur le succès de la veille et
+  // aucune ligne `collection_runs` n'existait pour le run raté. Le cas le
+  // plus probable est un 404 sur robots.txt : `PoliteFetcher` ne le retente
+  // pas et lève directement.
+  try {
+    const fetcher = deps.createFetcher
+      ? deps.createFetcher(settings)
+      : new PoliteFetcher({ userAgent: settings.userAgent, minDelayMs: settings.minDelayMs });
 
-  // robots.txt à CHAQUE exécution : une autorisation constatée en septembre ne
-  // vaut rien en décembre. Le verdict est écrit même à blanc — c'est un fait sur
-  // le monde extérieur, et une répétition à blanc sert justement à l'apprendre.
-  const robots = await fetcher.get(`${settings.baseUrl}/robots.txt`);
-  const rules = parseRobots(robots.body, settings.userAgent);
-  const allowed = scraper.pathsUsed.every((path) => rules.allows(path));
-  await recordRobotsCheck(db, scraper.source, allowed);
-  if (!allowed) {
-    log('error', 'robots.txt refuse désormais la collecte : arrêt', { source: scraper.source });
-    if (!dryRun) await markSourceRun(db, scraper.source, 'failed');
-    return 1;
+    // robots.txt à CHAQUE exécution : une autorisation constatée en septembre ne
+    // vaut rien en décembre. Le verdict est écrit même à blanc — c'est un fait sur
+    // le monde extérieur, et une répétition à blanc sert justement à l'apprendre.
+    const robots = await fetcher.get(`${settings.baseUrl}/robots.txt`);
+    const rules = parseRobots(robots.body, settings.userAgent);
+    const allowed = scraper.pathsUsed.every((path) => rules.allows(path));
+    await recordRobotsCheck(db, scraper.source, allowed);
+    if (!allowed) {
+      log('error', 'robots.txt refuse désormais la collecte : arrêt', { source: scraper.source });
+      if (!dryRun) await markSourceRun(db, scraper.source, 'failed');
+      return 1;
+    }
+
+    let builder = db
+      .from('search_queries')
+      .select('*')
+      .eq('source', scraper.source)
+      .eq('enabled', true);
+    if (onlyLabel) builder = builder.eq('label', onlyLabel);
+
+    const { data, error } = await builder.order('priority', { ascending: true });
+    if (error) throw new Error(`lecture des requêtes : ${error.message}`);
+    const queries = (data ?? []) as SearchQueryRow[];
+    if (queries.length === 0) throw new Error(`aucune requête active pour ${scraper.source}`);
+
+    const knownExternalIds = scraper.needsKnownExternalIds && mode === 'delta'
+      ? await loadKnownExternalIds(db, scraper.source)
+      : new Set<string>();
+
+    const ctx: ScraperRunContext = {
+      fetcher,
+      settings,
+      mode,
+      windowDays: WINDOW_DAYS[mode],
+      knownExternalIds,
+    };
+
+    const summary = await runCollection({
+      db,
+      source: scraper.source,
+      mode,
+      trigger,
+      dryRun,
+      queries,
+      fetchAll: (query) => scraper.fetchAll(ctx, query),
+      map: (raw) => scraper.map(raw),
+    });
+
+    if (!dryRun) await markSourceRun(db, scraper.source, summary.status);
+    console.log(JSON.stringify(summary, null, 2));
+
+    return summary.status === 'failed' ? 1 : 0;
+  } catch (err) {
+    if (!dryRun) {
+      try {
+        await markSourceRun(db, scraper.source, 'failed');
+      } catch (markErr) {
+        // Ne jamais masquer l'erreur d'origine derrière celle-ci : elle est
+        // seulement journalisée, l'erreur d'origine continue son chemin.
+        log('error', 'échec du marquage du run après une erreur', {
+          source: scraper.source,
+          error: markErr instanceof Error ? markErr.message : String(markErr),
+        });
+      }
+    }
+    throw err;
   }
-
-  let builder = db
-    .from('search_queries')
-    .select('*')
-    .eq('source', scraper.source)
-    .eq('enabled', true);
-  if (onlyLabel) builder = builder.eq('label', onlyLabel);
-
-  const { data, error } = await builder.order('priority', { ascending: true });
-  if (error) throw new Error(`lecture des requêtes : ${error.message}`);
-  const queries = (data ?? []) as SearchQueryRow[];
-  if (queries.length === 0) throw new Error(`aucune requête active pour ${scraper.source}`);
-
-  const knownExternalIds = scraper.needsKnownExternalIds && mode === 'delta'
-    ? await loadKnownExternalIds(db, scraper.source)
-    : new Set<string>();
-
-  const ctx: ScraperRunContext = {
-    fetcher,
-    settings,
-    mode,
-    windowDays: WINDOW_DAYS[mode],
-    knownExternalIds,
-  };
-
-  const summary = await runCollection({
-    db,
-    source: scraper.source,
-    mode,
-    trigger,
-    dryRun,
-    queries,
-    fetchAll: (query) => scraper.fetchAll(ctx, query),
-    map: (raw) => scraper.map(raw),
-  });
-
-  if (!dryRun) await markSourceRun(db, scraper.source, summary.status);
-  console.log(JSON.stringify(summary, null, 2));
-
-  return summary.status === 'failed' ? 1 : 0;
 }
