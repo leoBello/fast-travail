@@ -59,29 +59,34 @@ une occasion de bouger quelque chose.
 
 ---
 
-## À faire avant la phase 2
+## Fait avant la phase 2
 
-### Perf — `offers_shortlist` grandit en offres × termes du lexique
+### Perf d'`offers_shortlist` — divisée par deux, le 2026-09-08
 
-**Coût estimé : 1 h 30 à 2 h.** C'est de la conception, pas un correctif.
+La liste quotidienne mettait **3,7 s**, et ce coût grandissait avec le corpus.
+Le profil, mesuré : `offer_lexical_score` faisait une boucle imbriquée de
+4 146 offres × 67 termes, soit **277 782 évaluations**, pour 5 832 ms.
 
-`offers_shortlist` met **3,7 s**, dont 3,3 s dans `offer_lexical_score` : une
-boucle imbriquée de 4 112 offres × 67 termes, **86 631 évaluations** de
-`@@ plainto_tsquery` ou de `ILIKE`, sans index utilisable. Le corpus a triplé
-en une semaine.
+La cause n'était pas le volume mais la **forme de la requête**. L'index GIN sur
+`description_tsv` existe depuis la première migration, mais la vue exprimait la
+correspondance par un `case l.match_type when 'fts' … when 'ilike' … end` dans
+la condition de jointure : un `case` qui mélange deux opérateurs incompatibles
+n'est pas indexable, donc les **56 termes `fts` sur 67** étaient évalués ligne
+à ligne alors qu'ils étaient indexables.
 
-Pourquoi maintenant plutôt qu'après : **la phase 2 lira cette vue**. Son modèle
-de coût — combien d'offres méritent un appel payant — s'appuie dessus. Un
-pré-filtre à quinze secondes contamine tout ce qui se construit au-dessus, et
-se corrige beaucoup plus mal une fois que du code en dépend.
+Séparer les deux modes par une union rend la branche `fts` indexable :
+`offer_lexical_score` passe de **5 832 à 1 781 ms**, et `offers_shortlist` de
+**3,7 à 1,94 s**. Résultat prouvé identique — jointure externe complète entre
+les deux formulations : 3 085 lignes de chaque côté, **zéro divergence**.
 
-Deux pistes à mesurer avant de choisir : une vue matérialisée rafraîchie par le
-cron après chaque collecte, ou un index qui rende la correspondance lexicale
-indexable. La première est simple et suffirait ; la seconde est plus propre
-mais bute sur le fait que la moitié du lexique est en `ILIKE`, non indexable
-tel quel.
+**Une vue matérialisée a été écartée**, alors qu'elle aurait été plus rapide
+encore : `CLAUDE.md` promet que régler le lexique a un effet **immédiat** sur
+les offres déjà collectées, parce que le score est une vue. Matérialiser
+romprait cette promesse, et l'on réglerait à l'aveugle.
 
----
+Le coût reste linéaire en offres × termes, avec une constante bien plus
+petite. Si le corpus décuple encore, c'est la branche `ilike` — onze termes,
+non indexable telle quelle — qu'il faudra regarder en premier.
 
 ## Après la phase 2, ou plus tard
 
