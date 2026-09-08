@@ -331,9 +331,12 @@ profit d'une fonction de fenêtrage, qui a fait tomber le produit de
 
 C'est la recette à préférer depuis la phase 2 : `offers_shortlist` répond à
 « qu'est-ce que le lexique a reconnu », `offers_scored` à « qu'est-ce qui
-correspond au CV ». Les deux ne se recouvrent pas — mesuré le 2026-09-08,
-6 des 19 offres notées 70 ou plus, et 53 des 81 notées plus de 50, sont
-**absentes** d'`offers_shortlist`.
+correspond au CV ». Les deux ne se recouvrent pas — remesuré le 2026-09-08 au
+soir, après les correctifs de la revue finale, **5 des 17** offres notées 70 ou
+plus et **33 des 61** notées plus de 50 sont **absentes** d'`offers_shortlist`.
+Ces quatre nombres bougent à chaque collecte *et* à chaque migration qui touche
+au barème (`20260909040000` a changé les `final_score` eux-mêmes) : les
+recompter, jamais les recopier — la recette est dans `docs/ETAT.md`.
 
 ```sql
 select title, company_name, city, final_score, fit_score, engagement, work_mode,

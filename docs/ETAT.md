@@ -29,6 +29,16 @@ chaque matin. Le classement se lit dans `offers_scored`. Amorçage complet :
 11,70 €, 0 offre en erreur. Détail, mesures et défauts trouvés en revue :
 section « Phase 2 — Scoring IA » plus bas.
 
+**La revue finale de la phase 2 est traitée** *(2026-09-08)*. Quatre défauts,
+dont deux graves, tous corrigés sans re-payer un seul jugement : le bonus de
+rémunération appliquait la formule de **TJM aux salaires annuels** (94 % des
+CDI au plafond, contre 6 % des freelances — l'inverse de la préférence
+déclarée) ; le cron **ne tenait pas le flux réel** et perdait son reliquat en
+silence ; une **erreur transitoire** d'API faisait disparaître une offre
+définitivement ; et `.env.local.example` n'avait jamais reçu les variables
+`ANTHROPIC_*`. Deux migrations, `20260909040000` et `20260909050000`. Détail et
+mesures avant/après : « Les correctifs de la revue finale » plus bas.
+
 **Le plan A est terminé.** Les 13 tâches sont livrées.
 
 **Le plan « confiance par requête » (4 tâches, plus les correctifs de sa
@@ -709,11 +719,36 @@ personne n'avait lues** — le seul endroit du système où le critère fondateu
 du dépôt (« une offre jamais affichée est perdue ») était violé, et il l'était
 en silence.
 
-Le jugement a posteriori tranche sans ambiguïté : **6 des 19 offres notées 70
-ou plus, et 53 des 81 notées plus de 50, ne sont pas dans `offers_shortlist`**.
+Le jugement a posteriori tranche sans ambiguïté : **5 des 17 offres notées 70
+ou plus, et 33 des 61 notées plus de 50, ne sont pas dans `offers_shortlist`**
+(remesuré le 2026-09-08 au soir, après les correctifs de la revue finale).
 Sous l'ancien contrat elles n'auraient jamais été lues. Le lexique n'a pas
 disparu pour autant — il reste un signal de tri dans `offers_shortlist` — mais
 il a cessé d'être une **porte**.
+
+Ces quatre nombres bougent, et il faut savoir pourquoi avant de les recopier.
+La version précédente de ce paragraphe annonçait « 6 des 19 » et « **53** des
+81 » : le 53 était déjà faux le jour même (51 à la remesure, `offers_shortlist`
+ayant changé sous les migrations de dédoublonnage), et les quatre ont ensuite
+bougé pour une seconde raison, indépendante — la migration
+`20260909040000` a corrigé `bonus_remuneration` et plafonné `malus_technos`,
+donc **les `final_score` eux-mêmes ont changé**. Les dénominateurs passent de
+19 à 17 et de 81 à 61. La conclusion, elle, ne bouge pas : plus de la moitié
+des offres bien notées restent invisibles pour le lexique. **Remesurer, jamais
+recopier** :
+
+```sql
+with sc as materialized (select id, final_score from offers_scored),
+     sl as materialized (select id from offers_shortlist)
+select count(*) filter (where final_score >= 70)                             as notees_70p,
+       count(*) filter (where final_score >= 70 and id not in (select id from sl)) as absentes_70p,
+       count(*) filter (where final_score > 50)                              as notees_50p,
+       count(*) filter (where final_score > 50 and id not in (select id from sl))  as absentes_50p
+from sc;
+```
+
+Les deux `materialized` ne sont pas décoratifs, pour la même raison que dans
+`CLAUDE.md` : sans eux le planificateur rejoue les vues à chaque ligne.
 
 **`claude-sonnet-5`, pas Haiku.** Le ROADMAP annonçait Haiku pour économiser.
 L'écart mesuré était de 4 €/mois : payer un modèle faible pour économiser un
@@ -774,15 +809,23 @@ offre au lieu des ~250 prévus**, parce que `claude-sonnet-5` émet un bloc de
 réflexion *facturé en sortie*. Décomposition de la facture : 8,26 $ de sortie
 contre 2,79 $ d'entrée fraîche et 1,64 $ de cache — **la sortie pèse 65 % du
 total**, là où le design ne la regardait pas. Sur le flux quotidien estimé par
-le design (~41 offres éligibles par jour), le régime permanent coûtera donc de
+le design (~41 offres éligibles par jour), le régime permanent coûtait donc de
 l'ordre de **12 €/mois, pas 6**. Le design a été corrigé en conséquence.
 
+**Et ce 12 €/mois est à son tour trop bas** *(revue finale, 2026-09-08)* :
+l'hypothèse de flux dont il hérite — les ~41 offres/jour du design — était
+elle-même fausse, biaisée par une moyenne sur 31 jours (voir « Les correctifs
+de la revue finale »). Au flux remesuré de **64,9 à 77,6 offres/jour** et à
+1 centime l'offre, le régime permanent est de l'ordre de **20 €/mois**. Le
+cron étant plafonné à 100 offres par exécution, la borne haute est de 30 €/mois.
+
 Réserve de méthode sur ce « par mois » : `first_seen_at` ne porte que deux
-jours de recul, tout le reste étant du backfill, et le 12 €/mois est le
-6 €/mois du design multiplié par deux — il hérite donc de l'hypothèse de flux
-du design, qui était elle-même déduite de `published_at` et non mesurée. **La
+jours de recul, tout le reste étant du backfill. Les deux estimations
+successives sont des **produits d'hypothèses de flux**, pas des factures. **La
 première semaine de `score-daily` donnera le premier chiffre réel**, et c'est
-lui qu'il faudra écrire ici.
+lui qu'il faudra écrire ici — c'est la troisième fois que ce nombre est corrigé
+à la hausse, ce qui est en soi le signal qu'il faut le mesurer et non le
+déduire.
 
 **Le cache de prompt fonctionne** — c'était le risque numéro un du design, un
 cache silencieusement inactif triplant la facture sans rien signaler. 85,4 %
@@ -793,10 +836,15 @@ concurrence de N, les N premiers appels d'une vague paient tous la prime
 d'écriture, aucun n'ayant encore fini d'écrire l'entrée quand les autres
 partent.
 
-**Le classement fonctionne.** En tête au 2026-09-08 : « Développeur Front-End
-React Senior » full remote, « Développeur Full Stack » full remote avec IA
-agentique, « Senior Fullstack Engineer » freelance full remote — les trois à
-100,0. Et le point qui prouve que la séparation compétence / préférence tient
+**Le classement fonctionne.** En tête au 2026-09-08, après les correctifs de la
+revue finale : « Senior Fullstack Engineer » freelance full remote
+(`fit_score` 90) et « Développeur Front-End React Senior » full remote
+(`fit_score` 88), tous deux à 100,0. *(Avant la migration `20260909040000`, un
+troisième les rejoignait à 100,0 : un « Développeur Full Stack » CDI à
+`fit_score` **68**, hissé là par le bonus de rémunération mal appliqué. Il est
+maintenant à 94,5 — le classement n'était donc pas encore juste au moment où ce
+paragraphe a été écrit la première fois.)* Et le point qui prouve que la
+séparation compétence / préférence tient
 en conditions réelles : **les verdicts ne mentionnent jamais le télétravail ni
 le TJM**. Le modèle juge la stack, la vue applique le reste.
 
@@ -872,6 +920,14 @@ repli aux **valeurs semées** pour les trois seuils, où 0 serait dangereux :
 `duration_long_months` 6 (sinon bonus de mission longue à toutes),
 `freshness_grace_days` 7 (sinon décote dès le premier jour).
 
+**Cette protection est une obligation permanente, pas un correctif ponctuel** :
+la migration `20260909040000` a porté le barème à **18 poids**, et ses quatre
+nouveaux (`salaire_floor` → 40000, `salaire_bonus_per_10k` → 0,
+`salaire_bonus_cap` → 0, `unwanted_tech_malus_cap` → 0) suivent la même règle —
+repli à la valeur semée pour le seul qui est un **seuil**, à 0 pour les autres.
+Tout poids ajouté par la suite doit l'être aussi ; un `coalesce` oublié ne
+casse rien de visible, il rend 100,0 en silence.
+
 **Une boucle infinie payante.** `score-backfill.ts` bouclait tant que
 `candidates > 0`. Mais une offre dont **l'écriture** échoue reste candidate :
 elle était re-jugée et **re-payée** sans fin. Le relecteur l'a reproduite, et
@@ -940,6 +996,103 @@ opaque n'est pas corrigeable à l'œil, et une vue SQL ne peut pas réutiliser s
 propres alias de sortie dans la même projection. La revue finale n'a pas trouvé
 mieux. Si quelqu'un propose une CTE intermédiaire qui expose les deux sans
 répéter, la prendre.
+
+**Le prix de cette duplication a été payé le 2026-09-08** : les deux défauts de
+barème corrigés par `20260909040000` étaient chacun présents **deux fois**, et
+il fallait corriger les deux copies. La duplication reste le moindre mal, mais
+elle n'est pas gratuite — toute correction de barème doit se relire à deux
+endroits, et c'est maintenant mesuré, plus supposé.
+
+### Les correctifs de la revue finale — 2026-09-08
+
+Quatre défauts trouvés après la livraison, tous mesurés et reproduits avant
+correction. Ils partagent un trait : **aucun ne provoquait d'erreur**. Chacun
+rendait un résultat plausible.
+
+**1. `bonus_remuneration` appliquait la formule de TJM aux salaires annuels.**
+L'expression lisait `coalesce(compensation_max, compensation_min)` sans jamais
+regarder `compensation_kind`, divisait par 100 et multipliait par
+`tjm_bonus_per_100`. Un salaire de 35 000 € donnait `(35000-400)/100*3 = 1038`,
+donc le plafond de 12. L'axe censé récompenser un bon TJM freelance
+récompensait donc systématiquement le CDI salarié — l'inverse exact de la
+préférence déclarée (`freelance_bonus` 12 contre `cdi_bonus` 2).
+
+| `compensation_kind` | n | bonus moyen avant | au plafond avant | bonus moyen après | au plafond après |
+|---|---:|---:|---:|---:|---:|
+| `salaire` | 616 | **11,29** | **578** (94 %) | **2,30** | **16** (2,6 %) |
+| `tjm` | 85 | 3,61 | 5 | 3,61 *(inchangé)* | 5 *(inchangé)* |
+| *(null)* | 568 | 0 | 0 | 0 | 0 |
+
+Effet en tête de classement : le « Développeur Full Stack (H/F) » CDI à 45 k€,
+`fit_score` **68**, était à **100,0** — à égalité avec un freelance à
+`fit_score` 90. Il redescend à **94,5**, et les deux offres à 100,0 sont
+désormais celles à `fit_score` 90 et 88.
+
+Ce qui a été retenu : une **échelle propre au salaire**, pas l'absence de
+bonus. Ne rien accorder aurait mis un CDI à 75 k€ et un CDI à 30 k€ au même
+rang. Les trois nouveaux poids (`salaire_floor` 40000,
+`salaire_bonus_per_10k` 3, `salaire_bonus_cap` 12) sont calibrés sur la
+conversion usuelle TJM ≈ (salaire annuel × 2) / 218 jours, qui fait
+correspondre `tjm_floor` 400 à ~43 600 € et le plafond à 800 €/jour ↔ 80 k€ :
+les deux échelles sont donc **équivalentes**, pas simplement plausibles. Voir
+**P22** pour la réserve d'amont sur l'unité des montants.
+
+**2. Le cron quotidien ne tenait pas le flux, et le reliquat était invisible.**
+`score-daily` demandait 60 offres. Le « ~41 offres/jour » du design venait
+d'une moyenne sur 31 jours, **biaisée** : les sources retirent les annonces
+expirées, donc les journées anciennes sont sous-représentées. Remesuré :
+
+| Fenêtre | Offres/jour |
+|---|---:|
+| 31 jours | 40,0 *(le chiffre biaisé)* |
+| 13 jours | 64,9 |
+| 7 jours | **77,6** |
+
+Jour par jour sur 16 jours : moyenne 58,4, **maximum 141**, et **8 journées
+au-dessus de 60**. Un jour à 141, le cron en jugeait 60 et en laissait 81 ; le
+lendemain ~78 nouvelles arrivaient avec un `published_at` plus récent et
+**passaient devant**. La file est un **LIFO**, et le reliquat est toujours fait
+des offres les plus anciennes, qui reculent un peu plus chaque jour. Rien ne le
+signalait : HTTP 200, `{"candidates":60,"scored":60,"failed":0}` — indiscernable
+d'une journée entièrement traitée.
+
+Corrigé en deux endroits. Migration `20260909050000` : corps du cron porté à
+`{"limit":100,"concurrency":4}`, soit 25 tours à 4,71 s ≈ 118 s, sous le
+plafond de 150 s d'une Edge Function, et `timeout_milliseconds` relevé de
+120 000 à **150 000** — à 118 s de travail, 120 000 ne laissait que 2 s de
+marge, et un dépassement aurait fait perdre la **réponse**, donc rendu
+`writeFailures` invisible, exactement ce que la valeur explicite visait à
+empêcher. Code : `runScoring` journalise en `warn` quand
+`candidates === limit`, avec ce qu'il faut faire.
+
+100 ne couvre pas les deux journées à 141 et 121 : ce n'est pas un oubli mais
+la limite de ce qu'une exécution quotidienne peut absorber (14 journées sur 16
+couvertes contre 8 avant), et le `warn` rend les deux autres **visibles**.
+Aller plus loin demande une **seconde exécution** dans la journée, pas un
+`limit` plus grand — la contrainte est le plafond de 150 s.
+
+**3. Une erreur transitoire faisait disparaître une offre définitivement.**
+Toute exception du worker écrivait une ligne d'erreur portant les versions
+courantes, ce qui sort l'offre d'`offers_ai_candidates` **pour toujours**. Une
+surcharge d'API de trois secondes à concurrence 4 coûtait donc **quatre offres
+perdues, sans un seul appel** — le mode d'échec que ce dépôt proscrit.
+
+Le correctif est le plus simple possible, et surtout **il n'ajoute aucun
+réessai** : `isRetryableFailure` (dans `claude.ts`) distingue l'échec rejouable
+— 429, 5xx, coupure réseau, statut 0 — de l'échec permanent — 4xx hors 429, ou
+un HTTP 200 illisible. Le rejouable **n'écrit rien** : l'offre reste candidate
+et repassera au prochain cron, ce qui coûte un centime. Le permanent continue
+d'écrire sa ligne, sans quoi un jugement irrécupérable bloquerait la file. Le
+repli par défaut est « rejouable », qui est le côté sûr : au pire un appel de
+plus. `ScoringSummary` compte les deux séparément (`failedPermanent`,
+`failedRetryable`) ; `failed` reste leur somme, donc les fusibles du backfill
+et la tâche 6 ne changent pas de comportement.
+
+**4. `.env.local.example` n'avait jamais reçu les variables de la phase 2.**
+`ANTHROPIC_API_KEY` et `ANTHROPIC_WORKSPACE_ID` sont exigées par
+`score-offers/index.ts` **et** par `scripts/score-backfill.ts` ; ce fichier est
+le seul inventaire versionné de la configuration, donc une réinstallation
+échouait sur « variable d'environnement manquante ». Ajoutées, sans valeur.
 
 ---
 
@@ -1319,7 +1472,30 @@ signal disponible sans coder de nouveau critère.
 
 ---
 
-### P15 — Le malus « technos non désirées » rejoue en score le signal rouge que le lexique avait délibérément refusé
+### ~~P15 — Le malus « technos non désirées » rejoue en score le signal rouge que le lexique avait délibérément refusé~~ *(résolu)*
+
+**Résolu le 2026-09-08** par la migration
+`20260909040000_remuneration_par_nature_et_plafond_technos`, qui ajoute le
+poids `unwanted_tech_malus_cap` (semé à 15, la valeur d'**un seul** terme) et
+écrit `least(w.unwanted_tech_malus_cap, b.unwanted_count * w.unwanted_tech_malus)`
+dans les **deux** copies de l'expression — la colonne exposée `malus_technos`
+et la somme du `final_score` — avec son `coalesce` de protection, comme les 14
+poids précédents. Mesuré après migration : le malus maximal appliqué passe de
+**45 à 15**, les 122 offres pénalisées le restent, mais aucune ne peut plus
+perdre davantage que le plus gros bonus du barème.
+
+**La piste écrite ci-dessous était fausse, et c'est le genre d'erreur que ce
+dépôt a déjà payé deux fois.** Plafonner le malus n'était **pas** « un `UPDATE`
+sur `scoring_weights` » : ajouter une ligne de poids ne sert à rien tant que la
+**vue ne la lit pas**, et modifier la vue est une migration. La règle générale
+tient toujours — les valeurs des poids s'ajustent par `UPDATE`, gratuitement et
+rétroactivement — mais elle ne s'étend pas à l'ajout d'un poids **neuf** : celui-là
+change la projection.
+
+Le texte d'origine est conservé ci-dessous, la mesure qu'il porte restant utile.
+
+---
+
 
 Le ROADMAP porte une décision structurante explicite : « `java` et `angular`
 en contexte (+1), pas en signal rouge — un rouge écarterait les offres
@@ -1344,11 +1520,14 @@ cherchait à éviter : une offre React portée par une ESN dont la stack serveur
 est en Java.
 
 *Pistes, par ordre de coût croissant* : plafonner le malus (`least(malus,
-unwanted_tech_malus)`), ce qui est un `UPDATE` sur `scoring_weights` si le
-plafond y est ajouté comme poids ; ou bien retirer `java` de la liste
-`unwanted`, ce qui est un `UPDATE` sur `profile_skills` **mais repaie les
-offres** puisque la liste part dans le prompt et que le CV changerait de
-version. La première piste est gratuite et rétroactive : la préférer.
+unwanted_tech_malus)`) — ~~un `UPDATE` sur `scoring_weights` si le plafond y est
+ajouté comme poids~~ **une migration**, corrigé ci-dessus : la vue doit
+référencer le nouveau poids, donc la projection change ; ou bien retirer `java`
+de la liste `unwanted`, ce qui est un `UPDATE` sur `profile_skills` **mais
+repaie les offres** puisque la liste part dans le prompt et que le CV changerait
+de version. La première piste est retenue : rétroactive, et sans un centime de
+re-jugement. La seconde reste écartée — mesuré, reclasser `java` ferait
+repasser **une seule** offre au-dessus de 50, pour 1 269 jugements rachetés.
 
 *Nuance en faveur du statu quo* : ces 122 offres ont un `fit_score` moyen de
 20, donc le malus tape très majoritairement juste. Seules **2** offres à
@@ -1357,11 +1536,17 @@ place en tête des ouverts sans être bloquant.
 
 ### P16 — Une offre en échec de jugement n'est signalée par aucune vue
 
-Une offre dont le jugement échoue écrit sa ligne dans `offer_ai_scores` avec
-`fit_score` nul et `error` renseigné. C'est délibéré : sans cette ligne elle
-reviendrait indéfiniment dans la file et serait re-payée à chaque passage.
-Mais `offers_scored` exclut les `fit_score` nuls, et **aucune vue ne montre
-ces offres**. Il faut interroger la table à la main pour savoir qu'elles
+**Périmètre réduit depuis la revue finale** : seuls les échecs **permanents**
+écrivent désormais une ligne (voir « Une erreur transitoire faisait disparaître
+une offre définitivement » plus haut). Un échec rejouable n'écrit rien et
+l'offre reste candidate, donc elle ne peut plus disparaître en silence par ce
+chemin-là. Ce qui suit ne vaut plus que pour les échecs permanents.
+
+Une offre dont le jugement échoue **de façon permanente** écrit sa ligne dans
+`offer_ai_scores` avec `fit_score` nul et `error` renseigné. C'est délibéré :
+sans cette ligne elle reviendrait indéfiniment dans la file et serait re-payée
+à chaque passage. Mais `offers_scored` exclut les `fit_score` nuls, et
+**aucune vue ne montre ces offres**. Il faut interroger la table à la main pour savoir qu'elles
 existent :
 
 ```sql
@@ -1450,6 +1635,48 @@ Le problème est donc une absence de garde, pas un défaut actif.
 quand le champ est absent. Le premier lot d'une exécution paie toujours la
 prime d'écriture, donc un cache à zéro sur **tous** les appels d'une exécution
 est le signal à guetter — pas un zéro isolé.
+
+### P21 — Le bloc de réflexion pèse 65 % de la facture, et personne n'a arbitré s'il le vaut
+
+`claude-sonnet-5` émet un bloc `thinking` **facturé en sortie**. Décomposition
+de l'amorçage : **8,26 $ de sortie** contre 2,79 $ d'entrée fraîche et 1,64 $ de
+cache, soit **65 % du total** pour la seule sortie — 434 tokens par offre au
+lieu des ~250 que le design prévoyait. C'est la cause unique de l'écart entre
+les 6 € annoncés et les 11,70 € payés, et donc du régime permanent estimé à
+~12 €/mois plutôt que 6.
+
+Ce bloc n'est pas gratuit en qualité non plus : il a été la cause du défaut de
+troncature de la tâche 8 (réflexion et texte puisent dans le **même** budget de
+sortie, d'où 75 JSON coupés au plafond de 1 024 tokens ; `MAX_TOKENS` est passé
+à 8 192 pour cela).
+
+**Ce n'est pas un défaut, c'est un arbitrage non tranché** — qualité contre
+coût — et il appartient à l'utilisateur, pas à un relecteur. Le désactiver
+diviserait la facture par environ trois ; personne n'a mesuré ce que le
+jugement y perdrait sur du texte français ambigu, qui est précisément la tâche
+pour laquelle Sonnet a été préféré à Haiku. **À trancher explicitement, avec
+une mesure de qualité avant/après sur un échantillon**, pas au fil de l'eau.
+Attention au coût du changement : toucher au paramètre ne change pas
+`PROMPT_VERSION`, donc les jugements déjà payés resteraient en base, mais ils
+auraient été rendus dans un autre régime — le corpus deviendrait hétérogène.
+
+### P22 — Les montants `salaire` n'ont pas d'unité, et mélangent horaire, mensuel et annuel
+
+Mesuré le 2026-09-08 sur les 599 valeurs de salaire extraites : elles vont de
+**4 à 150 000**. 23 sont sous 1 000 (des taux horaires) et 79 entre 1 000 et
+20 000 (des mensuels, ou des horaires annualisés à tort) — soit **102, 17 %,
+qui ne sont pas des montants annuels**. Le schéma de sortie ne porte **aucun
+champ d'unité** : `compensation_kind` dit `salaire` ou `tjm`, jamais « par
+heure » ou « par an ».
+
+Le correctif du 2026-09-08 (`20260909040000`) **neutralise** la contamination
+sans la corriger : `salaire_floor = 40000` place toutes ces valeurs sous le
+plancher, donc elles reçoivent 0 au lieu d'un bonus calculé sur une unité
+fausse. C'est suffisant pour le classement, et faux comme donnée.
+
+**Pourquoi ce n'est pas corrigé** : ajouter un champ d'unité au schéma change
+`PROMPT_VERSION`, donc fait **repayer les 1 269 jugements**. À grouper avec la
+prochaine évolution du prompt qui les repaiera de toute façon — jamais seul.
 
 ---
 

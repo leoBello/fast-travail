@@ -19,7 +19,7 @@ Mesuré le 2026-09-08, sur la base réelle :
 | Corpus entier, 4 146 offres | 7,96 M car. ≈ **2,3 M tokens** |
 | Offres franchissant le filtre **géographique** mais écartées par le lexique | **1 182** |
 | Flux en régime permanent (retenues par jour de publication, 13 jours) | **4 à 5 / jour** |
-| Flux géographiquement éligible | **~41 / jour** |
+| Flux géographiquement éligible | ~~**~41 / jour**~~ **64,9 à 77,6 / jour**, max **141** *(corrigé, voir ci-dessous)* |
 | Coût mensuel Sonnet 5 sur le périmètre géographique, cache compris | ~~**~6 €/mois**~~ **~12 €/mois** *(corrigé, voir ci-dessous)* |
 | Coût d'amorçage, une fois | ~~**~6 €**~~ **11,70 € mesurés** |
 
@@ -243,8 +243,22 @@ Idempotent, reprenable après une coupure, et sans état à suivre.
 
 **Cadence** : `pg_cron` à **7 h 00 UTC**, après les quatre collectes
 (`ft-daily` 6 h UTC, `adzuna-daily` 6 h 30 UTC, scrapers 7 h 15 heure locale).
-Volume quotidien attendu : ~41 offres, largement dans les 150 s de plafond
-d'une Edge Function avec une concurrence de 4.
+~~Volume quotidien attendu : ~41 offres, largement dans les 150 s de plafond
+d'une Edge Function avec une concurrence de 4.~~
+
+> **Corrigé le 2026-09-08 (revue finale).** Le « ~41 / jour » était une moyenne
+> sur **31 jours**, et cette fenêtre est **biaisée** : les sources retirent les
+> annonces expirées, donc les journées anciennes du corpus sont
+> sous-représentées et tirent la moyenne vers le bas. Remesuré sur le même
+> périmètre : **40,0 / jour** sur 31 jours, **64,9** sur 13 jours, **77,6** sur
+> 7 jours. Jour par jour sur 16 jours : moyenne 58,4, **maximum 141**, et
+> **8 journées au-dessus de 60**. Les fenêtres récentes sont l'estimation
+> honnête. Le cron a été porté à `{"limit":100,"concurrency":4}` (migration
+> `20260909050000`) — 25 tours à 4,71 s ≈ 118 s, sous les 150 s — et
+> `runScoring` avertit désormais quand le lot est plein, parce que 100 ne
+> couvre toujours pas les journées à 141. **La leçon de méthode est celle du
+> dépôt** : une moyenne sur une fenêtre longue, mesurée sur un corpus dont les
+> vieilles lignes s'effacent, sous-estime systématiquement le flux.
 
 **La Batch API est écartée pour l'instant** : moitié prix, mais elle impose un
 état à suivre entre soumission et récupération pour économiser environ 3 € par

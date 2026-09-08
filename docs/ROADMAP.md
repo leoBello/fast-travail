@@ -241,9 +241,13 @@ n'étaient lues par personne.** C'était le seul endroit du système où le crit
 fondateur du dépôt (« une offre jamais affichée est perdue ») était violé, et
 il l'était en silence.
 
-Le jugement a posteriori tranche : **6 des 19 offres notées 70 ou plus, et 53
-des 81 notées plus de 50, ne sont pas dans `offers_shortlist`**. Sous l'ancien
-contrat, elles n'auraient jamais été lues. Le lexique n'a pas disparu — il
+Le jugement a posteriori tranche : **5 des 17 offres notées 70 ou plus, et 33
+des 61 notées plus de 50, ne sont pas dans `offers_shortlist`** (remesuré le
+2026-09-08 au soir, après les correctifs de la revue finale ; la version
+précédente annonçait « 6 des 19 » et « 53 des 81 » — le 53 était faux, et les
+dénominateurs ont ensuite bougé parce que la migration `20260909040000` a
+corrigé le barème lui-même). Sous l'ancien contrat, elles n'auraient jamais
+été lues. Le lexique n'a pas disparu — il
 reste un signal de tri, et il gouverne toujours `offers_shortlist` — mais il a
 cessé d'être une **porte**. Le périmètre de lecture de l'IA est
 `department in ('13','83','84') or remote_label = 'full'`.
