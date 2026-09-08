@@ -9,10 +9,13 @@ Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUD
 
 ## Où en est-on
 
-**Le système tourne tout seul.** 700 offres en base, 6 retenues par la vue
-`offers_shortlist`. La fonction France Travail est déployée et le cron
-`ft-daily` s'exécute **chaque jour à 6 h, PC éteint** — chaîne vérifiée de bout
-en bout : Vault, `pg_net`, fonction déployée, écriture en base.
+**Le système tourne tout seul sur France Travail.** 700 offres en base, 6 retenues
+par la vue `offers_shortlist`. La fonction est déployée et le cron `ft-daily`
+s'exécute **chaque jour à 6 h UTC — 8 h à Marseille, PC éteint**. Chaîne
+vérifiée de bout en bout : Vault, `pg_net`, fonction déployée, écriture en base.
+
+**Adzuna est écrit et testé, pas encore collecté.** Le code est livré et relu ;
+restent la collecte réelle et le déploiement. C'est la tâche en cours.
 
 ```sql
 select * from offers_shortlist order by score desc, published_at desc;
@@ -26,8 +29,9 @@ select * from offers_shortlist order by score desc, published_at desc;
 | Mentionnant LLM / IA / agents | 67 |
 | En full remote | 9 |
 | Requêtes France Travail actives | 24 sur 38 |
+| Requêtes Adzuna semées | 11 |
 | Termes au lexique | 66 |
-| Tests | 70 verts |
+| Tests | 115 verts |
 
 ---
 
@@ -48,8 +52,8 @@ select * from offers_shortlist order by score desc, published_at desc;
 | — | Classification du télétravail + repli département | ✅ |
 | — | Vue `offers_shortlist` | ✅ |
 | 10 | Déploiement France Travail + cron quotidien | ✅ |
-| **11** | **Adzuna : client, mapper, orchestration** | **à faire** |
-| **12** | **Déploiement Adzuna + cron** | **à faire** |
+| **11** | **Adzuna : client, mapper, orchestration** | **code livré et relu ; collecte réelle à faire** |
+| **12** | **Déploiement Adzuna + cron** | **à faire** (secrets déjà poussés) |
 
 Chaque tâche a été relue par un agent distinct, sur conformité au cahier des
 charges **et** sur qualité.
@@ -65,10 +69,41 @@ Le plan sera écrit contre des fixtures HTML réelles, à capturer d'abord. Deux
 contraintes déjà connues : Codeur.com interdit les query strings sauf `?page=N`,
 et Free-Work banne `Wget` et `HTTrack` nommément.
 
+**Fait nouveau à exploiter** : Collective.work et Malt apparaissent comme
+employeurs dans les résultats Adzuna. Adzuna couvre donc déjà une partie des
+cibles du plan B, ce qui peut en réduire le périmètre.
+
 ## Phases 2 à 5
 
 Pas commencées. Voir [`ROADMAP.md`](ROADMAP.md) : scoring IA, tableau de bord,
 génération de CV et lettres, suivi des candidatures.
+
+---
+
+## Ce que la mesure a établi sur Adzuna
+
+Trois faits mesurés le 2026-09-08 gouvernent la conception, et l'un d'eux a
+démenti ce que `ROADMAP.md` et `CLAUDE.md` affirmaient.
+
+**Adzuna tronque toute description à 500 caractères.** Mesuré sur 50 offres :
+min 500, médiane 500, max 500, et 50 sur 50 finissent par « … ». Le lexique,
+filtre principal pour France Travail, ne voit donc presque rien — 1 offre sur
+50 mentionne « react » dans le texte reçu. Mais l'index d'Adzuna voit le texte
+intégral : sur 19 offres rendues par `what_phrase=full remote`, 13 ne portent
+pas la locution dans les 500 caractères reçus. **Sur Adzuna, la requête est
+donc le filtre** — l'inverse exact de France Travail.
+
+**`React` est inutilisable seul** : le lemmatiseur français d'Adzuna le confond
+avec « réacteur ». 60 offres à Marseille, dont 8 titres de réacteurs
+nucléaires et une seule contenant le mot. `what_exclude=réacteur` les ramène
+toutes à zéro, vraies offres React comprises. Le lexique n'est pas menacé :
+`react` y est en `fts`, insensible à cette collision.
+
+**L'affirmation « Adzuna rend 36 offres React à Marseille » était fausse.**
+C'était un `count` gonflé par la collision. Signal réel : 5 offres sur 31
+jours. Là où Adzuna gagne, c'est le **full remote national** — 63 offres sur 31
+jours contre 9 pour France Travail sur 699. Sur le local, les deux sources
+concordent : Marseille est un marché Angular / Java.
 
 ---
 
@@ -94,37 +129,48 @@ mode de travail.
 Sans effet sur `offers_shortlist`, qui ne retient que `full` ou le département
 local. À affiner seulement si la distinction hybride devient utile.
 
-### P3 — Défaut de pagination latent
+### P3 — Défaut de pagination latent (France Travail)
 
 La boucle de `fetchAllPages` avance par pas fixes de 150 sans tenir compte du
 nombre d'offres réellement reçues. Si l'API renvoyait une page intermédiaire plus
 courte sans que le total soit atteint, des offres seraient perdues **en
 silence**.
 
-Non déclenché sur la première collecte réelle — `fetched` égalait
-`total_available` sur les 24 requêtes, et de nouveau sur le run du cron — mais le défaut reste dans le code.
+Non déclenché sur les collectes réelles — `fetched` égalait `total_available`
+sur les 24 requêtes, et de nouveau sur le run du cron — mais le défaut reste
+dans le code. Le client Adzuna, lui, renseigne désormais `truncated`.
 
-### P4 — `supabase functions serve` écrase les variables `SUPABASE_*` *(contourné, à documenter)*
+### P5 — Signal local mince, et ce n'est pas un défaut d'outillage
 
-La commande **réserve** ces noms et ignore silencieusement les valeurs de
-`.env.local`. Une collecte lancée ainsi écrit dans une Postgres locale éphémère
-et vide, en croyant écrire sur le projet distant. Deux contournements :
-`deno run --env-file=.env.local` directement sur le point d'entrée pour un test
-local, ou `npx supabase db query --linked` pour toute vérification en base.
-
-Reste à documenter dans le plan avant la tâche 11, qui porte la même étape.
-
-### P5 — Signal local mince
-
-6 offres retenues sur 700. France Travail seul ne suffit pas pour ce profil :
-zéro offre React dans son index sur Marseille. Adzuna devrait changer l'échelle
-(36 offres React à Marseille, 1481 au national) — c'est l'enjeu de la tâche 11.
+6 offres retenues sur 700. Adzuna ne changera pas l'échelle localement, contre
+ce qu'on espérait : les deux sources concordent, le marché React marseillais est
+réellement petit et dominé par Angular et Java. **Le gisement exploitable est
+national et full remote**, ce qui pèse sur la phase 2.
 
 ### P6 — Dédoublonnage inter-sources absent
 
 `unique (source, external_id)` empêche les doublons **dans** une source, pas
-entre sources. Dès qu'Adzuna alimentera la base, une même offre pourra y figurer
-deux fois. Première dette à payer en phase 2.
+entre sources. Dès que la collecte Adzuna tournera, une même offre pourra
+figurer deux fois. Première dette à payer en phase 2.
+
+### P7 — La Corse s'encode de deux façons
+
+Adzuna rend `'2A'` / `'2B'` via `_shared/departments.ts`, France Travail rend
+`'20'` via `codePostal.slice(0,2)`. Deux encodages du même territoire dans une
+même colonne `text`. Sans effet sur le filtre `('13','83','84')`.
+
+### ~~P4 — `supabase functions serve` écrase les variables `SUPABASE_*`~~ *(résolu)*
+
+La commande **réserve** ces noms et ignore silencieusement les valeurs de
+`.env.local` : une collecte lancée ainsi écrit dans une Postgres locale
+éphémère et vide, en croyant écrire sur le projet distant. Aucune erreur,
+aucune ligne — un faux succès complet.
+
+Résolu : deux scripts npm, `fn:local:ft` et `fn:local:adzuna`, lancent le point
+d'entrée par `deno run --env-file=.env.local` sur le port 8000, sans en-tête
+`Authorization` (`verify_jwt` est appliqué par la plateforme, pas par
+`Deno.serve`). Documenté dans `CLAUDE.md` et dans les trois étapes du plan qui
+pointaient encore vers `fn:serve`.
 
 ---
 
@@ -135,17 +181,46 @@ deux fois. Première dette à payer en phase 2.
 | M1 | `upsert_test.ts` : ternaire mort `offer ? [offer] : []` |
 | M2 | `upsertOffers` déduit la source de `rows[0]` et suppose un lot monosource. L'invariant tient par construction, l'écriture est protégée par l'`onConflict` composé, mais le comptage de télémétrie serait faussé si l'invariant sautait. Une garde explicite manque |
 | M3 | Correspondance des clés du payload `upsert` aux colonnes réelles : non vérifiable par le typage, `DbClient` n'étant pas typé sur le schéma |
-| M4 | `client.ts` : le `break` sur `rangeStart !== start` est mathématiquement redondant et son commentaire évoque à tort un risque de boucle infinie |
+| M4 | `client.ts` France Travail : le `break` sur `rangeStart !== start` est mathématiquement redondant et son commentaire évoque à tort un risque de boucle infinie |
 | M6 | `runCollection` renvoie `success` sur une liste de requêtes vide. Cohérent avec la formule, mais masquerait une configuration où toutes les requêtes d'une source sont désactivées |
 | M7 | Le champ `fetched` de la télémétrie compte les offres **après** mapping, pas le brut renvoyé par la source. Nommage trompeur |
+| M11 | `published_since_days` est semé en base mais **lu par personne** : la fenêtre vient de `WINDOW_DAYS[mode]`. Colonne morte pour les deux sources |
+| M12 | `contract_label` reçoit un temps de travail chez Adzuna (`full_time`) et un libellé de contrat chez France Travail. Divergence sémantique dans une même colonne |
+| M13 | `salary_is_predicted`, présent dans chaque payload Adzuna, est ignoré : un salaire estimé s'afficherait comme publié. Aucun impact mesuré — 0 offre sur 50 est prédite dans l'échantillon |
+
+---
+
+## Une leçon de méthode, payée deux fois
+
+**Un test unitaire ne prouve rien sur un client d'API.** Le défaut le plus grave
+de la tâche 11 — `implies_remote` transmis à l'URL Adzuna, qui répond **HTTP
+400** à tout paramètre inconnu — aurait fait échouer en entier les quatre
+requêtes full remote en production. Les tests étaient verts : ils injectent un
+`fetch` factice. Seul un appel réel sur l'URL **construite par le code** l'a
+révélé.
+
+Corollaire pour la suite : toute tâche livrant un client d'API doit se terminer
+par un appel véritable sur une URL produite par le code, pas seulement par une
+suite verte.
+
+**Et une copie de travail peut mentir sans que rien ne casse.** Le fichier
+`20260907234512_fix_adzuna_priority_order.sql` s'est retrouvé écrasé sur le
+disque par le contenu d'une *autre* migration, celle du poids d'`angular`. La
+version commitée était intacte et la base portait bien les bonnes priorités : la
+corruption était purement locale, donc totalement silencieuse. Elle aurait
+survécu à une reprise de session et fait rejouer la mauvaise migration.
+Restaurée par `git checkout --`, après vérification en base des 11 priorités et
+du poids d'`angular`. Le réflexe : `git status` avant tout `db push`, et croire
+la base plutôt que le fichier.
 
 ---
 
 ## Décisions en attente
 
-Aucune. Les dernières tranchées : `angular` et `java` à +1 en contexte, `cobol`
-en signal rouge, matrices France Travail et Adzuna révisées d'après les volumes
-mesurés.
+Aucune. Les dernières tranchées : matrice Adzuna en requêtes précises avec full
+remote garanti par la requête, `category=it-jobs` conservé comme filet en
+première position d'écriture, `angular` et `java` à +1 en contexte, `cobol` en
+signal rouge.
 
 ---
 
@@ -172,3 +247,9 @@ Désactiver une requête : `update search_queries set enabled = false where labe
 Ajuster un poids : `update skill_lexicon set weight = … where term = '…';`
 Dans les deux cas, l'effet est immédiat sur les offres déjà collectées — le score
 est une vue.
+
+**Ordre d'écriture, à ne pas confondre avec un ordre d'importance** : `priority`
+croissante décide de l'ordre d'exécution, et comme l'upsert écrase, **la
+dernière requête à voir une offre fixe ses colonnes** — provenance et
+`remote_label` compris. Les requêtes les plus informatives doivent donc passer
+en dernier.
