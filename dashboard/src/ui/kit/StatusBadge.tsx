@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Badge } from './Badge';
-import type { BadgeTaille, BadgeTon } from './Badge';
+import type { BadgeTaille } from './Badge';
+import { TON_STATUT } from './statusTon';
 
 /**
  * Les six étapes du suivi d'une candidature, et sa sortie.
@@ -15,15 +16,10 @@ import type { BadgeTaille, BadgeTon } from './Badge';
 export type SuiviStatus =
   'a_traiter' | 'retenue' | 'postulee' | 'relancee' | 'entretien' | 'terminee' | 'ecartee';
 
-const TON: Record<SuiviStatus, BadgeTon> = {
-  a_traiter: 'neutre',
-  retenue: 'accent',
-  postulee: 'info',
-  relancee: 'alerte',
-  entretien: 'succes',
-  terminee: 'neutre',
-  ecartee: 'danger',
-};
+// Réexporté depuis `statusTon.ts` (voir ce fichier pour le pourquoi de la
+// séparation) : `import { TON_STATUT } from '.../StatusBadge'` reste le
+// point d'entrée public, comme si la constante vivait ici.
+export { TON_STATUT } from './statusTon';
 
 interface Props {
   status: SuiviStatus;
@@ -46,7 +42,7 @@ interface Props {
 export function StatusBadge({ status, label, taille }: Props) {
   return (
     <Badge
-      ton={TON[status]}
+      ton={TON_STATUT[status]}
       taille={taille}
       point={status !== 'ecartee'}
       discontinu={status === 'ecartee'}

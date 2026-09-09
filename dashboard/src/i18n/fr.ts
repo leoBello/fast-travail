@@ -243,6 +243,29 @@ export const fr = {
     colEmployeur: 'Employeur',
     colLieu: 'Lieu',
     colPubliee: 'Publiée',
+    // La barre d'onglets de « Toute la veille » (`Main.dc.html`, bloc
+    // « barre d'onglets »). Libellés DÉDIÉS, distincts de `statuts.*` :
+    // `statuts.*` qualifie UNE offre (`StatusBadge` sur une ligne), un
+    // onglet nomme une COLLECTION — d'où le pluriel (« Retenues », pas
+    // « Retenue »). Réutiliser `statuts.*` mettrait le mauvais nombre
+    // grammatical à l'écran, l'écart (c) déjà constaté sur cette maquette
+    // (« Importer mon CV » là où elle écrit « Mon CV »). « À traiter »,
+    // « Entretien » et « Toutes » restent au singulier/invariable : c'est
+    // ce que la maquette écrit déjà pour ces trois-là.
+    ongletsLabel: 'Statut de candidature',
+    ongletATraiter: 'À traiter',
+    ongletRetenues: 'Retenues',
+    ongletPostulees: 'Postulées',
+    ongletRelancees: 'Relancées',
+    ongletEntretien: 'Entretien',
+    ongletTerminees: 'Terminées',
+    ongletEcartees: 'Écartées',
+    ongletToutes: 'Toutes',
+    // Le compte d'un onglet tant que `GET /statut-counts` n'a pas répondu :
+    // un tiret cadratin, jamais « 0 » (GUIDELINES §3.3 — une absence se
+    // nomme, elle ne se vide pas). Version courte de `compteEnAttente`
+    // (« … »), pour un espace d'onglet plus étroit qu'une carte.
+    compteEnAttenteCourt: '—',
     sources: (n: number) => `${n} sources`,
     // Fait distinct de l'absence `absences.texte-coupe` (celle-ci porte sur
     // `stack` vide) : ce badge dit que LE TEXTE REÇU par le modèle est
