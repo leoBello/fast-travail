@@ -2128,6 +2128,44 @@ sur intuition : lire les 64 paires avant de toucher à la clé.
 
 ---
 
+### P24 — Les clés `anon` et `service_role` disparaissent fin 2026, et le remplaçant ne passe pas `verify_jwt`
+
+**Constaté le 2026-09-09**, en remplissant `dashboard/.env`. Supabase remplace
+les deux clés JWT historiques par des clés **opaques** : `sb_publishable_…`
+pour `anon`, `sb_secret_…` pour `service_role`. Le projet porte déjà les
+quatre — `npx supabase projects api-keys --project-ref zbpbuzoukldbzfbbikhw`
+rend `anon`/`service_role` en `legacy` et une publishable/secret nommées
+`default`. La plateforme injecte aussi `SUPABASE_PUBLISHABLE_KEYS` et
+`SUPABASE_SECRET_KEYS` dans les Edge Functions, visibles dans
+`npx supabase secrets list`.
+
+**Ce n'est pas un remplacement à variable près, et c'est tout le problème.**
+La clé publishable n'est pas un JWT : `verify_jwt = true` la rejette à la
+passerelle, avant que le code de la fonction tourne. La réponse Supabase sur
+le sujet est de déployer en `--no-verify-jwt` dès qu'on appelle avec une clé
+publishable ou secret. Migrer, c'est donc **renoncer à `verify_jwt`**, pas
+échanger une chaîne contre une autre.
+
+Les quatre fonctions ne sont pas dans la même situation :
+
+| Fonction | Ce que `verify_jwt` protège aujourd'hui | Coût de la migration |
+|---|---|---|
+| `api-dashboard` | Rien de plus que `x-dashboard-token`, vérifié avant tout accès base — et la clé `anon` est publique par construction | Faible : `verify_jwt = false`, et plus aucune clé Supabase dans le bundle de la SPA (3 variables `VITE_` → 2) |
+| `collect-france-travail`, `collect-adzuna`, `score-offers` | **Leur seule barrière.** Elles n'ont aucun secret partagé | Élevé : sans nouveau secret partagé, retirer `verify_jwt` rendrait `score-offers` déclenchable par quiconque trouve l'URL — dépense Anthropic réelle |
+
+**Décision du 2026-09-09** : on reste sur la clé `anon` legacy, qui fonctionne
+tant qu'elle n'est pas désactivée à la main dans le tableau de bord. Il reste
+**environ trois mois** de marge. Le chantier à mener avant l'échéance :
+donner un secret partagé aux trois fonctions cron (sur le modèle de
+`x-dashboard-token`), passer les quatre en `verify_jwt = false`, et remplacer
+la clé du Vault `cron_auth_key` par ce secret.
+
+**Le piège à ne pas manquer** : cette échéance ne se signale par aucun test
+rouge ni aucune alerte du dépôt. Elle tombera sur les crons de 6 h et 6 h 30,
+un matin, sous forme de 401.
+
+---
+
 ## Mineurs consignés
 
 Les huit derniers viennent de la revue finale du plan B. Ils ont été vérifiés,
