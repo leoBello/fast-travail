@@ -128,25 +128,68 @@ au passage : le modèle n'est pas Haiku mais Sonnet 5 (l'écart mesuré était d
 4 €/mois, un prix dérisoire pour un jugement nuancé sur du français ambigu), et
 le coût réel est de **~12 €/mois, pas 6** — voir « Ce que la mesure a démenti ».
 
-### Phase 3 — Tableau de bord
+### Phase 3 — Tableau de bord *(livrée le 2026-09-09)*
 
-Interface Next.js locale pour parcourir, filtrer et marquer les offres. Aucune
-authentification : usage mono-utilisateur. La clé `service_role` reste côté
-serveur, jamais exposée au navigateur.
+Interface **Vite + React** locale (SPA statique, sous `dashboard/`) pour
+parcourir, filtrer et marquer les offres — **et non Next.js**, comme ce
+document l'annonçait. Décidé en écrivant le plan : l'application est
+mono-utilisateur et servie en local, donc n'a aucun besoin de rendu serveur ;
+le kit de départ repris (prospeo) est lui-même Vite. Next.js aurait ajouté un
+routeur, un runtime serveur et une build à un projet qui n'en a besoin
+d'aucun. Onze tâches livrées — détail, mesures et défauts trouvés en revue :
+[`ETAT.md`](ETAT.md), section « Phase 3 — Tableau de bord ».
 
-C'est là que se paiera la dette du filtrage géographique : les coordonnées sont
-absentes d'une bonne part des offres, et un filtre sur la distance les
-écarterait silencieusement.
+**Aucune authentification** : usage mono-utilisateur, l'accès passe par
+l'Edge Function `api-dashboard` derrière trois barrières — la clé `anon`,
+`verify_jwt`, et un secret partagé (`x-dashboard-token`) vérifié avant tout
+accès base. **Aucune des trois n'est une authentification** : elles suffisent
+tant que la SPA n'est servie qu'en local. Si elle est publiée un jour, il
+faudra une vraie authentification avant — le secret partagé se retrouverait
+alors dans un bundle public. La clé `service_role`, elle, reste côté serveur
+(injectée par la plateforme dans l'Edge Function), jamais exposée au
+navigateur.
+
+C'est là que s'est payée la dette du filtrage géographique : les coordonnées
+sont absentes d'une bonne part des offres, et un filtre sur la distance les
+aurait écartées silencieusement — d'où une liste qui ne masque jamais rien
+par défaut, avec un seuil réglable à la main.
+
+**Conséquence sur la phase 5** : le suivi des candidatures qu'elle promettait
+est **partiellement absorbé** par cette phase — voir le détail sous
+« Phase 5 » ci-dessous.
 
 ### Phase 4 — Génération de CV et de lettres
 
 À la demande, avec Claude Sonnet : adapter le CV et rédiger une lettre pour une
 offre donnée. Le contrôle humain reste systématique avant envoi.
 
-### Phase 5 — Suivi des candidatures
+### Phase 5 — Suivi des candidatures *(partiellement absorbée par la phase 3)*
 
 Historique : offre, date, documents envoyés, statut, relances. Ferme la boucle
 entre la veille et la candidature.
+
+**Ce que la phase 3 a déjà livré**, à la table `offer_applications` et à
+l'écran « Mes candidatures » : un statut à six étapes plus une sortie à tout
+moment (`a_traiter → retenue → postulee → relancee → entretien → terminee`,
+`ecartee` en sortie), quatre issues sur `terminee`, les dates clés (retenue,
+postulée, relancée, entretien) — le tout **propagé à tout le groupe de
+doublons d'une offre**, pas seulement à la ligne cliquée — et quatre
+mécaniques fondées sur un fait réel : l'entonnoir, la série de jours avec
+candidature envoyée, le taux de réponse, le compteur anti-perte.
+
+**Ce qui reste, précisément** :
+
+- **Aucun écran ne lit ni n'écrit `notes`.** La colonne existe dans
+  `offer_applications` et le champ est déjà exposé par `api-dashboard`
+  (`GET /offers/:id`, `PATCH /offers/:id/application`), mais aucun composant
+  du tableau de bord ne l'affiche ni ne permet de la modifier.
+- **Une seule relance mémorisée** (`last_followup_at`, un timestamp unique),
+  pas un historique de plusieurs relances par candidature.
+- **Aucune trace des documents envoyés** (CV, lettre) : la table ne porte
+  aucune colonne pour ça, et leur génération relève de la phase 4 — non
+  commencée.
+
+Détail : [`ETAT.md`](ETAT.md), section « Phase 3 — Tableau de bord ».
 
 ---
 

@@ -1,0 +1,37 @@
+.erreurConfig {
+  max-width: 480px;
+  margin: 80px auto;
+  padding: var(--space-5) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.titre {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+
+.detail {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+  line-height: 1.5;
+}
+
+/*
+ * Le détail SUPERPOSÉ à l'écran du matin (tâche 8, revue) : `MatinScreen`
+ * reste monté dessous, son état local survit à l'aller-retour. `--z-panel`
+ * était réservé sans consommateur depuis la tâche 3 (theme.css) — en voici
+ * un. Sous `--z-tooltip` (30) : une infobulle ouverte À L'INTÉRIEUR du
+ * panneau doit rester visible par-dessus lui.
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  overflow-y: auto;
+  z-index: var(--z-panel);
+}

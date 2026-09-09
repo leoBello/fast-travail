@@ -5,3 +5,11 @@ supabase/functions/
 supabase/migrations/
 node_modules/
 .superpowers/
+
+# Le canvas de maquettes (.dc.html, canvas.json) est la capture d'un outil de
+# design, pas du code du projet : le reformater masquerait sa nature, comme
+# pour les fixtures de tests decrites dans CLAUDE.md.
+docs/design/maquettes/
+
+# Sortie de build du dashboard, jamais du code source.
+dashboard/dist/

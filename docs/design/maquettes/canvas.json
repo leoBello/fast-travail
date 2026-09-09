@@ -1,0 +1,54 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Application" },
+    { "id": "page-2", "name": "Systeme" },
+    { "id": "page-3", "name": "Directions" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 1440, "h": 980, "title": "Ce matin" },
+    { "file": "Detail.dc.html", "page": "page-1", "x": 1540, "y": 0, "w": 900, "h": 1180, "title": "Detail d une offre" },
+    { "file": "Suivi.dc.html", "page": "page-1", "x": 0, "y": 1100, "w": 1280, "h": 940, "title": "Mes candidatures" },
+
+    { "file": "Composants.dc.html", "page": "page-2", "x": 0, "y": 0, "w": 1280, "h": 1200, "title": "Vocabulaire d interface" },
+    { "file": "Etats.dc.html", "page": "page-2", "x": 1380, "y": 0, "w": 1280, "h": 1180, "title": "Les etats qui decident" },
+
+    { "file": "DirectionA.dc.html", "page": "page-3", "x": 0, "y": 0, "w": 640, "h": 520 },
+    { "file": "DirectionB.dc.html", "page": "page-3", "x": 740, "y": 0, "w": 640, "h": 520 },
+    { "file": "DirectionC.dc.html", "page": "page-3", "x": 1480, "y": 0, "w": 640, "h": 520 }
+  ],
+  "annotations": [
+    {
+      "id": "note-perimetre",
+      "page": "page-1",
+      "x": 1540,
+      "y": 1280,
+      "w": 900,
+      "text": "Les offres affichees sont reelles, comptees en base le 2026-09-09.\n\nCe qui vient des donnees : intitules, employeurs, scores, verdicts, confiances, stacks, remunerations, et les quatre nombres de l'entonnoir (4 146 / 1 269 / 61).\n\nCe qui n'existe pas encore et qu'aucune ligne de code ne rend vrai aujourd'hui : la table de suivi de candidature, donc les colonnes du pipeline, la serie de jours, les relances dues et les deux derniers etages de l'entonnoir. Ils sont dessines pour decider de leur forme, pas pour etre construits avant la migration qui les porte."
+    },
+    {
+      "id": "note-doublons",
+      "page": "page-1",
+      "x": 0,
+      "y": 2160,
+      "w": 1280,
+      "text": "Le repli des doublons elit par CONFIANCE, pas par score.\n\nMesure qui l'impose : la mission ALLEGIS GROUP est jugee deux fois. Adzuna, sur 500 caracteres tronques, rend fit 75 et confiance basse ; Free-Work, sur le texte integral, rend fit 58 et confiance haute, avec un verdict bien plus precis. Elire par score mettrait donc en avant le jugement le MOINS informe.\n\nEn prime, le rapprochement tranche une ambiguite d'unite : Adzuna etiquetait ces 450 EUR comme un salaire annuel, Free-Work comme un TJM. C'est P22, resolu par le repli plutot que par du code."
+    },
+    {
+      "id": "note-absences",
+      "page": "page-2",
+      "x": 0,
+      "y": 1300,
+      "w": 1280,
+      "text": "Les huit absences ne sont pas une figure de style : elles sont comptees.\n\nPiege evite en les mesurant : 539 offres ont une stack vide, et 539 offres sont en confiance basse. Les totaux coincident, LES ENSEMBLES NON — 295 seulement sont dans les deux cas, 244 de chaque cote different. Ecrire 'stack vide = texte tronque' aurait donc ete faux sur 244 offres, avec deux causes opposees rendues identiques a l'ecran."
+    },
+    {
+      "id": "note-directions",
+      "page": "page-3",
+      "x": 0,
+      "y": 620,
+      "w": 2120,
+      "text": "TRANCHE LE 2026-09-09 : la direction A est retenue. Main.dc.html la porte.\n\nB et C restent ici comme trace de l'arbitrage, pas comme options ouvertes. Ce qui a decide : A est la seule des trois ou la fin de la tache du jour est visible, donc la seule ou la boucle qui se vide — la premiere mecanique de motivation retenue — a un support. Et les verdicts font 167 caracteres de mediane, donc les trois lignes de la carte suffisent presque toujours.\n\nL'esthetique n'etait pas en jeu : le kit, les tokens et les trois familles typographiques sont repris tels quels de prospeo/apps/dashboard, ou le contraste a deja ete mesure."
+    }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

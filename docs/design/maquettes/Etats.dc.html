@@ -1,0 +1,273 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --accent: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sect { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; margin-bottom: 12px; }
+    .note { margin: 12px 0 0; font-size: 11px; color: var(--faint); line-height: 1.55; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .badge.sm { height: 19px; padding: 0 7px; font-size: 10px; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-accent { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-dash { background: transparent; border-style: dashed; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; font-weight: 500; }
+    .btn-p { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+    .btn-sm { height: 28px; padding: 0 11px; font-size: 12px; border-radius: 8px; }
+    .bad { border: 1px solid rgba(255,122,133,0.35); border-radius: 11px; padding: 13px; background: rgba(255,122,133,0.04); }
+    .good { border: 1px solid rgba(79,209,165,0.35); border-radius: 11px; padding: 13px; background: rgba(79,209,165,0.04); }
+    .verdictK { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 8px; display: block; }
+    .chk { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 12.5px; }
+    .box { width: 15px; height: 15px; border-radius: 4px; border: 1px solid var(--border2); flex: none; }
+    .box-on { background: var(--accent); border-color: var(--accent); display: flex; align-items: center; justify-content: center; }
+  </style>
+</helmet>
+
+<div style="width: 1280px; height: 1180px; background: var(--bg); overflow: hidden; padding: 24px 26px">
+
+  <div style="margin-bottom: 18px">
+    <h1 style="font-size: 22px">Les etats qui decident</h1>
+    <p style="margin: 5px 0 0; color: var(--muted); font-size: 12.5px">Le jour zero, la panne, et les trois endroits ou l&rsquo;interface pourrait annoncer un fait qu&rsquo;aucun code ne rend vrai.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px">
+
+    <!-- ===== JOUR ZERO ===== -->
+    <div class="sect" style="grid-column: span 2">
+      <div class="sectT">Le premier matin &mdash; rien n&rsquo;a encore ete decide</div>
+
+      <div style="display: flex; align-items: flex-end; gap: 16px; margin-bottom: 14px">
+        <div>
+          <h2 style="font-size: 18px">Ce matin</h2>
+          <p style="margin: 3px 0 0; font-size: 12px; color: var(--muted)"><span class="num" style="color: var(--text); font-weight: 600">17</span> offres a 70 ou plus vous attendent. Aucune n&rsquo;a encore ete regardee.</p>
+        </div>
+        <div style="flex-grow: 1"></div>
+        <div style="display: flex; align-items: center; gap: 11px">
+          <span style="font-size: 11.5px; color: var(--muted)"><span class="num" style="color: var(--text); font-weight: 600">0</span> decidees</span>
+          <div style="display: flex; gap: 3px" role="img" aria-label="aucune offre decidee">
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+            <span style="width: 20px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+          </div>
+          <span style="width: 1px; height: 18px; background: var(--border2)"></span>
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--faint)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="aucune serie"><path d="M12 2c1.5 4 5 5.5 5 9.5a5 5 0 0 1-10 0C7 8.5 9 7 9.5 5.5 10.5 7 11 8 12 8c0-2-1-4 0-6z"/></svg>
+            serie non commencee
+          </span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px">
+        <div style="border: 1px dashed var(--border2); border-radius: 11px; padding: 14px">
+          <div style="font-size: 13px; font-weight: 600">La serie demarre a votre premiere candidature</div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5">Elle compte les jours ou vous avez <strong style="color: var(--text)">envoye</strong> quelque chose. Aujourd&rsquo;hui elle vaut zero, et elle le dit.</div>
+        </div>
+        <div style="border: 1px dashed var(--border2); border-radius: 11px; padding: 14px">
+          <div style="font-size: 13px; font-weight: 600">Aucun historique de candidature</div>
+          <div style="font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5">L&rsquo;entonnoir affiche ses trois premiers nombres, comptes en base, et laisse les deux derniers a <span class="num">0</span>.</div>
+        </div>
+      </div>
+
+      <p class="note">Aucun de ces vides n&rsquo;est une zone blanche&nbsp;: chacun dit ce qui le remplira. C&rsquo;est le seul etat que <span class="num">jsdom</span> ne verra jamais, et celui ou ce depot s&rsquo;est le plus souvent trompe.</p>
+    </div>
+
+    <!-- ===== LA PANNE ===== -->
+    <div class="sect" style="border-color: rgba(255,122,133,0.3)">
+      <div class="sectT">La collecte n&rsquo;a pas tourne</div>
+
+      <div style="display: flex; align-items: center; gap: 12px; font-size: 11.5px; color: var(--muted); padding: 9px 11px; border-radius: 9px; background: rgba(255,122,133,0.07); border: 1px solid rgba(255,122,133,0.3)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff7a85" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="en echec"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        <div>
+          <div style="color: #ffa8b0; font-weight: 600; font-size: 12.5px">Collecte de 6 h 30 en echec</div>
+          <div style="margin-top: 2px">Derniere reussite hier. La liste ci-dessous date d&rsquo;hier <span class="num">6 h 30</span>.</div>
+        </div>
+      </div>
+
+      <div style="margin-top: 12px; display: flex; align-items: center; gap: 12px; font-size: 11.5px; color: var(--muted); padding: 9px 11px; border-radius: 9px; background: rgba(240,180,92,0.06); border: 1px solid rgba(240,180,92,0.3)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f0b45c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="reliquat"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        <div>
+          <div style="color: #f5cd92; font-weight: 600; font-size: 12.5px">Le jugement a plafonne</div>
+          <div style="margin-top: 2px"><span class="num">100</span> offres jugees sur <span class="num">141</span> arrivees. <span class="num">41</span> attendent demain.</div>
+        </div>
+      </div>
+
+      <p class="note">Le second cas est celui qui n&rsquo;alertait pas&nbsp;: un cron qui rend <span class="num">100</span> sur <span class="num">100</span> ressemble a une journee complete. Le reliquat est fait des offres les <strong style="color: var(--muted)">plus anciennes</strong>, qui reculent chaque jour.</p>
+    </div>
+
+    <!-- ===== LE PIEGE DU NOUVEAU ===== -->
+    <div class="sect" style="grid-column: span 2; border-color: var(--border2)">
+      <div class="sectT">Le compteur qu&rsquo;on ne peut pas construire &mdash; encore</div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px">
+
+        <div class="bad">
+          <span class="verdictK" style="color: #ffa8b0">A ne pas faire</span>
+          <div style="display: flex; align-items: baseline; gap: 9px; margin-bottom: 9px">
+            <span class="num" style="font-family: var(--display); font-size: 30px; font-weight: 700; color: #ffa8b0">833</span>
+            <span style="font-size: 12.5px; color: var(--muted)">nouvelles offres aujourd&rsquo;hui</span>
+          </div>
+          <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.55">
+            <span class="num">first_seen_at</span> ne porte que <strong style="color: var(--text)">deux jours</strong> d&rsquo;historique&nbsp;: <span class="num">3 446</span> offres ont ete &laquo;&nbsp;vues pour la premiere fois&nbsp;&raquo; le meme jour, parce que tout le reste est du rattrapage. Le compteur afficherait <span class="num">833</span> aujourd&rsquo;hui puis <span class="num">70</span> demain, sans que rien n&rsquo;ait change.
+          </p>
+        </div>
+
+        <div class="good">
+          <span class="verdictK" style="color: #86e3c1">A la place</span>
+          <div style="display: flex; align-items: baseline; gap: 9px; margin-bottom: 9px">
+            <span class="num" style="font-family: var(--display); font-size: 30px; font-weight: 700; color: #86e3c1">6</span>
+            <span style="font-size: 12.5px; color: var(--muted)">offres a decider</span>
+          </div>
+          <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.55">
+            Compte les offres au-dessus du seuil <strong style="color: var(--text)">sans decision enregistree</strong>. Ne depend d&rsquo;aucun historique&nbsp;: c&rsquo;est vrai des le premier jour, ca descend quand vous travaillez, et ca remonte quand la collecte apporte quelque chose. Le meme nombre servira dans six mois.
+          </p>
+        </div>
+      </div>
+
+      <p class="note">La regle qui tranche&nbsp;: <strong style="color: var(--muted)">un chiffre motivant fonde sur rien est pire que pas de chiffre.</strong> &laquo;&nbsp;Nouveau&nbsp;&raquo; redeviendra construisible apres quelques semaines de cron &mdash; ce sera un ajout, pas une reprise.</p>
+    </div>
+
+    <!-- ===== LES FILTRES ===== -->
+    <div class="sect">
+      <div class="sectT">Filtres &mdash; aucun coche au demarrage</div>
+
+      <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); font-weight: 600; margin-bottom: 4px">Mode de travail</div>
+      <div class="chk"><span class="box"></span> Full remote <span style="color: var(--faint)" class="num">175</span></div>
+      <div class="chk"><span class="box"></span> Hybride <span style="color: var(--faint)" class="num">143</span></div>
+      <div class="chk"><span class="box"></span> Sur site <span style="color: var(--faint)" class="num">88</span></div>
+      <div class="chk" style="color: var(--amber)"><span class="box" style="border-color: rgba(240,180,92,0.5); border-style: dashed"></span> Non precise <span class="num">863</span></div>
+
+      <p class="note"><strong style="color: var(--muted)">Les deux tiers du corpus sont dans la derniere ligne.</strong> Cocher &laquo;&nbsp;full remote&nbsp;&raquo; seul masquerait <span class="num">863</span> offres dont beaucoup le sont sans le dire. La ligne &laquo;&nbsp;non precise&nbsp;&raquo; est donc visible, chiffree, et cochable &mdash; jamais un silence.</p>
+    </div>
+
+    <!-- ===== REGLAGE DES POIDS ===== -->
+    <div class="sect" style="grid-column: span 2">
+      <div class="sectT">Regler une preference &mdash; gratuit, retroactif, et range a part</div>
+
+      <div style="display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 20px">
+
+        <div style="display: flex; flex-direction: column; gap: 13px">
+          <div>
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px">
+              <span style="font-size: 12.5px; font-weight: 500">Full remote</span>
+              <div style="flex-grow: 1"></div>
+              <span class="num" style="font-size: 13px; font-weight: 700">+15</span>
+            </div>
+            <div style="height: 5px; border-radius: 999px; background: var(--surface3); position: relative">
+              <div style="position: absolute; left: 0; top: 0; height: 5px; width: 50%; border-radius: 999px; background: var(--accent)"></div>
+              <div style="position: absolute; left: calc(50% - 7px); top: -4.5px; width: 14px; height: 14px; border-radius: 999px; background: var(--text); border: 2px solid var(--accent)"></div>
+            </div>
+          </div>
+
+          <div>
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px">
+              <span style="font-size: 12.5px; font-weight: 500">Freelance</span>
+              <div style="flex-grow: 1"></div>
+              <span class="num" style="font-size: 13px; font-weight: 700">+12</span>
+            </div>
+            <div style="height: 5px; border-radius: 999px; background: var(--surface3); position: relative">
+              <div style="position: absolute; left: 0; top: 0; height: 5px; width: 40%; border-radius: 999px; background: var(--accent)"></div>
+              <div style="position: absolute; left: calc(40% - 7px); top: -4.5px; width: 14px; height: 14px; border-radius: 999px; background: var(--text); border: 2px solid var(--accent)"></div>
+            </div>
+          </div>
+
+          <div>
+            <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px">
+              <span style="font-size: 12.5px; font-weight: 500">IA / agentique</span>
+              <div style="flex-grow: 1"></div>
+              <span class="num" style="font-size: 13px; font-weight: 700; color: var(--mint)">+18</span>
+            </div>
+            <div style="height: 5px; border-radius: 999px; background: var(--surface3); position: relative">
+              <div style="position: absolute; left: 0; top: 0; height: 5px; width: 60%; border-radius: 999px; background: var(--mint)"></div>
+              <div style="position: absolute; left: calc(60% - 7px); top: -4.5px; width: 14px; height: 14px; border-radius: 999px; background: var(--text); border: 2px solid var(--mint)"></div>
+            </div>
+          </div>
+
+          <button class="btn btn-p" style="margin-top: 3px">Appliquer a tout le corpus</button>
+        </div>
+
+        <div>
+          <div style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); font-weight: 600; margin-bottom: 9px">Effet sur les rangs, pas sur les scores</div>
+
+          <div style="display: flex; flex-direction: column; gap: 5px">
+            <div style="display: grid; grid-template-columns: 26px 1fr 44px 26px; align-items: center; gap: 10px; padding: 6px 9px; border-radius: 8px; background: rgba(79,209,165,0.08)">
+              <span class="num" style="font-size: 11px; color: var(--faint)">1</span>
+              <span style="font-size: 12px">Ingenieur Agentique FullStack &mdash; Nantes</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right">103,0</span>
+              <span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; color: #86e3c1" aria-label="monte de 2 rangs">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>2
+              </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 26px 1fr 44px 26px; align-items: center; gap: 10px; padding: 6px 9px; border-radius: 8px; background: rgba(79,209,165,0.08)">
+              <span class="num" style="font-size: 11px; color: var(--faint)">2</span>
+              <span style="font-size: 12px">Senior Fullstack Engineer &mdash; Katchme</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right">100,0</span>
+              <span style="font-size: 10px; color: var(--faint)">&mdash;</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 26px 1fr 44px 26px; align-items: center; gap: 10px; padding: 6px 9px; border-radius: 8px">
+              <span class="num" style="font-size: 11px; color: var(--faint)">3</span>
+              <span style="font-size: 12px">Developpeur Front-End React Senior</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right">100,0</span>
+              <span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; color: #ffa8b0" aria-label="descend de 1 rang">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>1
+              </span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 26px 1fr 44px 26px; align-items: center; gap: 10px; padding: 6px 9px; border-radius: 8px">
+              <span class="num" style="font-size: 11px; color: var(--faint)">4</span>
+              <span style="font-size: 12px">Developpeur Front-end Expert Accessibilite</span>
+              <span class="num" style="font-size: 12px; font-weight: 700; text-align: right">87,0</span>
+              <span style="display: inline-flex; align-items: center; gap: 2px; font-size: 10px; color: #86e3c1" aria-label="monte de 3 rangs">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>3
+              </span>
+            </div>
+          </div>
+
+          <p class="note" style="margin-top: 11px"><strong style="color: var(--muted)">Le tableau montre les rangs et les fleches, jamais une moyenne.</strong> Trois offres sont deja a <span class="num">100</span> et le plafond les absorbe&nbsp;: monter un poids ne les bouge pas, et un attendu du type &laquo;&nbsp;apres &gt; avant&nbsp;&raquo; conclurait a tort a un echec.</p>
+        </div>
+      </div>
+
+      <p class="note" style="border-top: 1px solid var(--border); padding-top: 11px">
+        <strong style="color: var(--muted)">Ma recommandation&nbsp;: ce panneau existe, mais pas sur l&rsquo;ecran du matin.</strong> Regler un poids est une action rare a effet global&nbsp;; la mettre a cote de la liste inviterait a bricoler le classement au lieu de decider sur les offres. Elle vit derriere l&rsquo;icone de reglages, avec cette previsualisation avant application.
+      </p>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

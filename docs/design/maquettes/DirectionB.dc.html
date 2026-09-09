@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488; --accent: #6d92ff;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .ph { background: var(--surface3); border-radius: 3px; }
+    .box { border: 1px solid var(--border2); border-radius: 10px; }
+    .note { margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.55; }
+  </style>
+</helmet>
+
+<div style="width: 640px; height: 520px; background: var(--bg); overflow: hidden; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+
+  <div>
+    <h1 style="font-size: 17px">B &mdash; Une a la fois</h1>
+    <p class="note" style="margin-top: 4px">Une seule offre occupe l&rsquo;ecran. On decide, elle disparait, la suivante arrive.</p>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px">
+
+    <div style="display: flex; align-items: center; gap: 8px">
+      <span class="ph" style="width: 74px; height: 11px"></span>
+      <div style="flex-grow: 1"></div>
+      <div style="display: flex; gap: 3px">
+        <span style="width: 22px; height: 4px; border-radius: 999px; background: var(--accent)"></span>
+        <span style="width: 22px; height: 4px; border-radius: 999px; background: var(--surface3)"></span>
+        <span style="width: 22px; height: 4px; border-radius: 999px; background: var(--surface3)"></span>
+        <span style="width: 22px; height: 4px; border-radius: 999px; background: var(--surface3)"></span>
+        <span style="width: 22px; height: 4px; border-radius: 999px; background: var(--surface3)"></span>
+        <span style="width: 22px; height: 4px; border-radius: 999px; background: var(--surface3)"></span>
+      </div>
+      <span class="num" style="font-size: 10.5px; color: var(--faint)">1 / 6</span>
+    </div>
+
+    <div class="box" style="flex-grow: 1; padding: 16px; display: flex; flex-direction: column; gap: 11px">
+
+      <div style="display: flex; align-items: center; gap: 14px">
+        <span class="num" style="font-family: var(--display); font-size: 38px; font-weight: 700; line-height: 1">100</span>
+        <div style="width: 1px; height: 30px; background: var(--border)"></div>
+        <span class="num" style="font-size: 19px; color: var(--muted)">90</span>
+        <div style="flex-grow: 1"></div>
+        <span class="ph" style="width: 60px; height: 15px; border-radius: 999px"></span>
+      </div>
+
+      <span class="ph" style="width: 78%; height: 13px"></span>
+      <span class="ph" style="width: 40%; height: 7px"></span>
+
+      <div style="display: flex; gap: 5px">
+        <span class="ph" style="width: 56px; height: 15px; border-radius: 999px"></span>
+        <span class="ph" style="width: 44px; height: 15px; border-radius: 999px"></span>
+        <span class="ph" style="width: 50px; height: 15px; border-radius: 999px"></span>
+      </div>
+
+      <div style="border-left: 2px solid var(--border2); padding-left: 10px; display: flex; flex-direction: column; gap: 5px">
+        <span class="ph" style="width: 100%; height: 6px"></span>
+        <span class="ph" style="width: 100%; height: 6px"></span>
+        <span class="ph" style="width: 100%; height: 6px"></span>
+        <span class="ph" style="width: 62%; height: 6px"></span>
+      </div>
+
+      <div style="display: flex; gap: 4px; flex-wrap: wrap">
+        <span class="ph" style="width: 52px; height: 14px; border-radius: 5px"></span>
+        <span class="ph" style="width: 60px; height: 14px; border-radius: 5px"></span>
+        <span class="ph" style="width: 46px; height: 14px; border-radius: 5px"></span>
+        <span class="ph" style="width: 58px; height: 14px; border-radius: 5px"></span>
+        <span class="ph" style="width: 40px; height: 14px; border-radius: 5px"></span>
+      </div>
+
+      <div style="flex-grow: 1"></div>
+
+      <div style="display: flex; gap: 8px">
+        <span class="box" style="width: 120px; height: 30px"></span>
+        <span style="flex-grow: 1; height: 30px; border-radius: 10px; background: var(--accent)"></span>
+        <span class="box" style="width: 40px; height: 30px"></span>
+      </div>
+    </div>
+  </div>
+
+  <p class="note" style="border-top: 1px solid var(--border); padding-top: 11px">
+    <strong style="color: var(--muted)">Pour&nbsp;:</strong> le verdict entier et la stack tiennent a l&rsquo;ecran&nbsp;; la decision est rapide et le rythme evident.
+    <strong style="color: var(--muted)">Contre&nbsp;:</strong> aucune comparaison possible, et la liste complete disparait derriere un onglet.
+  </p>
+</div>
+</x-dc>
+</body>
+</html>

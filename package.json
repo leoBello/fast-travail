@@ -14,6 +14,7 @@
     "fn:deploy:adzuna": "supabase functions deploy collect-adzuna --import-map supabase/functions/deno.json",
     "fn:local:score": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/score-offers/index.ts",
     "fn:deploy:score": "supabase functions deploy score-offers --import-map supabase/functions/deno.json",
+    "fn:deploy:api-dashboard": "supabase functions deploy api-dashboard --import-map supabase/functions/deno.json",
     "score:backfill": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/score-backfill.ts",
     "scrape:free-work": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/_scrapers/free-work/main.ts",
     "scrape:collective": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env supabase/functions/_scrapers/collective/main.ts",
@@ -21,13 +22,24 @@
     "fmt": "deno fmt --config supabase/functions/deno.json supabase/functions/ scripts/",
     "lint": "deno lint --config supabase/functions/deno.json supabase/functions/ scripts/",
     "fmt:check": "deno fmt --check --config supabase/functions/deno.json supabase/functions/ scripts/",
-    "verify": "npm run fmt:check && npm run lint && npm run check && npm test",
     "check": "deno check --config supabase/functions/deno.json supabase/functions/ scripts/",
+    "verify": "npm run verify:deno && npm run verify:dashboard",
+    "verify:deno": "npm run fmt:check && npm run lint && npm run check && npm test",
+    "verify:dashboard": "npm --prefix dashboard run verify",
+    "dash:dev": "npm --prefix dashboard run dev",
     "backfill:remap": "deno run --config supabase/functions/deno.json --allow-read --allow-net --allow-env scripts/backfill-remap.ts",
     "claude:smoke": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/claude-smoke.ts",
     "claude:schema-check": "deno run --config supabase/functions/deno.json --env-file=.env.local --allow-read --allow-net --allow-env scripts/claude-schema-check.ts"
   },
   "devDependencies": {
-    "supabase": "^2.117.0"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.6",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.6",
+    "supabase": "^2.117.0",
+    "typescript-eslint": "^8.70.0"
   }
 }

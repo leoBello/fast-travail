@@ -1,0 +1,25 @@
+/*
+ * « non publiée par la source » et « non précisée » n'ont pas de classe ici :
+ * `Absence.tsx` compose `Absent` (`Card.module.css`, `.absent`), le rendu
+ * italique/faint que le kit porte déjà pour une valeur manquante ordinaire.
+ * Une seconde déclaration presque identique aurait été le dialecte que
+ * GUIDELINES §1 interdit.
+ */
+
+/*
+ * « salaire non publié » : un jeton discontinu, pas un badge — la maquette
+ * (classe `.chip.chip-nil`) le rend au même gabarit que les jetons de score,
+ * en chasse fixe : un montant qui manque reste dans la colonne des montants.
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  border: 1px dashed var(--color-border-strong);
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}

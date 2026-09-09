@@ -1,0 +1,93 @@
+.section {
+  flex-grow: 1;
+  min-height: 0;
+  border-top: 1px solid var(--color-border);
+  padding: 16px 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.entete {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: 11px;
+  flex-wrap: wrap;
+}
+
+.sectionTitre {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.compte {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: transparent;
+}
+
+.bouton:hover {
+  background: var(--color-surface-2);
+}
+
+.bouton[aria-expanded='true'] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.corps {
+  display: flex;
+  gap: var(--space-4);
+  min-height: 0;
+  flex-grow: 1;
+}
+
+.liste {
+  flex-grow: 1;
+  min-width: 0;
+}
+
+.entetesColonnes {
+  display: grid;
+  grid-template-columns: 52px 40px minmax(0, 1fr) 190px 122px 58px;
+  gap: 14px;
+  padding: 0 14px;
+  height: 24px;
+  align-items: center;
+}
+
+.entetesColonnes > span {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.colDroite {
+  text-align: right;
+}
+
+.separateurLigne {
+  height: 1px;
+  background: var(--color-border);
+}

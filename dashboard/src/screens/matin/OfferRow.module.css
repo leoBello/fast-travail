@@ -1,0 +1,66 @@
+.row {
+  display: grid;
+  grid-template-columns: 52px 40px minmax(0, 1fr) 190px 122px 58px;
+  align-items: center;
+  gap: 14px;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 10px;
+}
+
+.row:hover {
+  background: var(--color-surface-2);
+}
+
+.row[role='button'] {
+  cursor: pointer;
+}
+
+.rang {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  text-align: right;
+}
+
+.corr {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.intitule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/*
+ * `text-overflow: ellipsis` vit ICI, sur un span en ligne — jamais sur
+ * `.intitule` ci-dessus, qui est le conteneur flex : posé dessus, il n'a
+ * aucun effet (GUIDELINES §4, le piège nommé explicitement).
+ */
+.trunc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.badgeSlot {
+  flex: none;
+}
+
+.publiee {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: right;
+}

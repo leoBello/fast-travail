@@ -1,0 +1,75 @@
+.ecran {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 100%;
+  padding: var(--space-5) 28px 22px;
+}
+
+.entete {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+}
+
+.titre {
+  font-family: var(--font-display);
+  font-size: 22px;
+  margin: 0;
+}
+
+.sousTitre {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.bouton:hover {
+  background: var(--color-surface-2);
+}
+
+.corps {
+  display: flex;
+  gap: var(--space-4);
+  flex-grow: 1;
+  min-height: 0;
+}
+
+.pipeline {
+  flex-grow: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.aside {
+  width: 268px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.asideSpacer {
+  flex-grow: 1;
+}

@@ -12,6 +12,9 @@ React / TypeScript, zone Marseille / Aix-en-Provence et full-remote national.
 | [`docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md`](docs/superpowers/plans/2026-09-07-collecte-api-france-travail-adzuna.md) | Plan d'implémentation, tâche par tâche |
 | [`docs/superpowers/specs/2026-09-08-scoring-ia-phase2-design.md`](docs/superpowers/specs/2026-09-08-scoring-ia-phase2-design.md) | Design de la phase 2, le scoring IA |
 | [`docs/superpowers/plans/2026-09-08-scoring-ia-phase2.md`](docs/superpowers/plans/2026-09-08-scoring-ia-phase2.md) | Plan de la phase 2, tâche par tâche |
+| [`docs/design/GUIDELINES.md`](docs/design/GUIDELINES.md) | **Règles de conception de l'interface — contraignantes.** À lire avant d'écrire un composant |
+| [`docs/design/maquettes/README.md`](docs/design/maquettes/README.md) | Les maquettes de la phase 3, et ce que leurs données valent |
+| [`docs/superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](docs/superpowers/plans/2026-09-09-tableau-de-bord-phase3.md) | Plan de la phase 3, tâche par tâche |
 
 **Tenir `ETAT.md` à jour** fait partie du travail : chaque tâche terminée, chaque
 problème découvert et chaque décision prise y sont consignés. C'est le document
@@ -92,6 +95,21 @@ quand le code déplaît au linter.
   `.vscode/settings.json` active Deno uniquement sur `supabase/functions/`.
   Prettier et ESLint sont exclus de ce dossier par `.prettierignore` et
   `.eslintignore` : leurs conventions Node y sont fausses.
+- **`deno fmt` et Prettier ne peuvent pas voir les mêmes fichiers.** C'est une
+  boucle sans issue, prouvée dans les deux sens en phase 3 : chacun impose des
+  conventions que l'autre annule (guillemets, largeur de ligne...), donc les
+  faire tourner tous les deux sur le même dossier les fait alterner à
+  l'infini au lieu de converger. Les cibles `fmt`/`lint`/`check` (racine)
+  restent **exactement** `supabase/functions/ scripts/` : `dashboard/` ne doit
+  **jamais** y être ajouté. `dashboard/` a son propre `verify` (Prettier,
+  ESLint, `tsc`, Vitest — voir `dashboard/package.json`), agrégé par
+  `npm run verify` via `verify:deno` puis `verify:dashboard`, jamais fusionné
+  dans les commandes Deno.
+- **Depuis ESLint 9, le *flat config* ne lit plus `.eslintignore`.** Le
+  fichier à la racine est **décoratif** — gardé pour la trace et pour tout
+  outil qui le lirait encore, mais ce n'est pas lui qui protège
+  `supabase/functions/` d'ESLint. Les exclusions réelles vivent dans le
+  tableau `ignores` d'`eslint.config.js`, qui fait foi.
 
 ## Frontières d'architecture
 
@@ -157,6 +175,23 @@ parallélisme.
 - **RLS activé sur toutes les tables, sans aucune policy.** Seule la clé
   `service_role` accède aux données. Une table sans RLS rendrait la base
   lisible depuis Internet via la clé `anon`, qui est publique par nature.
+- **Le RLS d'une table ne protège PAS une vue posée dessus.** Une vue s'exécute
+  par défaut avec les droits de son propriétaire, donc elle **contourne** le RLS
+  des tables qu'elle lit. Toute vue nouvelle doit porter
+  `security_invoker = on` — sans quoi `anon` lit par la vue ce que le RLS lui
+  refuse par la table.
+
+  Mesuré le 2026-09-09 : `offers_dashboard` rendait **1 245 lignes** à la clé
+  `anon`, là où `offers` en rendait 0. Corrigé par la migration
+  `20260910020000`. Ça n'avait échappé à personne par négligence — le
+  commentaire du code affirmait même le contraire — mais parce que **la
+  protection de la table avait été vérifiée, et pas celle de la vue**.
+
+  Contrôle, qui doit rendre `security_invoker=on` sur chaque vue :
+
+  ```bash
+  npx supabase db query --linked "select c.relname, coalesce(array_to_string(c.reloptions,','),'(aucune)') as options from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='v' order by 1"
+  ```
 - **Pour interroger ou modifier la base distante, utiliser
   `npx supabase db query --linked "<SQL>"`.** C'est le chemin direct : il
   exécute du SQL arbitraire sur le projet distant, sans Docker ni script
@@ -459,3 +494,80 @@ Deux pièges de manipulation, tous deux sans garde-fou en base :
   nouvelle étiquette. L'id survit à la redéfinition, donc toutes les offres
   déjà estampillées resteraient dignes de confiance à vie sur la foi d'un
   texte de requête qui n'existe plus, sans le moindre signal.
+
+## Consulter le tableau de bord
+
+Phase 3, livrée le 2026-09-09. C'est la première interface du dépôt — tout ce
+qui précède se consultait en SQL. SPA **Vite + React**, sous `dashboard/`, et
+non Next.js (voir ROADMAP.md, phase 3, et la raison du choix). Trois écrans :
+le matin (le brief du jour, seuil réglable, puis toute la veille en dessous),
+le détail d'une offre (les deux jugements quand un groupe est vu par deux
+sources), le suivi (pipeline à six étapes, entonnoir, série, taux de réponse).
+
+**Pour la lancer** :
+
+1. `npx supabase secrets set DASHBOARD_TOKEN=<valeur>` doit déjà avoir été
+   posé côté fonction (fait une fois ; ne pas reposer sans raison — voir
+   « Secrets »), et `api-dashboard` déployée (`npm run fn:deploy:api-dashboard`
+   depuis la racine).
+2. `dashboard/.env` (gitignoré, jamais commité) rempli avec les trois
+   variables que `dashboard/.env.example` documente : `VITE_DASHBOARD_API_URL`
+   (l'URL de la fonction déployée), `VITE_SUPABASE_ANON_KEY` (la clé `anon`,
+   publique par conception mais hors dépôt par hygiène), `VITE_DASHBOARD_TOKEN`
+   (le même secret que `DASHBOARD_TOKEN`, requis en en-tête
+   `x-dashboard-token`).
+3. `npm run dash:dev` depuis la racine (ou `npm --prefix dashboard run dev`) —
+   sert la SPA en local sur Vite. Pour un aperçu du bundle de production tel
+   qu'il serait réellement chargé, `npm --prefix dashboard run build` puis
+   `npm --prefix dashboard run preview`.
+
+**Aucune des trois barrières n'est une authentification** — la clé `anon`,
+`verify_jwt` (vérifié à la passerelle avant que le code de la fonction
+tourne), et le secret partagé `x-dashboard-token` (vérifié par
+`api-dashboard` avant tout accès base). Elles suffisent tant que la SPA n'est
+servie **qu'en local** : quiconque a le poste peut déjà lire `dashboard/.env`.
+**Si la SPA est publiée un jour, il faut une vraie authentification avant** —
+le secret partagé se retrouverait alors dans un bundle JavaScript public,
+lisible par quiconque ouvre les outils de développement du navigateur.
+
+**Redéployer après toute modification de `supabase/functions/api-dashboard/`
+ou de `_shared/dashboard-*.ts`** : la SPA appelle une fonction déployée, pas
+le code local. Un oubli de redéploiement est silencieux — aucun test ne le
+détecte, la fonction répond toujours 200, juste avec l'ancien comportement.
+Vérifier après coup : `npx supabase functions list` porte `updated_at` par
+fonction, à comparer à l'heure du dernier commit qui l'a touchée.
+
+**Vérifier qu'une candidature a bien été enregistrée, et propagée à tout le
+groupe de doublons** — la même sonde que celle jouée en tâche 11 :
+
+```sql
+select offer_id, status, applied_at, status_changed_at from offer_applications;
+select offer_id, status, heritee from offer_application_state where offer_id in (<les id du groupe>);
+```
+
+Une ligne dans `offer_applications` ne porte que l'`offer_id` réellement
+cliqué (`heritee = false`) ; `offer_application_state` la propage à tout le
+groupe (`heritee = true` sur les autres membres) — c'est cette dernière vue,
+jamais `offer_applications` seule, qu'il faut lire pour savoir ce qu'affiche
+le tableau de bord sur une offre republiée par plusieurs sources.
+
+**Mesures (2026-09-09, en base à 4 511 offres / 1 339 jugées, bundle en
+production)** :
+
+| Mesure | Valeur |
+|---|---:|
+| `offer_display_groups` (`explain analyze`, hors premier appel à froid) | ~76 ms |
+| `offer_application_state`, table vide | ~0,3 ms |
+| `offer_application_state`, avec une ligne réelle | ~87 ms |
+| `offers_dashboard` (`order by final_score desc limit 20`) | ~104-127 ms |
+| Bundle de production (`dashboard/dist`, JS + CSS, non gzippé) | 452 KiB (421 KiB JS, 35 KiB CSS) |
+| Bundle gzippé | 142 kB (136 kB JS, 6 kB CSS) |
+| Premier affichage (`first-paint`), 3 navigations à froid, Chromium headless | 120 à 184 ms |
+| Premier contenu peint (`first-contentful-paint`) | 168 à 236 ms |
+
+Le premier appel à une vue après une connexion neuve (`db query --linked`) paie
+un coût de démarrage à froid isolé (~630 ms mesuré une fois) : toujours
+mesurer sur au moins trois appels et retenir les suivants, comme documenté
+plus haut pour `offer_display_groups`. Détail complet, sorties brutes de
+l'épreuve de bout en bout et méthode de mesure :
+`.superpowers/sdd/task-11-report.md`.

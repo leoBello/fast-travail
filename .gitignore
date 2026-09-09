@@ -14,3 +14,8 @@ supabase/.temp/
 # faire dans l'historique.
 *.csv
 .superpowers/
+
+# Le canvas de maquettes assemble : 2,5 Mo dont l'essentiel est l'editeur
+# embarque, pas le dessin. Les .dc.html et canvas.json font foi et suffisent a
+# le reconstruire ; le committer alourdirait chaque retouche d'un binaire.
+docs/design/maquettes/tableau-de-bord-fast-travail.html

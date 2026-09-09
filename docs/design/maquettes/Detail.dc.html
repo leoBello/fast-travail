@@ -1,0 +1,265 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --accent: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .badge.sm { height: 19px; padding: 0 7px; font-size: 10px; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-accent { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-dash { background: transparent; border-style: dashed; }
+    .sect { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; font-weight: 500; }
+    .btn-p { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+    .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-family: var(--mono); border: 1px solid var(--border2); color: var(--muted); white-space: nowrap; }
+    .chip-pos { color: #86e3c1; border-color: rgba(79,209,165,0.28); background: rgba(79,209,165,0.08); }
+    .chip-nil { color: var(--faint); border-style: dashed; }
+    .tech { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; background: var(--surface3); color: var(--text); border: 1px solid var(--border2); }
+    .fact { display: flex; flex-direction: column; gap: 2px; }
+    .factK { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); font-weight: 600; }
+    .factV { font-size: 13px; font-weight: 500; }
+    .absent { color: var(--faint); font-style: italic; font-weight: 400; font-size: 12.5px; }
+  </style>
+</helmet>
+
+<div style="width: 900px; height: 1180px; background: var(--bg); overflow: hidden; display: flex; flex-direction: column; padding: 22px 24px; gap: 14px">
+
+  <!-- ============ en-tete ============ -->
+  <div style="display: flex; align-items: flex-start; gap: 16px">
+    <div style="min-width: 0; flex-grow: 1">
+      <h1 style="font-size: 22px; line-height: 1.25">Developpeur React / Node / NestJS<br>&mdash; anglais courant obligatoire</h1>
+      <div style="margin-top: 8px; display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--muted)">
+        <span style="color: var(--text); font-weight: 500">ALLEGIS GROUP</span>
+        <span style="color: var(--faint)">&middot;</span>
+        <span class="absent">lieu non precise</span>
+        <span style="color: var(--faint)">&middot;</span>
+        <span>publiee il y a <span class="num">6</span> jours</span>
+      </div>
+    </div>
+    <button class="btn btn-p">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+      Voir l&rsquo;annonce
+    </button>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 6px">
+    <span class="badge b-accent"><span class="dot"></span>Full remote</span>
+    <span class="badge b-mint"><span class="dot"></span>Freelance</span>
+    <span class="badge b-mute"><span class="dot"></span>Seniorite non precisee</span>
+  </div>
+
+  <!-- ============ le classement, decompose ============ -->
+  <div class="sect">
+    <div class="sectT" style="margin-bottom: 13px">Pourquoi cette offre est a ce rang</div>
+
+    <div style="display: flex; align-items: center; gap: 18px">
+      <div style="display: flex; align-items: baseline; gap: 8px">
+        <span class="num" style="font-family: var(--display); font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1">86,5</span>
+        <span style="font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: 0.07em">rang</span>
+      </div>
+
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="egale"><path d="M5 9h14"/><path d="M5 15h14"/></svg>
+
+      <div style="display: flex; align-items: baseline; gap: 7px">
+        <span class="num" style="font-size: 24px; font-weight: 600; color: var(--muted)">58</span>
+        <span style="font-size: 11px; color: var(--faint)">correspondance au CV</span>
+      </div>
+
+      <span style="color: var(--faint); font-size: 16px">+</span>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 5px">
+        <span class="chip chip-pos">+15 full remote</span>
+        <span class="chip chip-pos">+12 freelance</span>
+        <span class="chip chip-pos">+1,5 TJM</span>
+        <span class="chip chip-nil">0 duree</span>
+        <span class="chip chip-nil">0 agentique</span>
+        <span class="chip chip-nil">0 fraicheur</span>
+      </div>
+    </div>
+
+    <p style="margin: 13px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.55; border-top: 1px solid var(--border); padding-top: 11px">
+      La correspondance vient du modele et ne bouge pas. Les six autres viennent de vos preferences&nbsp;: les changer reclasse tout le corpus sans rien repayer.
+    </p>
+  </div>
+
+  <!-- ============ LE POINT DUR : deux jugements de la meme mission ============ -->
+  <div class="sect" style="border-color: var(--border2)">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px">
+      <span class="sectT">Vue sur deux sources</span>
+      <span class="badge sm b-mute b-dash">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/></svg>
+        2 annonces
+      </span>
+    </div>
+    <p style="margin: 0 0 13px; font-size: 11.5px; color: var(--muted)">
+      La meme mission a ete jugee deux fois, sur deux textes de longueurs differentes. C&rsquo;est le jugement <strong style="color: var(--text)">le mieux informe</strong> qui est retenu, pas le mieux note.
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+
+      <!-- retenu -->
+      <div style="background: var(--surface2); border: 1px solid rgba(79,209,165,0.30); border-radius: 11px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span class="badge sm b-mint"><span class="dot"></span>Retenu</span>
+          <span style="font-size: 12px; color: var(--muted)">Free-Work</span>
+          <div style="flex-grow: 1"></div>
+          <span class="num" style="font-size: 17px; font-weight: 700">58</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 5px">
+          <span class="badge sm b-mint">Confiance haute</span>
+          <span class="badge sm b-mute">Texte integral</span>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5">
+          Excellent match sur React/TypeScript mais NestJS est explicitement indispensable et absent du CV, seul Node.js generique et ancien (dernier usage 2023) est mentionne.
+        </p>
+        <div style="display: flex; align-items: baseline; gap: 7px; margin-top: 2px">
+          <span class="factK">TJM</span>
+          <span class="num" style="font-size: 14px; font-weight: 600">450 &euro;</span>
+          <span style="font-size: 11.5px; color: var(--muted)">par jour</span>
+        </div>
+      </div>
+
+      <!-- ecarte -->
+      <div style="background: transparent; border: 1px dashed var(--border2); border-radius: 11px; padding: 13px; display: flex; flex-direction: column; gap: 9px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span class="badge sm b-mute b-dash">Masque</span>
+          <span style="font-size: 12px; color: var(--muted)">Adzuna</span>
+          <div style="flex-grow: 1"></div>
+          <span class="num" style="font-size: 17px; font-weight: 700; color: var(--muted)">75</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 5px">
+          <span class="badge sm b-amber">Confiance basse</span>
+          <span class="badge sm b-amber b-dash">Coupe a 500 car.</span>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: var(--faint); line-height: 1.5">
+          Le candidat maitrise React/TypeScript/Node.js en profondeur, mais NestJS n&rsquo;est pas mentionne dans son CV bien que Node.js le rende accessible rapidement.
+        </p>
+        <div style="display: flex; align-items: baseline; gap: 7px; margin-top: 2px">
+          <span class="factK">Remuneration</span>
+          <span class="num" style="font-size: 13px; color: var(--faint); text-decoration: line-through">450&ndash;530</span>
+          <span class="badge sm b-amber b-dash">unite fausse</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin: 12px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.55; border-top: 1px solid var(--border); padding-top: 11px">
+      Adzuna avait etiquete ces 450&nbsp;&euro; comme un <span class="num">salaire</span> annuel. Le rapprochement des deux annonces tranche l&rsquo;unite&nbsp;: c&rsquo;est un TJM.
+    </p>
+  </div>
+
+  <!-- ============ ce que l'annonce dit ============ -->
+  <div class="sect">
+    <div class="sectT" style="margin-bottom: 13px">Ce que l&rsquo;annonce dit</div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 14px">
+      <div class="fact"><span class="factK">Engagement</span><span class="factV">Freelance</span></div>
+      <div class="fact"><span class="factK">Mode de travail</span><span class="factV">Full remote</span></div>
+      <div class="fact"><span class="factK">Seniorite</span><span class="factV absent">non precisee</span></div>
+      <div class="fact"><span class="factK">Duree</span><span class="factV absent">non precisee</span></div>
+      <div class="fact"><span class="factK">TJM</span><span class="factV num">450 &euro; / jour</span></div>
+      <div class="fact"><span class="factK">Domaine</span><span class="factV absent">non degage</span></div>
+      <div class="fact"><span class="factK">IA / agents</span><span class="factV">Non</span></div>
+      <div class="fact"><span class="factK">Technos non desirees</span><span class="factV">Aucune</span></div>
+    </div>
+
+    <div style="margin-top: 16px; border-top: 1px solid var(--border); padding-top: 13px">
+      <div class="factK" style="margin-bottom: 8px">Stack detectee &mdash; <span class="num">9</span> technologies</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 5px">
+        <span class="tech" style="border-color: rgba(79,209,165,0.35); color: #86e3c1">React</span>
+        <span class="tech" style="border-color: rgba(79,209,165,0.35); color: #86e3c1">TypeScript</span>
+        <span class="tech" style="border-color: rgba(79,209,165,0.35); color: #86e3c1">Node.js</span>
+        <span class="tech">NestJS</span>
+        <span class="tech">Redux</span>
+        <span class="tech">Zustand</span>
+        <span class="tech">API REST</span>
+        <span class="tech">Git</span>
+        <span class="tech">CI/CD</span>
+      </div>
+      <p style="margin: 9px 0 0; font-size: 11px; color: var(--faint)">
+        En vert, les <span class="num">3</span> technologies presentes dans votre CV.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============ suivi de candidature ============ -->
+  <div class="sect">
+    <div class="sectT" style="margin-bottom: 13px">Ou j&rsquo;en suis</div>
+
+    <div style="display: flex; align-items: center; gap: 0">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 7px; width: 96px">
+        <div style="width: 26px; height: 26px; border-radius: 999px; background: var(--accent); color: #0b0d12; display: flex; align-items: center; justify-content: center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </div>
+        <span style="font-size: 11px; font-weight: 600">Retenue</span>
+      </div>
+      <div style="flex-grow: 1; height: 2px; background: var(--surface3)"></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 7px; width: 96px">
+        <div style="width: 26px; height: 26px; border-radius: 999px; border: 2px dashed var(--border2)"></div>
+        <span style="font-size: 11px; color: var(--muted)">Postulee</span>
+      </div>
+      <div style="flex-grow: 1; height: 2px; background: var(--surface3)"></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 7px; width: 96px">
+        <div style="width: 26px; height: 26px; border-radius: 999px; border: 2px dashed var(--border2)"></div>
+        <span style="font-size: 11px; color: var(--muted)">Relancee</span>
+      </div>
+      <div style="flex-grow: 1; height: 2px; background: var(--surface3)"></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 7px; width: 96px">
+        <div style="width: 26px; height: 26px; border-radius: 999px; border: 2px dashed var(--border2)"></div>
+        <span style="font-size: 11px; color: var(--muted)">Entretien</span>
+      </div>
+      <div style="flex-grow: 1; height: 2px; background: var(--surface3)"></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 7px; width: 96px">
+        <div style="width: 26px; height: 26px; border-radius: 999px; border: 2px dashed var(--border2)"></div>
+        <span style="font-size: 11px; color: var(--muted)">Terminee</span>
+      </div>
+    </div>
+
+    <div style="margin-top: 15px; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 13px">
+      <button class="btn btn-p">Marquer comme postulee</button>
+      <button class="btn">Ecarter cette offre</button>
+      <div style="flex-grow: 1"></div>
+      <span style="font-size: 11.5px; color: var(--faint)">Retenue le <span class="num">7 septembre</span></span>
+    </div>
+  </div>
+
+  <!-- ============ provenance ============ -->
+  <div style="display: flex; align-items: center; gap: 10px; padding: 0 4px">
+    <span class="sectT">Trouvee par</span>
+    <span class="badge sm b-mute">free-work:react</span>
+    <span class="badge sm b-mute">adzuna:remote:fr-ts</span>
+    <span class="badge sm b-accent" style="gap: 4px">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      requete de confiance
+    </span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

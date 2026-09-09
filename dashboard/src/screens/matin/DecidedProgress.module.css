@@ -1,0 +1,30 @@
+.groupe {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.legende {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.segments {
+  display: flex;
+  gap: 3px;
+}
+
+.segmentVide,
+.segmentRempli {
+  width: 20px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+}
+
+.segmentVide {
+  background: var(--color-surface-2);
+}
+
+.segmentRempli {
+  background: var(--color-success);
+}

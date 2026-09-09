@@ -35,6 +35,17 @@ const BATCH_SIZE = 50;
  */
 const CONCURRENCY = 4;
 
+/**
+ * Drapeau explicite, absent par defaut : sans lui, l'amorçage se comporte
+ * comme le cron — il ignore les offres dont seul le `profile_version` a
+ * change (import de CV). Le passer demande le rejugement DELIBERE et PAYANT
+ * du corpus deja juge sous un profil perime (~1 centime/offre, potentiellement
+ * tout le corpus) — l'operation que `CLAUDE.md` decrit comme volontaire.
+ * Usage : `npm run score:backfill -- --rejudge-stale-profile`.
+ */
+const REJUDGE_STALE_PROFILE_FLAG = '--rejudge-stale-profile';
+const includeStaleProfile = Deno.args.includes(REJUDGE_STALE_PROFILE_FLAG);
+
 const db = createDbClient({
   url: requireEnv('SUPABASE_URL'),
   serviceRoleKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
@@ -46,10 +57,27 @@ const claude = {
   model: 'claude-sonnet-5',
 };
 
+if (includeStaleProfile) {
+  log(
+    'warn',
+    'rejugement du profil demande explicitement : offres au profile_version perime incluses, ce lot les repaie',
+    {
+      flag: REJUDGE_STALE_PROFILE_FLAG,
+    },
+  );
+}
+
 try {
   await runBackfill({
     runScoring: () =>
-      runScoring({ db, claude, limit: BATCH_SIZE, concurrency: CONCURRENCY, dryRun: false }),
+      runScoring({
+        db,
+        claude,
+        limit: BATCH_SIZE,
+        concurrency: CONCURRENCY,
+        dryRun: false,
+        includeStaleProfile,
+      }),
     log,
     maxBatches: MAX_BATCHES,
   });

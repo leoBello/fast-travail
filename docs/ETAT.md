@@ -1,11 +1,12 @@
 # État d'avancement et reste à faire
 
-**Dernière mise à jour** : 2026-09-08
-**Branche de travail** : `scoring-ia-phase2`
+**Dernière mise à jour** : 2026-09-09
+**Branche de travail** : `tableau-de-bord-phase3`
 
 Reste à faire, priorités et coûts : [`RESTE-A-FAIRE.md`](RESTE-A-FAIRE.md)
 
 Vision et phases : [`ROADMAP.md`](ROADMAP.md) · Règles du dépôt : [`../CLAUDE.md`](../CLAUDE.md)
+Règles de conception de l'interface : [`design/GUIDELINES.md`](design/GUIDELINES.md)
 
 ---
 
@@ -1096,10 +1097,479 @@ le seul inventaire versionné de la configuration, donc une réinstallation
 
 ---
 
-## Phases 3 à 5
+## Phase 3 — Tableau de bord *(en cours, maquettes rendues le 2026-09-09)*
 
-Pas commencées. Voir [`ROADMAP.md`](ROADMAP.md) : tableau de bord, génération
-de CV et lettres, suivi des candidatures.
+Première phase à avoir une interface. Tout ce qui précède se consulte en SQL.
+
+**Aucun code écrit à ce stade, et c'est délibéré** : le brainstorming et les
+maquettes précèdent le plan d'implémentation.
+
+Règles de conception : [`design/GUIDELINES.md`](design/GUIDELINES.md),
+contraignant. Maquettes et statut de leurs données :
+[`design/maquettes/README.md`](design/maquettes/README.md).
+Canvas : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
+
+**Plan d'implémentation écrit le 2026-09-09**, dix tâches :
+[`superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](superpowers/plans/2026-09-09-tableau-de-bord-phase3.md).
+
+| # | Tâche | État |
+|---|---|---|
+| 1 | `offer_applications` + les vues de groupe et de propagation | ✅ `a223c12..9664995` |
+| 2 | Échafaudage `dashboard/`, et `verify` étendu aux deux côtés | ✅ `9664995..ba0604f` |
+| 3 | Thème et vocabulaire d'interface, avec les tests de garde-fous | ✅ `ba0604f..12bdb7d` |
+| 4 | i18n | ✅ `12bdb7d..dbaec57` |
+| 5 | Vue `offers_dashboard` — repli et élection par confiance | ✅ `dbaec57..4a157ed` |
+| 6 | Edge Function `api-dashboard` | ✅ `ed190e5..36e6a08` |
+| 7 | L'écran du matin | ✅ `36e6a08..0f2d14a` |
+| 8 | Le détail d'une offre | ✅ `0f2d14a..193f37b` |
+| 9 | Le suivi et la gamification | ✅ `193f37b..2024a68` |
+| 10 | **Combler la dette d'API** *(ajoutée le 2026-09-09)* | ✅ `2024a68..714fe42` |
+| 11 | Déploiement, mesure, documentation | ✅ `714fe42..ce4eac8` |
+
+**Les onze tâches sont livrées.** `npm run verify` sort en 0 des deux côtés
+(339 tests Deno, 269 dashboard). Détail de la tâche 11 — l'épreuve de bout en
+bout, les mesures et les corrections de documentation — dans « Ce que la
+tâche 11 a mesuré et vérifié » plus bas, et sorties brutes dans
+`.superpowers/sdd/task-11-report.md`.
+
+**Une onzième tâche a été ajoutée en cours de route, et c'est une erreur du
+plan qui l'impose.** Ma spécification de l'API en tâche 6 était trop courte :
+trois tâches successives — 7, 8 et bientôt 9 — s'y sont heurtées, et trois
+revues indépendantes ont vérifié à la source que les manques venaient de là,
+pas des implémenteurs. Six éléments que les maquettes approuvées promettent ne
+sont pas construisibles : la provenance (« Trouvée par »), les technos du CV
+distinguées, **le bouton d'import du CV demandé au brief initial**, le seuil
+`salaire_floor` recopié en dur côté navigateur, « décidées aujourd'hui » qui
+tient par un `localStorage`, et les filtres multi-valeurs qui rendraient
+possible « full remote **ou** non précisé ».
+
+Aucun ne fait perdre une offre — rien n'est masqué par défaut. Mais trois
+figurent nommément dans le brief. La leçon, pour les phases suivantes : **une
+spécification d'API s'écrit en partant des écrans qu'elle doit servir**, pas
+de la liste des tables disponibles.
+
+### Ce que les cinq premières tâches ont mesuré
+
+**`offers_dashboard`, la vue que le tableau de bord lira** *(tâche 5)* :
+
+| Mesure | Valeur |
+|---|---:|
+| Lignes dans `offers_scored` | 1 269 |
+| Lignes dans `offers_dashboard` | **1 187** |
+| Groupes repliés | **66** |
+| Offres perdues au repli | **0** |
+| Coût (`explain analyze`) | **93 à 100 ms** |
+
+**Le zéro est le chiffre qui compte.** Toute ligne d'`offers_scored` se retrouve
+affichée ou représentée par une autre de son groupe — vérifié par une requête
+d'écart, indépendamment par l'implémenteur, le relecteur et le coordinateur.
+C'est le critère fondateur du dépôt rendu contrôlable : un repli qui avalerait
+silencieusement une offre serait le pire défaut possible ici.
+
+**L'élection par confiance fonctionne en conditions réelles** : ALLEGIS GROUP et
+Digistrat consulting rendent chacune une ligne unique, et l'élue est dans les
+deux cas celle de **Free-Work, confiance haute** (`fit` 58 et 68) — pas celle
+d'Adzuna, mieux notée (75) mais jugée sur 500 caractères tronqués.
+
+**Le brief annonçait 79 lignes repliées, la mesure en donne 82.** L'écart n'est
+pas une erreur : le corpus grossit à chaque collecte, et les nombres du plan
+datent du 2026-09-09 au matin. **Remesurer, jamais recopier.**
+
+**Coûts des autres vues, remesurés** : `offer_display_groups` ~70 ms (contre
+~50 ms avant l'ajout de la liste blanche de suffixes), `offer_application_state`
+~79 ms avec une ligne. Aucun index d'expression posé : les temps ne le
+justifient pas, et le plan ne montre aucune boucle imbriquée qui grandirait avec
+le corpus — le seul `Nested Loop` passe par `offers_pkey`, à coût constant par
+itération.
+
+**Outillage** *(tâche 2)* : `npm run verify` couvre désormais les deux moitiés du
+dépôt — `verify:deno` puis `verify:dashboard`. Les quatre pattes de la moitié
+dashboard ont été éprouvées séparément par une faute provoquée (format, lint,
+type, test). `npm audit` est à **0 vulnérabilité** après la montée de Vite et
+Vitest.
+
+**Une décision d'architecture prise en écrivant le plan** : **Vite, pas
+Next.js**. Le `ROADMAP` annonçait Next.js et `.vscode/settings.json` le
+mentionne encore. Il n'y a aucun besoin de rendu serveur — application
+mono-utilisateur servie en local — et le kit repris est celui de prospeo, qui
+est Vite. Next.js aurait ajouté un routeur, un runtime serveur et une build à
+un projet qui n'en a besoin d'aucun. Les deux documents sont corrigés en
+tâche 10.
+
+**Conséquence sur la phase 5** : le suivi des candidatures, que le `ROADMAP`
+plaçait en phase 5, est **absorbé** par celle-ci — le tableau de bord en a
+besoin maintenant. Ce qui reste à la phase 5 sera dit en tâche 10.
+
+**L'import du CV ne rejuge rien** *(tranché le 2026-09-09)*. Le bouton met à
+jour `candidate_profile.cv_text` et s'arrête là : coût zéro, et les 1 269
+jugements payés restent valides. La contrepartie est que les scores reflètent
+le CV sous lequel ils ont été rendus, **et l'écran doit le dire** — en
+affichant combien d'offres portent un `profile_version` antérieur. Rejuger
+reste une opération délibérée en ligne de commande, à ~12 € le passage. Ce qui
+est interdit : un libellé ou une animation qui laisserait croire que l'import a
+mis les scores à jour.
+
+### Les décisions déjà tranchées
+
+| Décision | Ce qui l'a tranchée |
+|---|---|
+| **Écran du matin = « le brief du jour »** | Une liste finie qu'on termine, puis toute la veille en dessous. La boucle qui se vide est la seule mécanique de motivation qui repose sur un fait |
+| **La liste ne masque rien par défaut** | 1 269 offres triées par rang, seuil réglable à la main. Un filtre par défaut est exactement ce qui fait disparaître une offre |
+| **Les deux scores s'affichent toujours ensemble** | `fit` figé et payé, `final` réglable et gratuit : deux natures. Une offre à `fit` 42 / `final` 79 dit l'inverse d'une offre à `fit` 90 / `final` 89 |
+| **Quatre mécaniques de gamification, toutes fondées sur un fait** | La boucle qui se vide, la série de jours avec candidature envoyée, l'entonnoir, le compteur anti-perte. Aucun XP, aucun niveau, aucun badge de palier |
+| **Le réglage des poids existe, mais pas sur l'écran du matin** | Action rare à effet global. À côté de la liste, elle inviterait à bricoler le classement au lieu de décider sur les offres |
+| **Framer Motion, pas GSAP** | Le besoin est du réordonnancement de liste, que `layout` et `AnimatePresence` font en déclaratif. GSAP gagne sur les timelines et le canvas, dont il n'y a rien ici |
+| **Le kit vient de prospeo, tel quel** | Tokens, trois familles typographiques, anatomie du `Badge`. Le contraste y a déjà été mesuré — `--color-text-muted` y est passé de 3,60:1 à 4,5:1 |
+
+### Les quatre arbitrages du 2026-09-09, après validation des maquettes
+
+**Direction A — « les trois cartes ».** Portée par `Main.dc.html`. B et C
+restent au dépôt comme trace de l'arbitrage, pas comme options ouvertes. Ce qui
+a décidé : A est la seule des trois où **la fin de la tâche du jour est
+visible**, donc la seule où la boucle qui se vide a un support. Et les verdicts
+font 167 caractères de médiane : les trois lignes de la carte suffisent presque
+toujours.
+
+**Le suivi porte six étapes, une sortie et quatre issues.** Pipeline :
+`a_traiter` → `retenue` → `postulee` → `relancee` → `entretien` → `terminee`,
+avec `ecartee` en **sortie à tout moment** — pas la septième étape d'un
+parcours. Issues sur `terminee` : `offre_recue`, `refus`, `sans_reponse`,
+`desistement`. Deux axes orthogonaux, délibérément : « sans réponse » et
+« refus » se ressemblent à l'usage et ne disent pas la même chose sur une
+entreprise au moment de relancer.
+
+**L'accès à la base passe par une Edge Function `api-dashboard` + une SPA
+statique.** `verify_jwt` et clé `anon` côté navigateur, `service_role` injectée
+par la plateforme et jamais hors de Supabase — le motif déjà prouvé par les
+trois crons. La SPA est servie en local par Vite : **aucun hébergement à
+monter**. Écarté : un serveur Node, qui aurait ajouté un second outillage que
+`npm run verify` ne couvre pas, tué le tableau de bord PC éteint, et laissé le
+chemin d'écriture du suivi à sécuriser de zéro.
+
+**« Ce matin » ouvre au-dessus de 50** — 61 offres à l'amorçage, de l'ordre de
+3 à 8 par jour en régime. Le seuil ne s'applique **qu'au brief** : la liste
+complète continue de ne rien masquer, triée par rang. Le risque de masquage est
+borné par deux garde-fous — tout le reste est à un scroll, et le compteur
+anti-perte veille sur ce qui n'a jamais été ouvert. Écarté : un seuil à 40
+(126 offres, une tâche qu'on ne finit pas — et une boucle qu'on ne vide jamais
+cesse de motiver), et un top 6 sans seuil (un matin creux ferait examiner des
+offres à 20, ce qui apprend à se méfier du brief).
+
+### Ce que les maquettes ont fait sortir, et qui n'était pas su
+
+Trois constats sont nés du dessin lui-même, en confrontant le vocabulaire aux
+données réelles. C'est l'argument le plus concret en faveur de la règle « une
+maquette avant le code ».
+
+**1. `offers_scored` ne dédoublonne pas, et la clé rate des doublons
+évidents.** 1 269 lignes pour 1 211 groupes, mais **deux paires manifestes dans
+le top 14** — ALLEGIS GROUP et Digistrat consulting, chacune vue par Adzuna et
+Free-Work, chacune dans son propre groupe avec `dup_count = 1`. Mesuré sur tout
+le périmètre : **65 paires** portent un titre normalisé et une société
+identiques sans être groupées, soit **80 lignes en trop**. Consigné en P23.
+
+> **Correction du 2026-09-09** — la première version de ce paragraphe laissait
+> entendre que les deux paires du top 14 faisaient partie des 65. **C'est
+> faux, et je l'avais inféré sans le vérifier.** Les sources ajoutent leur
+> propre suffixe au même intitulé : Adzuna écrit « … obligatoire **(IT)** » là
+> où Free-Work écrit « … obligatoire ». Les deux titres normalisés diffèrent
+> donc, et ces paires **échappaient aussi à la mesure**. C'est la tâche 1 qui
+> l'a trouvé, en essayant de prouver la propagation sur ces deux paires
+> précises. Détail et remède en P23.
+
+**2. Un doublon doit s'élire par confiance, pas par score.** La mission ALLEGIS
+est jugée **deux fois**, et le classement met en tête le jugement le **moins**
+informé :
+
+| Source | Texte | `fit` | Confiance | Rémunération extraite |
+|---|---|---:|---|---|
+| Adzuna | tronqué à 500 car. | **75** | basse | `salaire` 450–530 — faux |
+| Free-Work | intégral | **58** | haute | `tjm` 450 — juste |
+
+Celui qui n'a lu que 500 caractères a été **plus généreux** que celui qui a lu
+l'annonce entière, dont le verdict est nettement plus précis (« NestJS est
+explicitement indispensable et absent du CV »). D'où l'ordre d'élection retenu :
+confiance, puis longueur de description, puis `final_score`, puis `published_at`,
+puis `id`.
+
+**Effet de bord qui vaut mieux qu'un correctif** : le rapprochement des deux
+annonces **tranche l'unité de P22**. Adzuna étiquetait ces 450 € en `salaire`
+annuel, Free-Work en TJM. P22 se résout donc à l'affichage sur les offres
+vues deux fois, sans toucher au prompt ni repayer un jugement.
+
+**3. Deux totaux identiques, deux ensembles différents — le piège évité de
+justesse.** 539 offres ont une `stack` vide ; 539 offres sont en confiance
+basse. Écrire « `stack` vide = texte tronqué » était tentant et **faux** :
+
+| | Compté |
+|---|---:|
+| `stack` vide **et** confiance basse | 295 |
+| `stack` vide, confiance **haute** | 244 |
+| Confiance basse, `stack` renseignée | 244 |
+
+Ce sont donc **deux absences de causes opposées** — « non détectable, texte
+coupé » contre « aucune techno reconnue » — qui auraient reçu le même rendu.
+La requête de contrôle est dans `design/GUIDELINES.md` §3.1.
+
+### Les mesures qui gouvernent l'interface — 2026-09-09
+
+Recomptées en base. Elles bougent à chaque collecte : **les remesurer**.
+
+| Mesure | Valeur |
+|---|---:|
+| Offres jugées | 1 269 |
+| — à 70 ou plus | 17 |
+| — au-dessus de 50 | 61 |
+| — à 40 ou plus | 126 |
+| Score moyen | **14,1** |
+| `work_mode` **nul** | **863** (68 %) |
+| `domain` — valeurs distinctes | **960** sur 1 269 |
+| `stack` vide | 539 (295 + 244, voir plus haut) |
+| Sans montant de rémunération | 568 |
+| Montants d'unité douteuse (P22) | 102 sur 599 |
+| Hors périmètre, jamais lues par l'IA | 2 877 |
+| Longueur des verdicts | 86 à 327 car., médiane ~167 |
+| Historique de `first_seen_at` | **2 jours** — tout le reste est du backfill |
+
+**Deux de ces nombres interdisent un composant chacun.**
+
+`domain` à **960 valeurs distinctes** est du texte libre du modèle : il
+s'affiche, il ne se facette **jamais**. Une liste de filtres par domaine aurait
+960 entrées.
+
+`first_seen_at` à **deux jours** rend le compteur « N nouvelles aujourd'hui »
+inconstructible : 3 446 offres ont été vues pour la première fois le même jour.
+Il afficherait 833 aujourd'hui puis ~70 demain sans que rien n'ait changé. Le
+remplacement — « 6 offres à décider », comptées sans décision enregistrée — ne
+dépend d'aucun historique et sera encore vrai dans six mois. C'est le cas
+d'école du §3.3 des règles de conception.
+
+### Ce qui reste à trancher
+
+Voir « Décisions en attente » en bas de ce document.
+
+### Tâche 1 livrée le 2026-09-09 — `offer_applications` et les deux vues
+
+Migration `20260910000000_offer_applications.sql` : la table `offer_applications`
+(clé sur `offer_id` réel, quatre contraintes `check`, RLS activé sans policy,
+deux index), la vue `offer_display_groups` (clé de regroupement d'affichage) et
+la vue `offer_application_state` (propagation de l'état à tout le groupe,
+colonne `heritee`). SQL repris verbatim du brief de tâche.
+
+**Coût mesuré, `explain analyze` × 3, le 2026-09-09 avant le correctif de
+clé ci-dessous** — la clé simple d'alors (sans liste blanche de suffixes)
+n'est **plus reproductible** : la vue a été remplacée par la migration
+`20260910005000`. Chiffres cités comme mesure historique, datée, pas comme
+quelque chose qu'on peut refaire aujourd'hui :
+
+| Vue | État de la table | Temps d'exécution (3 mesures) |
+|---|---|---:|
+| `offer_display_groups` (clé simple) | — (4 146 offres, `Seq Scan`) | 50,385 / 50,318 / 50,079 ms |
+| `offer_application_state` | `offer_applications` vide | 0,145 / 0,109 / 0,109 ms |
+| `offer_application_state` | `offer_applications` à 1 ligne | 61,741 / 60,125 / 60,028 ms |
+
+Bien sous le seuil de 200 ms fixé par le brief : aucun index d'expression
+posé. `offer_application_state` scanne `offers` **deux fois** (les deux
+`offer_display_groups` du merge join), d'où un coût environ double de
+`offer_display_groups` seule une fois la table peuplée — cohérent avec le
+plan, pas juste avec l'intuition. **Les mesures courantes, sur la clé
+réellement en place aujourd'hui, sont dans la section « Correctif » ci-dessous.**
+
+**Propagation vérifiée** sur une vraie paire cross-source (Experis France,
+« Data analyst (F/H) », vue par `adzuna` et `free_work`) : une ligne posée sur
+l'offre Adzuna avec `status = 'retenue'` apparaît sous les deux `offer_id` dans
+`offer_application_state`, `heritee = false` côté Adzuna et `heritee = true`
+côté Free-Work. Sonde supprimée ensuite, table revérifiée vide.
+
+**Constat non prévu par le brief** : les deux paires citées comme exemples
+(ALLEGIS GROUP, Digistrat consulting) **ne se groupent pas** sous la clé
+verbatim du brief. Adzuna suffixe ces deux titres de `(IT)`
+(`"...obligatoire (IT)"` côté Adzuna contre `"...obligatoire"` côté Free-Work),
+et le `regexp_replace` ne fait qu'ôter la ponctuation — il garde le `it`, donc
+les deux clés diffèrent d'un fragment de texte. Vérifié en lisant
+`offer_display_groups` sur les quatre `offer_id` des deux paires. La vérification
+de propagation ci-dessus a donc été faite sur une paire de substitution
+(Experis France) qui, elle, se groupe correctement — la mécanique est prouvée,
+mais ces deux paires précises resteront non regroupées tant que la clé ne
+tolère pas ce genre de suffixe. Pas corrigé ici : la tâche demandait le SQL
+verbatim, et élargir la clé sans mesure est exactement la mise en garde de P14
+que le brief rappelle lui-même. À consigner comme limite connue de la clé
+actuelle, pas comme un défaut de cette migration.
+
+### Correctif du 2026-09-09 — `20260910005000`, la clé ignore un suffixe d'annotation
+
+Le constat ci-dessus venait d'une affirmation fausse du coordinateur (« ces
+deux paires font partie des 64 mesurées ») : ce n'était pas vérifié, et la
+vérification a montré le contraire. Le remède a été mesuré et appliqué en
+migration séparée (`20260910000000` déjà appliquée n'a pas été retouchée) :
+le titre est débarrassé d'un suffixe d'annotation pris dans une **liste
+blanche** (`h/f`, `f/h`, `h-f`, `it`, `cdi`, `cdd`, `alternance`, `stage`)
+avant normalisation, jamais de « tout parenthétique final » — piège mesuré
+sur Digistrat consulting, dont le titre Free-Work se termine par un
+parenthétique porteur de sens (« *(orienté front React)* ») qu'un retrait
+aveugle aurait amputé, cassant la correspondance au lieu de la faire.
+
+Mesure sur les 1 269 offres jugées : clé simple → 65 groupes repliés
+(80 lignes, 23 inter-sources) ; clé liste blanche → **66 groupes**
+(**82 lignes**, **24 inter-sources**). Les 7 groupes que seul le retrait
+forme ont été lus un par un — Act Digital France, ALLEGIS GROUP, Boond,
+Digistrat consulting, Letsignit, Mon Consultant Indépendant, Synanto —
+aucune fusion abusive constatée (P14).
+
+Revérifié en base après application : ALLEGIS GROUP et Digistrat consulting
+rendent chacune une `display_key` unique et partagée par leurs deux offres.
+Sonde de propagation refaite sur ALLEGIS (la paire citée par le brief) :
+`status = 'retenue'` posé sur l'offre Adzuna apparaît sur les deux
+`offer_id` dans `offer_application_state`, `heritee = true` côté Free-Work.
+Sonde supprimée, table revérifiée vide.
+
+#### Remesure du 2026-09-09 (soir) — les chiffres du rapport ne concordaient pas avec ceux consignés ici
+
+Une revue a relevé que les nombres cités juste au-dessus dans une version
+antérieure de cette section ne correspondaient pas à ceux du rapport de
+tâche — une retranscription à la main, pas la sortie brute. Remesuré dans
+l'état réel de la base (clé liste blanche déjà en place,
+`offer_applications` vide au départ), sortie brute collée telle quelle,
+identique à `.superpowers/sdd/task-1-report.md` :
+
+```
+=== offer_display_groups run 1 (anomalie de démarrage à froid, écartée — voir note) ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=1.524..632.049 rows=4146 loops=1)
+Planning Time: 13.018 ms
+Execution Time: 632.546 ms
+
+=== offer_display_groups run 2 ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=0.330..69.462 rows=4146 loops=1)
+Planning Time: 0.944 ms
+Execution Time: 69.842 ms
+
+=== offer_display_groups run 3 ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=0.314..69.466 rows=4146 loops=1)
+Planning Time: 0.942 ms
+Execution Time: 69.865 ms
+
+=== offer_display_groups run 4 (extra, pour confirmer que le run 1 est une anomalie) ===
+Seq Scan on offers o  (cost=0.00..1016.11 rows=4146 width=48) (actual time=0.279..69.527 rows=4146 loops=1)
+Planning Time: 0.968 ms
+Execution Time: 69.926 ms
+
+=== offer_application_state run 1 (offer_applications vide) ===
+Unique  (cost=2948.58..2993.15 rows=4146 width=169) (actual time=0.119..0.120 rows=0 loops=1)
+Planning Time: 4.395 ms
+Execution Time: 0.359 ms
+
+=== offer_application_state run 2 (vide) ===
+Planning Time: 2.204 ms
+Execution Time: 0.330 ms
+
+=== offer_application_state run 3 (vide) ===
+Planning Time: 2.165 ms
+Execution Time: 0.317 ms
+
+=== offer_application_state, avec 1 ligne réelle (probe Experis France) ===
+run 1 : Planning Time: 2.239 ms | Execution Time: 79.088 ms
+run 2 : Planning Time: 2.221 ms | Execution Time: 80.053 ms
+run 3 : Planning Time: 2.253 ms | Execution Time: 79.485 ms
+```
+
+Le premier run d'`offer_display_groups` (632 ms d'exécution, 13 ms de
+planification) est un artefact de démarrage à froid de la connexion —
+chaque appel `db query --linked` réinitialise le rôle de connexion, et le
+tout premier appel d'une série paie un coût que les suivants n'ont plus. Un
+quatrième run a été ajouté pour le confirmer : trois mesures consécutives
+convergent à 69,4–69,9 ms, le quatrième run les confirme. Retenu comme les
+« trois mesures » : **69,842 / 69,865 / 69,926 ms**, contre ~50 ms avant le
+correctif (le second `regexp_replace` s'ajoute au coût) — toujours un
+`Seq Scan` unique sur les 4 146 offres, toujours largement sous le seuil de
+200 ms.
+
+`offer_application_state` : **0,359 / 0,330 / 0,317 ms** sur table vide (le
+planificateur court-circuite les deux scans d'`offers`, marqués
+`never executed`, dès que `offer_applications` ne renvoie aucune ligne — pas
+une mesure représentative de l'usage réel), et **79,088 / 80,053 /
+79,485 ms** avec une ligne réelle en base — cohérent avec le double scan
+d'`offers` qu'implique la définition de la vue, et toujours sous 200 ms.
+Aucun index d'expression nécessaire.
+
+### Tâche 11 livrée le 2026-09-09 — déploiement, mesure, documentation
+
+**`api-dashboard` était en retard sur le dépôt, et ce n'est pas anodin.** La
+fonction déployée (version 6, `updated_at` 11:48:24 UTC) datait d'**avant**
+le dernier correctif de revue de la tâche 10 (`714fe42`, commité 11:49:55
+UTC) : le correctif de `dashboard-query.ts` (le repli robuste sur le profil
+actif, voir tâche 10) n'était donc **pas** en production. Redéployé
+(`npm run fn:deploy:api-dashboard` → version 7, `updated_at` 11:55:24 UTC,
+postérieur au commit). **Aucun test ni aucune alerte du dépôt ne signale un
+déploiement périmé** : `npm run verify` teste le code local, jamais la
+fonction en production. Le réflexe à garder pour toute tâche future qui
+touche `_shared/dashboard-*.ts` : comparer `updated_at` de
+`npx supabase functions list` à l'heure du dernier commit qui la touche,
+avant de considérer une tâche terminée.
+
+**Épreuve de bout en bout, jouée en réel contre la fonction redéployée** — la
+paire ALLEGIS GROUP citée par P23/le brief de tâche 1 (Adzuna
+`e770bf00-77ac-401e-a9d8-58daedfb8ba8`, Free-Work
+`f309a8f1-286e-471c-bc11-d4d9f45428a4`, même `display_key`) : SPA lancée
+(`vite preview` sur le bundle de production), offre ouverte depuis la liste,
+« Retenir cette offre » puis « Marquer comme postulée » cliqués. Relu en
+base immédiatement après (sortie brute, `.superpowers/sdd/task-11-report.md`) :
+
+```
+offer_applications (1 ligne) : offer_id = f309a8f1-… (Free-Work, la ligne cliquée)
+  status = postulee, applied_at = 2026-09-09 12:02:35+00
+
+offer_application_state (2 lignes, tout le groupe) :
+  e770bf00-… (adzuna)    | postulee | heritee = true
+  f309a8f1-… (free_work) | postulee | heritee = false
+```
+
+**Une seule ligne écrite, deux `offer_id` qui portent l'état** — la
+propagation group-aware posée en tâche 1 fonctionne en conditions réelles,
+pas seulement sur une sonde synthétique. Le compteur de l'écran du matin est
+passé de « 0 décidées » à « 1 décidée » et la liste de 59 à 58 offres sans
+recharger la page, preuve que la SPA relit bien l'état serveur. Sonde
+supprimée aussitôt après (`delete from offer_applications where offer_id =
+'f309a8f1-…'`), table revérifiée à 0 ligne.
+
+**Mesures, écrites et non estimées** (base à 4 511 offres / 1 339 jugées ce
+jour-là — ces deux nombres bougent chaque matin) :
+
+| Mesure | Valeur |
+|---|---:|
+| `offer_display_groups` (`explain analyze`, 1er appel à froid exclu) | 75,5 / 76,0 / 76,5 ms |
+| `offer_application_state`, table vide | 0,31 / 0,32 / 0,36 ms |
+| `offer_application_state`, une ligne réelle | 86,3 / 86,7 / 87,6 ms |
+| `offers_dashboard` (`order by final_score desc limit 20`) | 103,3 / 108,7 / 127,2 ms |
+| Bundle de production (`dashboard/dist`, non gzippé) | 452 KiB — 420 931 o JS + 35 475 o CSS + 1 028 o HTML |
+| Bundle gzippé | 135,53 kB JS + 6,06 kB CSS ≈ **142 kB** |
+| `first-paint`, 3 navigations à froid (Chromium headless, bundle de prod) | 184 / 124 / 120 ms |
+| `first-contentful-paint` | 236 / 172 / 168 ms |
+| Groupes repliés dans `offers_dashboard` (sur le périmètre jugé du jour) | 76 groupes, 94 lignes, **0 offre perdue** |
+
+Le premier appel à `db query --linked` d'une série paie un coût de connexion
+à froid isolé (~630 ms observé une fois en tâche 1, confirmé non reproduit en
+tâche 11) : toujours écarter le premier relevé et garder les trois suivants,
+comme documenté plus haut. Les trois vues restent largement sous le seuil de
+200 ms fixé par le brief de tâche 1 ; le bundle et les temps de peinture sont
+mesurés ici pour la première fois sur ce chantier.
+
+**`DASHBOARD_TOKEN` était déjà posé** (`npx supabase secrets set`, fait en
+tâche 10 en remplissant `dashboard/.env`) — rien à reposer, sa valeur n'a pas
+été relue ni recopiée.
+
+**Documentation mise à jour par cette tâche** : ce tableau (tâches 9 à 11),
+`ROADMAP.md` (phase 3 livrée, Vite et non Next.js avec la raison, phase 5
+partiellement absorbée avec le détail de ce qui reste),
+`.vscode/settings.json` (ne mentionne plus de « futur dashboard Next.js »),
+`CLAUDE.md` (recette de consultation du tableau de bord, et les deux pièges
+d'outillage `deno fmt`/Prettier et `.eslintignore` décoratif depuis
+ESLint 9 — découverts en écrivant l'outillage de la phase 3 mais jamais
+consignés jusqu'ici).
+
+**Aucun problème nouveau ouvert.** Le seul constat notable — le déploiement
+périmé — est corrigé dans ce commit même, pas laissé en l'état ; P24 reste le
+seul point d'attention hérité de la phase 3, déjà visible dans
+« Problèmes ouverts, par priorité » ci-dessous.
 
 ---
 
@@ -1131,6 +1601,85 @@ concordent : Marseille est un marché Angular / Java.
 ---
 
 ## Problèmes ouverts, par priorité
+
+### Ce que la revue finale de la phase 3 a trouvé — 2026-09-09
+
+**Cinq défauts qu'aucune revue de tâche ne pouvait voir**, parce qu'ils ne se
+lisent qu'en joignant deux ou trois tâches. Tous corrigés avant fusion ; ils
+sont consignés parce que leur *forme* se reproduira.
+
+**C1 — L'import du CV aurait déclenché un rejugement complet, sous un écran qui
+affirmait le contraire.** `run-scoring.ts` sélectionnait ses candidats par
+`scored_profile_version.neq.<version active>` ; l'import écrit une **nouvelle**
+version. Importer un CV rendait donc les ~1 390 offres candidates, et le cron de
+7 h en aurait repayé 100 par jour pendant deux semaines — **~14 €** — en
+**écrasant** les scores affichés par `upsert`. Pendant ce temps l'interface
+disait « Aucune offre n'a été rejugée ».
+
+Il fallait joindre trois choses pour le voir : le chemin d'écriture de la
+tâche 10, la sélection de candidats de la **phase 2**, et le cron de 7 h. Aucune
+revue de tâche n'avait les trois sous les yeux.
+
+**Tranché par Léo** : le cron ignore désormais les changements de CV. Les
+candidats sont les offres *jamais jugées* ou jugées sous un **prompt**
+différent. Le rejugement volontaire reste possible et explicite :
+`npm run score:backfill -- --rejudge-stale-profile`.
+
+**I1 — Les vues étaient lisibles par la clé `anon`, désormais embarquée dans le
+navigateur.** Les tables sont bien protégées (`relrowsecurity = true`), mais
+`offers_dashboard`, `offers_scored`, `offer_display_groups` et
+`offer_application_state` avaient `relrowsecurity = false` et **aucune option
+`security_invoker`** : une vue s'exécute alors avec les droits de son
+propriétaire et **contourne le RLS**. `anon` ayant `SELECT` dessus,
+`/rest/v1/offers_dashboard` rendait **tout le corpus** à qui possédait la clé —
+publique par conception. `offer_application_state` porte les notes et les dates
+d'entretien ; elle ne rendait 0 que parce que la table était vide.
+
+Et le commentaire de `api-dashboard/index.ts` **affirmait le contraire** :
+« RLS actif sans policy — la clé `anon` ne lit rien directement ».
+
+Corrigé par la migration `20260910020000` (`security_invoker = on` sur les
+quatre vues), prouvé par `curl` réel : sans clé **401**, clé `anon` **200 avec
+`[]`**, clé `service_role` **200 avec les lignes**. `rolbypassrls` vérifié
+(`anon` faux, `service_role` vrai), pas supposé.
+
+**La leçon, qui vaut au-delà de cette phase** : *le RLS d'une table ne protège
+pas une vue posée dessus.* Toute vue nouvelle doit porter
+`security_invoker = on`, et c'est à vérifier plutôt qu'à supposer.
+
+**I2 — Le détail affirmait « Aucune » et « Non » sur un texte tronqué.**
+527 offres sur 1 339 affichaient « Technos non désirées : Aucune », 559 « IA /
+agents : Non », sans consulter `truncated_input` — à trois lignes du bloc
+`stack` qui, lui, le faisait correctement. Et 501 des 1 245 lignes affichées
+n'avaient **aucun** signal de troncature, les badges de confiance ne vivant que
+dans le panneau à deux jugements.
+
+**I3 — L'entonnoir comptait le statut courant, pas le cumul.** Passer une
+candidature de `retenue` à `postulee` faisait **retomber « retenues » à 0**. La
+même réponse `/stats` portait déjà les deux définitions : `funnel.applied`
+(courant) et `responseRate.sent` (cumulatif). Un entonnoir compte ce qui est
+**passé par** une étape, jamais ce qui y stationne.
+
+*Réserve subsistante* : faute d'un horodatage `retained_at`, une candidature
+écartée sans être jamais passée par « retenue » ne se distingue pas avec
+certitude. Le pipeline séquentiel de l'interface rend l'approximation fiable en
+pratique, mais ce n'est pas une garantie serveur.
+
+**I4 — Un test dont l'intitulé nommait le cas que son assertion ne couvrait
+pas.** `parisDate.test.ts` promettait de traiter une date **seule**
+(`"2026-09-11"`) et passait en réalité un horodatage déjà converti. Mesuré :
+une date seule arrive à **01 h ou 02 h heure de Paris** selon la saison, et la
+carte d'entretien aurait affirmé une heure jamais saisie.
+
+**C'est la troisième fois de ce chantier qu'un test promet plus que son
+assertion.** Les deux précédentes : un badge « vérifié » qui ne contrôlait
+qu'une classe CSS, et deux tests de `prefers-reduced-motion` qui validaient un
+attribut de diagnostic calculé à côté de la vraie prop. **Le motif est à
+chercher activement en revue** : lire l'intitulé, puis l'assertion, et vérifier
+qu'ils parlent de la même chose.
+
+---
+
 
 ### P1 — Le rayon local ne peut pas être ajusté finement
 
@@ -1678,6 +2227,108 @@ fausse. C'est suffisant pour le classement, et faux comme donnée.
 `PROMPT_VERSION`, donc fait **repayer les 1 269 jugements**. À grouper avec la
 prochaine évolution du prompt qui les repaiera de toute façon — jamais seul.
 
+**Atténuation trouvée en phase 3, gratuite** : quand la même offre est vue par
+deux sources, le rapprochement tranche l'unité — voir P23 et la section
+« Phase 3 ». Ça ne couvre que les offres vues deux fois, mais ça ne coûte rien.
+
+### P23 — `offers_scored` ne dédoublonne pas, et la clé rate des paires évidentes
+
+**Trouvé le 2026-09-09**, en dessinant l'écran du matin : deux paires de
+doublons manifestes occupent quatre des quatorze premières lignes du
+classement.
+
+| Offre | Adzuna | Free-Work | Groupes |
+|---|---:|---:|---|
+| ALLEGIS GROUP — « Developpeur React/Node/NestJS » | 90,0 | 86,5 | **distincts**, `dup_count = 1` chacun |
+| Digistrat consulting — « Développeur Full stack REACT/C# » | 94,0 | 85,5 | **distincts**, `dup_count = 1` chacun |
+
+Mesure d'ensemble sur le périmètre jugé : **65 paires** portent un titre
+normalisé et une société identiques sans partager de groupe, soit **80 lignes
+en trop** sur 1 269. Six pour cent du corpus, mais bien davantage en tête de
+liste — et l'écran est la ressource rare.
+
+**Et ces deux paires-là n'étaient même pas dans les 65** *(trouvé en tâche 1,
+le 2026-09-09)*. Les sources suffixent le même intitulé : Adzuna écrit
+« … obligatoire **(IT)** », France Travail « … **(H/F)** », Free-Work rien. Les
+titres normalisés diffèrent donc, et la mesure elle-même les ratait. La clé de
+regroupement d'affichage retire un suffixe d'annotation pris dans une **liste
+blanche** (`h/f`, `f/h`, `it`, `cdi`, `cdd`, `alternance`, `stage`) avant de
+normaliser.
+
+**Pourquoi une liste blanche et non « tout parenthétique final »** : un retrait
+aveugle casse Digistrat, dont le titre Free-Work se termine par un
+parenthétique **porteur de sens** — « Développeur Full stack REACT/C#
+*(orienté front React)* ». L'amputer produirait une clé différente de celle
+d'Adzuna, soit l'inverse de l'effet recherché.
+
+| | Groupes | Lignes repliées | Dont inter-sources |
+|---|---:|---:|---:|
+| Clé simple | 65 | 80 | 23 |
+| Clé avec liste blanche | **66** | **82** | **24** |
+
+Le gain agrégé est petit, et c'est trompeur : les **7 groupes** que seul le
+retrait forme sont précisément ceux qui occupent le haut du classement. Ils ont
+été **lus un par un** — Act Digital France, ALLEGIS GROUP, Boond, Digistrat
+consulting, Letsignit, Mon Consultant Indépendant, Synanto — et **aucun n'est
+une fusion abusive** : chacun est le même intitulé à un suffixe de source près.
+C'est la lecture manuelle que P14 exige avant tout élargissement de clé.
+
+**Deux problèmes distincts, à ne pas confondre** :
+
+1. **La vue ne replie pas.** `offers_shortlist` dédoublonne dans la sélection ;
+   `offers_scored` ne le fait pas du tout. C'était sans conséquence tant que
+   personne ne regardait la vue autrement qu'avec un `limit 40` en SQL.
+2. **La clé rate ces paires.** Elles échappent au rapprochement existant alors
+   que titre et société sont identiques à la normalisation près.
+
+**Ce qui est décidé** : le tableau de bord replie **à l'affichage**, sur titre
+normalisé + société, et **élit par confiance** (voir « Phase 3 »). Ça ne demande
+aucune migration et ça règle le symptôme visible tout de suite.
+
+**Ce qui reste ouvert** : faut-il corriger la clé elle-même ? L'avantage serait
+que `offers_shortlist` et toute analyse future en profitent. Le risque est
+qu'une clé plus lâche fusionne deux missions réellement distinctes chez un même
+intermédiaire — c'est exactement la réserve de P14. À trancher sur mesure, pas
+sur intuition : lire les 64 paires avant de toucher à la clé.
+
+---
+
+### P24 — Les clés `anon` et `service_role` disparaissent fin 2026, et le remplaçant ne passe pas `verify_jwt`
+
+**Constaté le 2026-09-09**, en remplissant `dashboard/.env`. Supabase remplace
+les deux clés JWT historiques par des clés **opaques** : `sb_publishable_…`
+pour `anon`, `sb_secret_…` pour `service_role`. Le projet porte déjà les
+quatre — `npx supabase projects api-keys --project-ref zbpbuzoukldbzfbbikhw`
+rend `anon`/`service_role` en `legacy` et une publishable/secret nommées
+`default`. La plateforme injecte aussi `SUPABASE_PUBLISHABLE_KEYS` et
+`SUPABASE_SECRET_KEYS` dans les Edge Functions, visibles dans
+`npx supabase secrets list`.
+
+**Ce n'est pas un remplacement à variable près, et c'est tout le problème.**
+La clé publishable n'est pas un JWT : `verify_jwt = true` la rejette à la
+passerelle, avant que le code de la fonction tourne. La réponse Supabase sur
+le sujet est de déployer en `--no-verify-jwt` dès qu'on appelle avec une clé
+publishable ou secret. Migrer, c'est donc **renoncer à `verify_jwt`**, pas
+échanger une chaîne contre une autre.
+
+Les quatre fonctions ne sont pas dans la même situation :
+
+| Fonction | Ce que `verify_jwt` protège aujourd'hui | Coût de la migration |
+|---|---|---|
+| `api-dashboard` | Rien de plus que `x-dashboard-token`, vérifié avant tout accès base — et la clé `anon` est publique par construction | Faible : `verify_jwt = false`, et plus aucune clé Supabase dans le bundle de la SPA (3 variables `VITE_` → 2) |
+| `collect-france-travail`, `collect-adzuna`, `score-offers` | **Leur seule barrière.** Elles n'ont aucun secret partagé | Élevé : sans nouveau secret partagé, retirer `verify_jwt` rendrait `score-offers` déclenchable par quiconque trouve l'URL — dépense Anthropic réelle |
+
+**Décision du 2026-09-09** : on reste sur la clé `anon` legacy, qui fonctionne
+tant qu'elle n'est pas désactivée à la main dans le tableau de bord. Il reste
+**environ trois mois** de marge. Le chantier à mener avant l'échéance :
+donner un secret partagé aux trois fonctions cron (sur le modèle de
+`x-dashboard-token`), passer les quatre en `verify_jwt = false`, et remplacer
+la clé du Vault `cron_auth_key` par ce secret.
+
+**Le piège à ne pas manquer** : cette échéance ne se signale par aucun test
+rouge ni aucune alerte du dépôt. Elle tombera sur les crons de 6 h et 6 h 30,
+un matin, sous forme de 401.
+
 ---
 
 ## Mineurs consignés
@@ -1805,13 +2456,29 @@ pour chaque entrée ce qu'elle coûte, ce qu'elle rapporte et quand la faire.
 
 ## Decisions en attente
 
-Aucune. Les dernieres tranchees : matrice Adzuna en requetes precises avec full
-remote garanti par la requete, `category=it-jobs` conserve comme filet en
-premiere position d'ecriture, `angular` et `java` a +1 en contexte, `cobol` en
-signal rouge. Et pour ce chantier : un ensemble de requetes plutot qu'un
-scalaire, `adzuna:local:javascript` maintenue `anchored` malgre sa majorite de
-hors sujet, son declassement coutant 5 offres adjacentes sans autre voie
-d'entree.
+**Une seule, et elle est hors du périmètre de la phase 3.**
+
+**P21 — désactiver la réflexion du modèle.** Elle pèse 65 % de la facture du
+scoring ; la couper ramènerait le coût vers ~7 €/mois. Personne n'a mesuré ce
+que le jugement y perdrait sur du texte français ambigu, qui est précisément la
+tâche pour laquelle Sonnet a été préféré à Haiku. À trancher **avec une mesure
+de qualité avant/après sur un échantillon**, jamais au fil de l'eau.
+
+Les cinq questions ouvertes par les maquettes ont été tranchées le 2026-09-09.
+Quatre le sont dans « Les quatre arbitrages » plus haut : direction A, six
+étapes + sortie + quatre issues, Edge Function + SPA statique, seuil du brief à
+50. La cinquième est **P23** : le tableau de bord replie **à l'affichage**, et
+les 64 paires se lisent **avant** toute décision sur la clé — élargir la clé
+sans les avoir lues risquerait de fusionner deux missions réellement distinctes
+chez un même intermédiaire, qui est la réserve déjà consignée en P14.
+
+Les dernieres tranchees avant la phase 3 : matrice Adzuna en requetes precises
+avec full remote garanti par la requete, `category=it-jobs` conserve comme
+filet en premiere position d'ecriture, `angular` et `java` a +1 en contexte,
+`cobol` en signal rouge. Et pour le chantier de confiance : un ensemble de
+requetes plutot qu'un scalaire, `adzuna:local:javascript` maintenue `anchored`
+malgre sa majorite de hors sujet, son declassement coutant 5 offres adjacentes
+sans autre voie d'entree.
 
 ---
 

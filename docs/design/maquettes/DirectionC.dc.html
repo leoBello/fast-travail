@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488; --accent: #6d92ff;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .ph { background: var(--surface3); border-radius: 3px; }
+    .box { border: 1px solid var(--border2); border-radius: 10px; }
+    .note { margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.55; }
+    .entry { display: grid; grid-template-columns: 54px minmax(0, 1fr) 128px; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  </style>
+</helmet>
+
+<div style="width: 640px; height: 520px; background: var(--bg); overflow: hidden; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+
+  <div>
+    <h1 style="font-size: 17px">C &mdash; La colonne</h1>
+    <p class="note" style="margin-top: 4px">Une seule colonne qui se lit en descendant. Le brief et la liste sont le meme objet, a deux densites.</p>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; flex-direction: column; min-height: 0">
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px">
+      <span class="ph" style="width: 74px; height: 11px"></span>
+      <div style="flex-grow: 1"></div>
+      <span class="ph" style="width: 82px; height: 6px"></span>
+    </div>
+
+    <div class="entry">
+      <div style="text-align: right">
+        <div class="num" style="font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1">100</div>
+        <div class="num" style="font-size: 11px; color: var(--muted)">90</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span class="ph" style="width: 84%; height: 9px"></span>
+        <span class="ph" style="width: 38%; height: 6px"></span>
+        <div style="display: flex; gap: 4px">
+          <span class="ph" style="width: 46px; height: 13px; border-radius: 999px"></span>
+          <span class="ph" style="width: 38px; height: 13px; border-radius: 999px"></span>
+        </div>
+        <span class="ph" style="width: 100%; height: 5px"></span>
+        <span class="ph" style="width: 70%; height: 5px"></span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px">
+        <span style="height: 24px; border-radius: 9px; background: var(--accent)"></span>
+        <span class="box" style="height: 24px"></span>
+      </div>
+    </div>
+
+    <div class="entry">
+      <div style="text-align: right">
+        <div class="num" style="font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1">100</div>
+        <div class="num" style="font-size: 11px; color: var(--muted)">88</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <span class="ph" style="width: 72%; height: 9px"></span>
+        <span class="ph" style="width: 44%; height: 6px"></span>
+        <div style="display: flex; gap: 4px">
+          <span class="ph" style="width: 46px; height: 13px; border-radius: 999px"></span>
+          <span class="ph" style="width: 30px; height: 13px; border-radius: 999px"></span>
+          <span class="ph" style="width: 52px; height: 13px; border-radius: 999px"></span>
+        </div>
+        <span class="ph" style="width: 96%; height: 5px"></span>
+        <span class="ph" style="width: 58%; height: 5px"></span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px">
+        <span style="height: 24px; border-radius: 9px; background: var(--accent)"></span>
+        <span class="box" style="height: 24px"></span>
+      </div>
+    </div>
+
+    <div class="entry" style="padding: 8px 0">
+      <div style="text-align: right">
+        <div class="num" style="font-size: 14px; font-weight: 700; line-height: 1.3">95</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px; justify-content: center">
+        <span class="ph" style="width: 90%; height: 7px"></span>
+        <span class="ph" style="width: 34%; height: 5px"></span>
+      </div>
+      <div></div>
+    </div>
+
+    <div class="entry" style="padding: 8px 0">
+      <div style="text-align: right">
+        <div class="num" style="font-size: 14px; font-weight: 700; line-height: 1.3">94</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px; justify-content: center">
+        <span class="ph" style="width: 78%; height: 7px"></span>
+        <span class="ph" style="width: 42%; height: 5px"></span>
+      </div>
+      <div></div>
+    </div>
+
+    <div class="entry" style="padding: 8px 0; border-bottom: none">
+      <div style="text-align: right">
+        <div class="num" style="font-size: 14px; font-weight: 700; line-height: 1.3">90</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px; justify-content: center">
+        <span class="ph" style="width: 86%; height: 7px"></span>
+        <span class="ph" style="width: 30%; height: 5px"></span>
+      </div>
+      <div></div>
+    </div>
+  </div>
+
+  <p class="note" style="border-top: 1px solid var(--border); padding-top: 11px">
+    <strong style="color: var(--muted)">Pour&nbsp;:</strong> aucune pagination, aucune frontiere entre &laquo;&nbsp;le brief&nbsp;&raquo; et &laquo;&nbsp;le reste&nbsp;&raquo;&nbsp;; la densite decroit avec le rang.
+    <strong style="color: var(--muted)">Contre&nbsp;:</strong> rien ne marque la fin de la tache du jour, donc la boucle ne se vide jamais visiblement.
+  </p>
+</div>
+</x-dc>
+</body>
+</html>
