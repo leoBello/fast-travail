@@ -224,6 +224,8 @@ export const fr = {
     // vaut donc que le tout premier jour, jamais recopié ici.
     resume: (n: number) =>
       `${n} offre${n === 1 ? '' : 's'} au-dessus de 50 sans décision. Les autres attendent dans la liste.`,
+    replier: 'Replier',
+    deplier: (n: number) => `Déplier les ${n} carte${n === 1 ? '' : 's'}`,
     suivantes: 'Suivantes',
     precedentes: 'Précédentes',
     pagination: (debut: number, fin: number, total: number) => `${debut}–${fin} sur ${total}`,

@@ -28,6 +28,8 @@ function props(partiel: Partial<ComponentProps<typeof MorningBand>> = {}) {
     erreur: false,
     onReessayer: vi.fn(),
     salaireFloor: 40000,
+    replie: false,
+    onToggleRepli: vi.fn(),
     ...partiel,
   };
 }
@@ -144,4 +146,24 @@ describe('MorningBand', () => {
       expect(container.querySelectorAll('[data-rempli="true"]')).toHaveLength(0);
     },
   );
+
+  it('repliée : garde ses chiffres, mais ne rend plus aucune carte', () => {
+    render(<MorningBand {...props({ replie: true })} />);
+    expect(screen.queryByRole('button', { name: 'Garder' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Déplier/ })).not.toBeNull();
+  });
+
+  it('dépliée : le bouton propose de replier', () => {
+    render(<MorningBand {...props({ replie: false })} />);
+    expect(screen.getByRole('button', { name: 'Replier' }).getAttribute('aria-expanded')).toBe(
+      'true',
+    );
+  });
+
+  it('le bouton remonte le basculement', async () => {
+    const onToggleRepli = vi.fn();
+    render(<MorningBand {...props({ replie: false, onToggleRepli })} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Replier' }));
+    expect(onToggleRepli).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,9 +1,13 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardClient } from '../../data/client';
 import { ligneOffre } from '../../data/test-fixtures';
 import { MatinScreen } from './MatinScreen';
+
+beforeEach(() => {
+  localStorage.clear();
+});
 
 const OFFRES_MATIN = [
   ligneOffre({ id: 'a', title: 'Offre A', final_score: 100 }),
@@ -168,4 +172,20 @@ describe('MatinScreen', () => {
       await waitFor(() => expect(screen.getByText('2 décidées')).toBeDefined());
     },
   );
+
+  it('le repli de "Ce matin" survit à un remontage de l’écran (lireRepli/ecrireRepli réellement branchés)', async () => {
+    const user = userEvent.setup();
+    const client = clientFactice();
+    const { unmount } = render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
+
+    await waitFor(() => expect(screen.getByText('Offre A')).toBeDefined());
+    await user.click(screen.getByRole('button', { name: 'Replier' }));
+    expect(screen.queryByText('Offre A')).toBeNull();
+
+    unmount();
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /Déplier/ })).not.toBeNull());
+    expect(screen.queryByText('Offre A')).toBeNull();
+  });
 });

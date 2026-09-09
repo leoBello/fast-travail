@@ -7,6 +7,7 @@ import type { FilterState } from './FilterPanel';
 import { FilterPanel } from './FilterPanel';
 import { MorningBand } from './MorningBand';
 import { OfferList } from './OfferList';
+import { ecrireRepli, lireRepli } from './repliStorage';
 import styles from './MatinScreen.module.css';
 
 const LIST_PAGE_SIZE = 50;
@@ -37,6 +38,19 @@ interface Props {
  */
 export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }: Props) {
   // ---- Bande « Ce matin » ----
+  // `lireRepli` (la fonction, pas son appel) : `useState(lireRepli())`
+  // relirait `localStorage` à CHAQUE rendu de l'écran, pour un résultat qui
+  // n'est lu qu'au premier.
+  const [replie, setReplie] = useState(lireRepli);
+
+  function basculerRepli() {
+    setReplie((precedent) => {
+      const suivant = !precedent;
+      ecrireRepli(suivant);
+      return suivant;
+    });
+  }
+
   const [briefPage, setBriefPage] = useState(1);
   const [briefState, recargerBrief] = useBrief(client, briefPage);
   // Ids retirés OPTIMISTEMENT (avant même que le serveur ne confirme) —
@@ -188,6 +202,8 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
         erreur={briefState.statut === 'erreur'}
         onReessayer={recargerBrief}
         salaireFloor={salaireFloor}
+        replie={replie}
+        onToggleRepli={basculerRepli}
       />
 
       <OfferList

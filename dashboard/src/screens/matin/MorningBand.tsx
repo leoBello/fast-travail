@@ -43,6 +43,11 @@ export interface MorningBandProps {
   /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
    * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
   salaireFloor: number | null;
+  /** Repliée, la bande garde ses chiffres sur une ligne et rend sa hauteur à
+   * la liste (`VeilleRepliee.dc.html`) : 15 lignes au lieu de 8. Rien ne
+   * disparaît — c'est le sens du repli, pas un masquage. */
+  replie: boolean;
+  onToggleRepli: () => void;
 }
 
 /**
@@ -76,6 +81,8 @@ export function MorningBand({
   erreur,
   onReessayer,
   salaireFloor,
+  replie,
+  onToggleRepli,
 }: MorningBandProps) {
   const debut = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const fin = Math.min(page * PAGE_SIZE, total);
@@ -98,61 +105,87 @@ export function MorningBand({
           />
           <span className={styles.separateur} aria-hidden="true" />
           <StreakIndicator jours={streakDays} chargement={streakChargement} />
+          <span className={styles.separateur} aria-hidden="true" />
+          <button
+            type="button"
+            className={styles.repli}
+            aria-expanded={!replie}
+            onClick={onToggleRepli}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d={replie ? 'm6 9 6 6 6-6' : 'm18 15-6-6-6 6'} />
+            </svg>
+            {replie ? t('matin.deplier', total) : t('matin.replier')}
+          </button>
         </div>
       </div>
 
-      {erreur ? (
-        <EmptyState
-          titre={t('matin.erreurChargement')}
-          detail={t('matin.erreurChargementDetail')}
-        />
-      ) : chargement || (total === 0 && decideesChargement) ? (
-        // `decideesChargement` entre dans cette garde UNIQUEMENT quand elle
-        // empêcherait le texte du zéro confirmé ci-dessous d'afficher un
-        // `decidees` pas encore confirmé par `/stats` (tâche 10) — un
-        // chargement qui traînerait sur `decidees` seul, `total` déjà connu
-        // et non nul, n'a pas besoin de bloquer l'affichage des cartes.
-        <EmptyState titre={t('matin.chargement')} detail={t('matin.chargementDetail')} />
-      ) : total === 0 ? (
-        <EmptyState
-          titre={t('vides.rienADeciderTitre')}
-          detail={t('vides.rienADeciderDetail', decidees)}
-        />
-      ) : (
+      {replie ? null : (
         <>
-          <div className={styles.grille}>
-            <AnimatePresence initial={false}>
-              {offers.map((offer) => (
-                <OfferCard
-                  key={offer.id}
-                  offer={offer}
-                  enTraitement={offresEnTraitement.has(offer.id)}
-                  onGarder={() => onDecision(offer, 'garder')}
-                  onEcarter={() => onDecision(offer, 'ecarter')}
-                  onOuvrir={onOuvrirOffre}
-                  salaireFloor={salaireFloor}
-                />
-              ))}
-            </AnimatePresence>
-          </div>
+          {erreur ? (
+            <EmptyState
+              titre={t('matin.erreurChargement')}
+              detail={t('matin.erreurChargementDetail')}
+            />
+          ) : chargement || (total === 0 && decideesChargement) ? (
+            // `decideesChargement` entre dans cette garde UNIQUEMENT quand elle
+            // empêcherait le texte du zéro confirmé ci-dessous d'afficher un
+            // `decidees` pas encore confirmé par `/stats` (tâche 10) — un
+            // chargement qui traînerait sur `decidees` seul, `total` déjà connu
+            // et non nul, n'a pas besoin de bloquer l'affichage des cartes.
+            <EmptyState titre={t('matin.chargement')} detail={t('matin.chargementDetail')} />
+          ) : total === 0 ? (
+            <EmptyState
+              titre={t('vides.rienADeciderTitre')}
+              detail={t('vides.rienADeciderDetail', decidees)}
+            />
+          ) : (
+            <>
+              <div className={styles.grille}>
+                <AnimatePresence initial={false}>
+                  {offers.map((offer) => (
+                    <OfferCard
+                      key={offer.id}
+                      offer={offer}
+                      enTraitement={offresEnTraitement.has(offer.id)}
+                      onGarder={() => onDecision(offer, 'garder')}
+                      onEcarter={() => onDecision(offer, 'ecarter')}
+                      onOuvrir={onOuvrirOffre}
+                      salaireFloor={salaireFloor}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
 
-          <Pagination
-            debut={debut}
-            fin={fin}
-            total={total}
-            onSuivant={() => onPageChange(page + 1)}
-            onPrecedent={() => onPageChange(page - 1)}
-            suivantDisponible={fin < total}
-            precedentDisponible={page > 1}
-          />
+              <Pagination
+                debut={debut}
+                fin={fin}
+                total={total}
+                onSuivant={() => onPageChange(page + 1)}
+                onPrecedent={() => onPageChange(page - 1)}
+                suivantDisponible={fin < total}
+                precedentDisponible={page > 1}
+              />
+            </>
+          )}
+
+          {erreur ? (
+            <button type="button" className={styles.reessayer} onClick={onReessayer}>
+              {t('matin.reessayer')}
+            </button>
+          ) : null}
         </>
       )}
-
-      {erreur ? (
-        <button type="button" className={styles.reessayer} onClick={onReessayer}>
-          {t('matin.reessayer')}
-        </button>
-      ) : null}
     </section>
   );
 }
