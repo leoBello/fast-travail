@@ -1124,7 +1124,7 @@ Canvas : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
 | 8 | Le détail d'une offre | ✅ `0f2d14a..193f37b` |
 | 9 | Le suivi et la gamification | ✅ `193f37b..2024a68` |
 | 10 | **Combler la dette d'API** *(ajoutée le 2026-09-09)* | ✅ `2024a68..714fe42` |
-| 11 | Déploiement, mesure, documentation | ✅ `714fe42..` *(ce commit)* |
+| 11 | Déploiement, mesure, documentation | ✅ `714fe42..ce4eac8` |
 
 **Les onze tâches sont livrées.** `npm run verify` sort en 0 des deux côtés
 (339 tests Deno, 269 dashboard). Détail de la tâche 11 — l'épreuve de bout en
