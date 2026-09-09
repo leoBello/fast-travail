@@ -1,6 +1,7 @@
 import { t } from '../../i18n/i18n';
 import { numerosDePage } from './paginationLogic';
 import type { PaginationNumerotee } from './paginationLogic';
+import { Badge } from '../../ui/kit/Badge';
 import styles from './Pagination.module.css';
 
 // `numerosDePage` est une fonction pure : elle vit dans `paginationLogic.ts`,
@@ -73,6 +74,15 @@ export function Pagination({
   return (
     <div className={styles.pagination}>
       <span className={styles.compte}>{t('matin.pagination', debut, fin, total)}</span>
+      {numerotation === undefined ? null : (
+        // Badge de `Main.dc.html` (« 10 par page ») : seulement la liste
+        // paginée le porte, jamais la bande « Ce matin », qui ne le dessine
+        // pas. `pageSize` vient de `numerotation`, pas de `fin - debut + 1`,
+        // faux sur une dernière page incomplète.
+        <Badge ton="neutre" taille="compacte" discontinu>
+          {t('matin.parPage', numerotation.pageSize)}
+        </Badge>
+      )}
       <div className={styles.spacer} />
       {numerotation === undefined ? (
         // Bande « Ce matin », sans numérotation : Précédentes/Suivantes

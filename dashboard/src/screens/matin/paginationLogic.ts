@@ -11,6 +11,13 @@ export interface PaginationNumerotee {
   page: number;
   pageCount: number;
   onPageChange: (page: number) => void;
+  /**
+   * La taille de page affichée par le badge « N par page » (`Main.dc.html`).
+   * Ne se déduit pas de `fin - debut + 1` : sur la dernière page, incomplète,
+   * cette différence est plus petite que la vraie taille de page — l'afficher
+   * quand même dirait un fait faux (GUIDELINES §3.3).
+   */
+  pageSize: number;
 }
 
 /**

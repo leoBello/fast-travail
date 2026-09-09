@@ -55,7 +55,7 @@ describe('Pagination', () => {
       <Pagination
         {...base}
         precedentDisponible={true}
-        numerotation={{ page: 3, pageCount: 158, onPageChange: vi.fn() }}
+        numerotation={{ page: 3, pageCount: 158, onPageChange: vi.fn(), pageSize: 8 }}
       />,
     );
     const pagination = container.querySelector('[class*="pagination"]');
@@ -74,7 +74,10 @@ describe('Pagination', () => {
 
   it('avec numérotation : la page courante porte aria-current', () => {
     render(
-      <Pagination {...base} numerotation={{ page: 1, pageCount: 158, onPageChange: vi.fn() }} />,
+      <Pagination
+        {...base}
+        numerotation={{ page: 1, pageCount: 158, onPageChange: vi.fn(), pageSize: 8 }}
+      />,
     );
     expect(screen.getByRole('button', { name: 'Page 1' }).getAttribute('aria-current')).toBe(
       'page',
@@ -83,7 +86,12 @@ describe('Pagination', () => {
 
   it('un clic sur un numéro remonte cette page', async () => {
     const onPageChange = vi.fn();
-    render(<Pagination {...base} numerotation={{ page: 1, pageCount: 158, onPageChange }} />);
+    render(
+      <Pagination
+        {...base}
+        numerotation={{ page: 1, pageCount: 158, onPageChange, pageSize: 8 }}
+      />,
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Page 3' }));
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
@@ -95,9 +103,28 @@ describe('Pagination', () => {
         fin={6}
         total={6}
         suivantDisponible={false}
-        numerotation={{ page: 1, pageCount: 1, onPageChange: vi.fn() }}
+        numerotation={{ page: 1, pageCount: 1, onPageChange: vi.fn(), pageSize: 8 }}
       />,
     );
     expect(screen.queryByRole('button', { name: 'Page 1' })).toBeNull();
+  });
+
+  it('avec numérotation : le badge « N par page » est rendu avec la bonne taille de page (Main.dc.html)', () => {
+    const { container } = render(
+      <Pagination
+        {...base}
+        numerotation={{ page: 1, pageCount: 158, onPageChange: vi.fn(), pageSize: 10 }}
+      />,
+    );
+    const badge = container.querySelector(
+      '[data-ton="neutre"][data-taille="compacte"][data-discontinu="true"]',
+    );
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toBe('10 par page');
+  });
+
+  it('sans numérotation : aucun badge « par page » (la bande « Ce matin » ne le dessine pas)', () => {
+    const { container } = render(<Pagination {...base} />);
+    expect(container.querySelector('[data-discontinu="true"]')).toBeNull();
   });
 });

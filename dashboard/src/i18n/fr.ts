@@ -247,10 +247,9 @@ export const fr = {
     pagination: (debut: number, fin: number, total: number) => `${debut}–${fin} sur ${total}`,
     pageNumero: (n: number) => `Page ${n}`,
     ellipsePages: '…',
-    // Plafonnée à `PAGE_SIZE_MAX` (10, décidé le 2026-09-10) : « ce que la
-    // fenêtre tient » serait redevenu faux sur un grand écran, où la fenêtre
-    // tiendrait plus que le plafond (GUIDELINES §3.3, une affirmation que le
-    // code ne rend plus vraie).
+    // La taille de page est fixe (`LIST_PAGE_SIZE`, `MatinScreen.tsx`), pas
+    // mesurée sur la fenêtre : le badge dit donc un fait stable, jamais une
+    // valeur qui pourrait varier d'un écran à l'autre (GUIDELINES §3.3).
     parPage: (n: number) => `${n} par page`,
     toutesLaVeille: 'Toute la veille',
     offresJugeesRienMasque: (n: number) =>
