@@ -54,20 +54,78 @@ interface Violation {
 }
 
 /**
+ * `expr` rend-il un morceau de texte littéral, directement, sans passer par
+ * un appel de fonction ? Couvre les trois formes signalées en revue, où un
+ * texte en dur se cache derrière une expression plutôt que d'être un enfant
+ * JSX nu :
+ * - un opérande littéral d'un ternaire (`cond ? 'oui en dur' : t('non')`),
+ *   recherché des deux côtés, récursivement pour un ternaire imbriqué ;
+ * - une concaténation portant un littéral (`'a' + name`), côté gauche ou
+ *   droit, y compris chaînée (`'a' + 'b' + name`) ;
+ * - les portions littérales d'un gabarit **avec** substitution
+ *   (`` `Bonjour ${name}` `` — « Bonjour  » est du texte en dur autant que
+ *   `` `texte` `` sans substitution, déjà couvert directement par
+ *   `isNoSubstitutionTemplateLiteral` dans `violationsDe`).
+ *
+ * Chaque branche/opérande qui est un **appel de fonction** (`t('a.b')`,
+ * `formatX('texte')`, `list.map(...)`…) est traitée comme opaque et n'est
+ * jamais descendue : c'est la même exemption que celle déjà documentée pour
+ * `t()` lui-même — un argument littéral passé à une fonction n'est pas du
+ * texte affiché tel quel, c'est une donnée que la fonction transforme.
+ * Conséquence assumée, à garder à l'esprit : `{cond ? formatX('texte en
+ * dur') : 'x'}` ne relève QUE la branche `'x'`, pas le littéral caché dans
+ * `formatX(...)`.
+ */
+function contientLitteral(expr: ts.Expression): boolean {
+  if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) {
+    return expr.text.trim() !== '';
+  }
+  if (ts.isTemplateExpression(expr)) {
+    const morceaux = [expr.head.text, ...expr.templateSpans.map((s) => s.literal.text)];
+    return morceaux.some((m) => m.trim() !== '');
+  }
+  if (ts.isConditionalExpression(expr)) {
+    return contientLitteral(expr.whenTrue) || contientLitteral(expr.whenFalse);
+  }
+  if (ts.isBinaryExpression(expr) && expr.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+    return contientLitteral(expr.left) || contientLitteral(expr.right);
+  }
+  if (ts.isParenthesizedExpression(expr)) {
+    return contientLitteral(expr.expression);
+  }
+  // Tout le reste — Identifier, PropertyAccess, CallExpression, les autres
+  // opérateurs binaires (`&&`, `||`, `??`, comparaisons)… — est opaque.
+  // `&&`/`||`/`??` restent un angle mort NOMMÉ, pas fermé par cette tâche :
+  // `{cond && 'texte en dur'}` passerait au vert. Une comparaison
+  // (`x === 'foo'`) est exclue à dessein : son opérande littéral ne devient
+  // JAMAIS le texte rendu (l'expression rend un booléen), l'inclure aurait
+  // créé un faux positif sur du code parfaitement légitime.
+  return false;
+}
+
+/**
  * Parcourt l'AST d'un `.tsx` et relève tout texte JSX affiché en dur :
  * - le texte entre balises (`JsxText` non blanc — les retours à la ligne
  *   et l'indentation entre éléments ne comptent pas comme du texte) ;
- * - une chaîne littérale utilisée comme enfant JSX via une expression
- *   (`{'texte'}` ou `` {`texte`} `` sans substitution) — le même texte,
- *   écrit avec des accolades plutôt que nu.
+ * - une expression enfant de JSX qui rend un littéral, directement
+ *   (`{'texte'}`, `` {`texte`} `` sans substitution) ou via l'une des trois
+ *   formes de `contientLitteral` ci-dessus (ternaire, concaténation,
+ *   gabarit avec substitution).
  *
- * Volontairement **hors périmètre** : les valeurs d'attribut (`type="button"`,
- * `className="…"`, `data-testid="…"`…). La plupart ne sont pas du texte
- * affiché, et les y inclure sans distinction ferait échouer le test sur du
- * code technique légitime — le risque inverse de « passer à vide », tout
- * aussi réel. Le vocabulaire d'attributs réellement visibles (`aria-label`,
- * `alt`, `title`) est laissé aux écrans des tâches 7-9, qui sauront lesquels
- * portent du texte et lesquels portent un identifiant technique.
+ * Volontairement **hors périmètre** :
+ * - les valeurs d'attribut (`type="button"`, `className="…"`,
+ *   `data-testid="…"`…). La plupart ne sont pas du texte affiché, et les y
+ *   inclure sans distinction ferait échouer le test sur du code technique
+ *   légitime — le risque inverse de « passer à vide », tout aussi réel. Le
+ *   vocabulaire d'attributs réellement visibles (`aria-label`, `alt`,
+ *   `title`) est laissé aux écrans des tâches 7-9, qui sauront lesquels
+ *   portent du texte et lesquels portent un identifiant technique ;
+ * - un littéral passé en argument à un appel de fonction (voir
+ *   `contientLitteral`) — sauf s'il redevient, lui, un `JsxText` ou une
+ *   expression enfant de JSX plus bas dans l'arbre (ex. à l'intérieur d'un
+ *   `.map()` qui retourne du JSX), auquel cas cette même fonction le
+ *   retrouvera à cet endroit-là, normalement ;
+ * - les opérateurs binaires autres que `+` (`&&`, `||`, `??`, comparaisons).
  */
 function violationsDe(chemin: string): Violation[] {
   const source = readFileSync(chemin, 'utf8');
@@ -97,15 +155,15 @@ function violationsDe(chemin: string): Violation[] {
     if (
       ts.isJsxExpression(noeud) &&
       noeud.expression !== undefined &&
-      (ts.isStringLiteral(noeud.expression) ||
-        ts.isNoSubstitutionTemplateLiteral(noeud.expression)) &&
-      estEnfantJsx(noeud)
+      estEnfantJsx(noeud) &&
+      contientLitteral(noeud.expression)
     ) {
-      const texte = noeud.expression.text.trim();
-      if (texte !== '') {
-        const { line } = fichier.getLineAndCharacterOfPosition(noeud.getStart(fichier));
-        violations.push({ chemin, ligne: line + 1, extrait: texte });
-      }
+      const { line } = fichier.getLineAndCharacterOfPosition(noeud.getStart(fichier));
+      violations.push({
+        chemin,
+        ligne: line + 1,
+        extrait: noeud.expression.getText(fichier).trim(),
+      });
     }
     ts.forEachChild(noeud, visiter);
   }

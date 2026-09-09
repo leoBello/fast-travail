@@ -66,10 +66,15 @@ describe('fr.ts — aucune clé manquante, aucune clé orpheline', () => {
   it('trouve des feuilles dans le dictionnaire — sinon les contrôles suivants passeraient à vide', () => {
     // Garde-fou (même forme que guidelines.test.ts, tâche 3) : si
     // `feuilles()` se casse et rend toujours `[]`, chaque `expect` sur un
-    // ensemble vide serait vrai par vacuité. Compté au moment d'écrire ce
-    // test : 33 feuilles. Le seuil est posé nettement en dessous pour ne
-    // pas casser à la moindre reformulation future.
-    expect(feuilles(fr).length).toBeGreaterThanOrEqual(20);
+    // ensemble vide serait vrai par vacuité. Recompté après revue : 51
+    // feuilles (pas 33 — chiffre corrigé, voir le rapport de tâche). Le
+    // seuil est posé à 40, pas à 20 : les 10 groupes de `fr.ts` portent en
+    // moyenne 5 feuilles chacun, donc un seuil trop bas (20) laisserait
+    // passer une régression qui casserait la récursion sur la moitié des
+    // groupes (ex. ~25 feuilles restantes) sans le détecter. 40 laisse
+    // quand même de la marge (11 feuilles, environ deux groupes) pour un
+    // élagage futur sans casser ce test à la moindre suppression.
+    expect(feuilles(fr).length).toBeGreaterThanOrEqual(40);
   });
 
   it("n'a aucune feuille vide", () => {
@@ -165,13 +170,25 @@ describe('fr.ts — aucune clé manquante, aucune clé orpheline', () => {
     expect(Object.keys(fr.engagement).sort()).toEqual(Object.keys(attendu).sort());
   });
 
-  it('confiance : les trois niveaux de Confidence, jamais un doute sur la basse', () => {
-    const attendu: Record<Confiance, true> = { haute: true, moyenne: true, basse: true };
-    expect(Object.keys(fr.confiance)).toEqual(expect.arrayContaining(Object.keys(attendu)));
+  it("confiance : exactement les trois niveaux de Confidence, plus les deux clés d'infobulle", () => {
+    // Comparaison stricte, comme les cinq blocs ci-dessus — pas
+    // `arrayContaining` : ce groupe porte deux clés en plus de
+    // l'énumération (l'infobulle de la confiance basse), mais une clé mal
+    // orthographiée ou en trop doit rester détectable par ce test, pas
+    // seulement par le `satisfies` de `fr.ts` (revue du 2026-09-09).
+    const attendu: Record<Confiance, true> &
+      Record<'infobulleBasseTitre' | 'infobulleBasseCorps', true> = {
+      haute: true,
+      moyenne: true,
+      basse: true,
+      infobulleBasseTitre: true,
+      infobulleBasseCorps: true,
+    };
+    expect(Object.keys(fr.confiance).sort()).toEqual(Object.keys(attendu).sort());
     // GUIDELINES §3.7 : la confiance basse n'est pas un doute sur l'offre,
     // seulement sur le texte lu. Le mot « douteu » (douteuse, douteux) ne
     // doit apparaître dans aucun des trois libellés.
-    for (const cle of Object.keys(attendu) as Confiance[]) {
+    for (const cle of ['haute', 'moyenne', 'basse'] as const satisfies Confiance[]) {
       expect(fr.confiance[cle].toLowerCase()).not.toContain('douteu');
     }
   });
