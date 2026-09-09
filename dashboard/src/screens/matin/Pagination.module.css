@@ -15,6 +15,18 @@
   flex-grow: 1;
 }
 
+/* Groupe imbriqué des boutons de navigation (Précédentes, numéros,
+   ellipse, Suivantes) — Main.dc.html les regroupe dans un conteneur à
+   `gap: 4px`, distinct du `gap: 10px` du conteneur externe. 4px correspond
+   exactement à --space-1 ; 10px ne correspond à aucun token (équidistant de
+   --space-2=8px et --space-3=12px), et .pagination le portait déjà en
+   --space-2 avant ce correctif — conservé à l'identique. */
+.navGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .bouton {
   display: inline-flex;
   align-items: center;

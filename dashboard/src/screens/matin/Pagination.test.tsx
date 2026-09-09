@@ -38,6 +38,40 @@ describe('Pagination', () => {
     expect(screen.queryByRole('button', { name: 'Page 2' })).toBeNull();
   });
 
+  it('sans numérotation : Précédentes/Suivantes restent enfants directs de la pagination, sans groupe imbriqué', () => {
+    const { container } = render(<Pagination {...base} precedentDisponible={true} />);
+    const pagination = container.querySelector('[class*="pagination"]');
+    expect(pagination).not.toBeNull();
+    expect(container.querySelector('[class*="navGroup"]')).toBeNull();
+
+    const boutonPrecedent = screen.getByRole('button', { name: 'Précédentes' });
+    const boutonSuivant = screen.getByRole('button', { name: 'Suivantes' });
+    expect(boutonPrecedent.parentElement).toBe(pagination);
+    expect(boutonSuivant.parentElement).toBe(pagination);
+  });
+
+  it('avec numérotation : les boutons de navigation sont dans un groupe imbriqué distinct', () => {
+    const { container } = render(
+      <Pagination
+        {...base}
+        precedentDisponible={true}
+        numerotation={{ page: 3, pageCount: 158, onPageChange: vi.fn() }}
+      />,
+    );
+    const pagination = container.querySelector('[class*="pagination"]');
+    const navGroup = container.querySelector('[class*="navGroup"]');
+    expect(pagination).not.toBeNull();
+    expect(navGroup).not.toBeNull();
+    expect(navGroup?.parentElement).toBe(pagination);
+
+    const boutonPrecedent = screen.getByRole('button', { name: 'Précédentes' });
+    const boutonSuivant = screen.getByRole('button', { name: 'Suivantes' });
+    const boutonPage = screen.getByRole('button', { name: 'Page 3' });
+    expect(boutonPrecedent.parentElement).toBe(navGroup);
+    expect(boutonSuivant.parentElement).toBe(navGroup);
+    expect(boutonPage.parentElement).toBe(navGroup);
+  });
+
   it('avec numérotation : la page courante porte aria-current', () => {
     render(
       <Pagination {...base} numerotation={{ page: 1, pageCount: 158, onPageChange: vi.fn() }} />,
