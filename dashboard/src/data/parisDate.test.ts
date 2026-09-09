@@ -40,14 +40,27 @@ describe('formatJourHeure', () => {
   });
 
   it(
-    'rend null sur MINUIT PILE heure de Paris — le cas limite tranché : ' +
-      "`interview_at` est un timestamptz qu'un appelant peut renseigner avec une date " +
-      'SEULE (ex. `"2026-09-11"`, minuit UTC). Rien ne distingue alors « rendez-vous à ' +
-      'minuit » de « heure non saisie » ; le doute penche du côté de l’absence, comme une ' +
-      'unité de rémunération incertaine (GUIDELINES §3.6) ne se pare jamais d’un montant sûr.',
+    'rend null sur MINUIT PILE heure de Paris (timestamptz complet qui y tombe pile) — ' +
+      'un entretien réellement fixé à minuit pile est assez improbable pour que le doute ' +
+      'penche du côté de l’absence, comme une unité de rémunération incertaine (GUIDELINES ' +
+      '§3.6) ne se pare jamais d’un montant sûr',
     () => {
       // 22 h UTC le 10 septembre = minuit (00:00) le 11 septembre à Paris (été, UTC+2).
       expect(formatJourHeure('2026-09-10T22:00:00.000Z')).toBeNull();
+    },
+  );
+
+  it(
+    'rend null sur une date SEULE (sans heure) — le cas limite tranché : `interview_at` ' +
+      'est un timestamptz qu’un appelant peut renseigner avec une date SEULE (ex. ' +
+      '`"2026-09-11"`), que `Date.parse` interprète à minuit UTC et non minuit PARISIEN ; ' +
+      'reconvertie, elle rend 02 h l’été et 01 h l’hiver, jamais 00 h — un garde posé APRÈS ' +
+      'coup sur "00:00 heure de Paris" ne peut donc jamais l’attraper (constat I4, revue ' +
+      'finale de branche phase 3 : ce test, avant correctif, n’exerçait jamais cette chaîne, ' +
+      'malgré son intitulé).',
+    () => {
+      expect(formatJourHeure('2026-09-11')).toBeNull(); // été, aurait rendu "vendredi 02 h"
+      expect(formatJourHeure('2026-01-15')).toBeNull(); // hiver, aurait rendu "jeudi 01 h"
     },
   );
 

@@ -67,15 +67,31 @@ const formateurHeureMinute = new Intl.DateTimeFormat('fr-FR', {
   hourCycle: 'h23',
 });
 
+/** Une date SANS heure (ex. `"2026-09-11"`), reconnue AVANT tout parsing —
+ * jamais après. `Date.parse` interprète une telle chaîne comme MINUIT **UTC**
+ * (ISO 8601), qui ne retombe sur minuit PARISIEN que par une coïncidence de
+ * fuseau qui n'arrive jamais (Paris est toujours UTC+1 ou UTC+2) : reconvertie
+ * en heure de Paris, `"2026-09-11"` rend 02 h l'été, 01 h l'hiver — jamais
+ * 00 h. Un garde-fou posé APRÈS coup (comparer l'heure Paris obtenue à
+ * « 00:00 ») ne peut donc jamais l'attraper ; c'est le bug corrigé ici
+ * (constat I4, revue finale de branche phase 3) — mesuré :
+ * `formatJourHeure('2026-09-11')` rendait bel et bien « vendredi 02 h », une
+ * heure jamais saisie par personne. */
+const DATE_SEULE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * « vendredi 15 h » — jour de semaine et heure, en heure de Paris.
  *
- * `null` sur date absente/invalide, **et aussi** sur une heure à MINUIT
- * PILE (00 h 00 heure de Paris) : `interview_at` est un `timestamptz` que
- * n'importe quel appelant peut renseigner avec une date SANS heure choisie
- * (ex. la chaîne `"2026-09-11"`, que `Date.parse` interprète à minuit UTC) —
- * rien dans le schéma ne distingue « rendez-vous réellement fixé à minuit »
- * de « seule la date a été saisie ». Un entretien professionnel à minuit
+ * `null` sur date absente/invalide, **et aussi** :
+ * - quand `iso` est une date SEULE, sans composante horaire (`DATE_SEULE`
+ *   ci-dessus) — `interview_at` est un `timestamptz` que n'importe quel
+ *   appelant peut renseigner ainsi (ex. `"2026-09-11"`) ;
+ * - quand l'instant, une fois converti, tombe pile à MINUIT heure de Paris —
+ *   un `timestamptz` complet peut aussi y atterrir (ex.
+ *   `"2026-09-10T22:00:00.000Z"`, minuit pile le 11 à Paris l'été).
+ *
+ * Dans les deux cas, rien ne distingue « rendez-vous réellement fixé à
+ * minuit » de « aucune heure choisie ». Un entretien professionnel à minuit
  * pile est assez improbable pour que le doute penche du côté de l'absence
  * d'heure plutôt que de l'affirmer — même principe que GUIDELINES §3.6 (une
  * unité incertaine ne s'affiche jamais comme si elle était sûre) : ne
@@ -84,6 +100,7 @@ const formateurHeureMinute = new Intl.DateTimeFormat('fr-FR', {
  */
 export function formatJourHeure(iso: string | null): string | null {
   if (iso === null) return null;
+  if (DATE_SEULE.test(iso)) return null;
   const parsed = Date.parse(iso);
   if (Number.isNaN(parsed)) return null;
   const date = new Date(parsed);
