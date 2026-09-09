@@ -247,7 +247,11 @@ export const fr = {
     pagination: (debut: number, fin: number, total: number) => `${debut}–${fin} sur ${total}`,
     pageNumero: (n: number) => `Page ${n}`,
     ellipsePages: '…',
-    parPage: (n: number) => `${n} par page — ce que la fenêtre tient`,
+    // Plafonnée à `PAGE_SIZE_MAX` (10, décidé le 2026-09-10) : « ce que la
+    // fenêtre tient » serait redevenu faux sur un grand écran, où la fenêtre
+    // tiendrait plus que le plafond (GUIDELINES §3.3, une affirmation que le
+    // code ne rend plus vraie).
+    parPage: (n: number) => `${n} par page`,
     toutesLaVeille: 'Toute la veille',
     offresJugeesRienMasque: (n: number) =>
       `${n} offre${n === 1 ? '' : 's'} jugée${n === 1 ? '' : 's'}, rien de masqué`,
@@ -328,6 +332,40 @@ export const fr = {
     decisionEchouee: "La décision n'a pas pu être enregistrée. L'offre reste dans la bande.",
     listeVideTitre: 'Aucune offre ne correspond',
     listeVideDetail: 'Essayez de retirer un filtre — la liste complète ne masque rien par défaut.',
+    // « Rien de masqué » ne se dit QUE sur l'onglet « Toutes » : un onglet
+    // qui filtre et une phrase qui affirme le contraire seraient un
+    // mensonge (GUIDELINES §3.3).
+    compteOnglet: (n: number, total: number) =>
+      `${n} dans cet onglet, sur ${total} jugée${total === 1 ? '' : 's'}`,
+    compteOngletFiltre: (n: number, total: number) =>
+      `${n} sur ${total} dans cet onglet — filtres actifs`,
+    // Le détail du vide d'un onglet à zéro : commun aux sept onglets de
+    // statut (le titre, lui, est dédié — voir `videATraiter` et suivants
+    // ci-dessous), repris mot pour mot d'`OngletsSuivi.dc.html`.
+    listeOngletVideDetail:
+      "L'onglet reste visible à zéro : c'est une étape du parcours, pas une absence de données.",
+    // Sept titres DÉDIÉS, un par statut (`OngletsSuivi.dc.html`, panneau B :
+    // « Aucune offre retenue pour l'instant », le participe, jamais une
+    // formule passe-partout). Consommés par un `switch` exhaustif SANS
+    // `default` sur `Exclude<OngletId, 'toutes'>` (`OfferList.tsx`) : un
+    // huitième statut ajouté un jour serait une erreur de compilation, pas
+    // un titre manquant à l'écran. L'onglet « Toutes » à zéro garde
+    // `listeVideTitre` ci-dessus, inchangé : ce n'est pas une étape, c'est
+    // un corpus vide.
+    videATraiter: 'Aucune offre à traiter pour l’instant',
+    videRetenue: 'Aucune offre retenue pour l’instant',
+    videPostulee: 'Aucune offre postulée pour l’instant',
+    videRelancee: 'Aucune offre relancée pour l’instant',
+    videEntretien: 'Aucune offre en entretien pour l’instant',
+    videTerminee: 'Aucune candidature terminée pour l’instant',
+    videEcartee: 'Aucune offre écartée pour l’instant',
+    // Le bouton du vide d'un onglet de statut, qui bascule vers « À
+    // traiter » (`OngletsSuivi.dc.html`) — rendu SEULEMENT quand
+    // `comptesStatut` est connu : afficher un nombre avant que
+    // `GET /statut-counts` ait répondu serait une affirmation fausse
+    // (GUIDELINES §3.3), la même règle que le tiret cadratin de
+    // `StatusTabs`.
+    videVersATraiter: (n: number) => `Voir les ${n} à traiter`,
   },
 
   /**

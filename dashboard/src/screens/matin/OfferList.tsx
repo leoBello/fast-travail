@@ -2,11 +2,58 @@ import { AnimatePresence, motion } from 'framer-motion';
 import type { ReactNode } from 'react';
 import { EmptyState } from '../../ui/kit/EmptyState';
 import { Badge } from '../../ui/kit/Badge';
-import type { OfferDashboardRow, SortField } from '../../data/types';
+import type { OfferDashboardRow, SortField, StatutCounts } from '../../data/types';
+import type { DateColonne } from '../../data/format';
 import { t } from '../../i18n/i18n';
 import { OfferRow } from './OfferRow';
 import { Pagination } from './Pagination';
+import { StatusTabs } from './StatusTabs';
+import { comptePourOnglet } from './statusTabsLogic';
+import type { OngletId } from './statusTabsLogic';
 import styles from './OfferList.module.css';
+
+/** La dernière colonne suit l'onglet — mais seulement là où la base porte
+ * réellement la date (voir `DateColonne`, format.ts). */
+function colonneDatePourOnglet(onglet: OngletId): DateColonne {
+  if (onglet === 'postulee') return 'envoyee';
+  if (onglet === 'relancee') return 'relancee';
+  if (onglet === 'entretien') return 'entretien';
+  return 'publiee';
+}
+
+function libelleColonneDate(onglet: OngletId): string {
+  const colonne = colonneDatePourOnglet(onglet);
+  if (colonne === 'envoyee') return t('matin.colPostulee');
+  if (colonne === 'relancee') return t('matin.colRelancee');
+  if (colonne === 'entretien') return t('matin.colEntretien');
+  return t('matin.colPubliee');
+}
+
+/** Le titre du vide d'un onglet de STATUT à zéro — un participe dédié par
+ * statut (`OngletsSuivi.dc.html`, panneau B : « Aucune offre retenue pour
+ * l'instant »), jamais une formule passe-partout. `switch` exhaustif SANS
+ * `default`, sur `Exclude<OngletId, 'toutes'>` : un huitième statut ajouté
+ * un jour est une erreur de compilation, pas un titre manquant à l'écran.
+ * L'onglet « Toutes » à zéro reste un corpus vide, pas une étape — il garde
+ * `matin.listeVideTitre`, géré séparément par l'appelant. */
+function libelleVideOnglet(onglet: Exclude<OngletId, 'toutes'>): string {
+  switch (onglet) {
+    case 'a_traiter':
+      return t('matin.videATraiter');
+    case 'retenue':
+      return t('matin.videRetenue');
+    case 'postulee':
+      return t('matin.videPostulee');
+    case 'relancee':
+      return t('matin.videRelancee');
+    case 'entretien':
+      return t('matin.videEntretien');
+    case 'terminee':
+      return t('matin.videTerminee');
+    case 'ecartee':
+      return t('matin.videEcartee');
+  }
+}
 
 export interface OfferListProps {
   offers: OfferDashboardRow[];
@@ -42,6 +89,19 @@ export interface OfferListProps {
   /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
    * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
   salaireFloor: number | null;
+  onglet: OngletId;
+  onOngletChange: (onglet: OngletId) => void;
+  /** `null` tant que `GET /statut-counts` n'a pas répondu. */
+  comptesStatut: StatutCounts | null;
+  /** Le total du CORPUS, tous onglets confondus — distinct de `total`, qui
+   * est celui de l'onglet actif. Les deux ensemble permettent de dire ce que
+   * l'onglet montre ET ce qu'il laisse aux autres, sans jamais prétendre
+   * « rien de masqué » sur un onglet qui filtre. */
+  totalCorpus: number;
+  /** Vrai dès qu'une dimension du panneau de filtres est sélectionnée : la
+   * ligne de compte le dit alors explicitement, parce que les comptes
+   * d'onglets, eux, restent globaux. */
+  filtresActifs: boolean;
 }
 
 /**
@@ -77,16 +137,29 @@ export function OfferList({
   erreur,
   onReessayer,
   salaireFloor,
+  onglet,
+  onOngletChange,
+  comptesStatut,
+  totalCorpus,
+  filtresActifs,
 }: OfferListProps) {
   const debut = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const fin = Math.min(page * pageSize, total);
 
   return (
     <section className={styles.section}>
+      <StatusTabs actif={onglet} onChange={onOngletChange} comptes={comptesStatut} />
+
       <div className={styles.entete}>
         <span className={styles.sectionTitre}>{t('matin.toutesLaVeille')}</span>
         <span className={styles.compte}>
-          {chargement ? t('matin.chargement') : t('matin.offresJugeesRienMasque', total)}
+          {chargement
+            ? t('matin.chargement')
+            : filtresActifs
+              ? t('matin.compteOngletFiltre', total, totalCorpus)
+              : onglet === 'toutes'
+                ? t('matin.offresJugeesRienMasque', total)
+                : t('matin.compteOnglet', total, totalCorpus)}
         </span>
         {statsChargement ? (
           <Badge ton="neutre" taille="compacte" discontinu>
@@ -133,7 +206,25 @@ export function OfferList({
           ) : chargement ? (
             <EmptyState titre={t('matin.chargement')} detail={t('matin.chargementDetail')} />
           ) : total === 0 ? (
-            <EmptyState titre={t('matin.listeVideTitre')} detail={t('matin.listeVideDetail')} />
+            onglet === 'toutes' ? (
+              <EmptyState titre={t('matin.listeVideTitre')} detail={t('matin.listeVideDetail')} />
+            ) : (
+              <EmptyState
+                titre={libelleVideOnglet(onglet)}
+                detail={t('matin.listeOngletVideDetail')}
+                action={
+                  comptesStatut === null ? undefined : (
+                    <button
+                      type="button"
+                      className={styles.bouton}
+                      onClick={() => onOngletChange('a_traiter')}
+                    >
+                      {t('matin.videVersATraiter', comptePourOnglet('a_traiter', comptesStatut))}
+                    </button>
+                  )
+                }
+              />
+            )
           ) : (
             <>
               <div className={styles.entetesColonnes}>
@@ -141,8 +232,8 @@ export function OfferList({
                 <span className={styles.colDroite}>{t('matin.colCorr')}</span>
                 <span>{t('matin.colIntitule')}</span>
                 <span>{t('matin.colEmployeur')}</span>
-                <span>{t('matin.colLieu')}</span>
-                <span className={styles.colDroite}>{t('matin.colPubliee')}</span>
+                <span>{onglet === 'a_traiter' ? t('matin.colLieu') : t('matin.colStatut')}</span>
+                <span className={styles.colDroite}>{libelleColonneDate(onglet)}</span>
               </div>
               <div className={styles.separateurLigne} />
               <motion.div layout>
@@ -152,9 +243,9 @@ export function OfferList({
                       key={offer.id}
                       offer={offer}
                       onOuvrir={onOuvrirOffre}
-                      afficherStatut={false}
-                      dateColonne="publiee"
                       salaireFloor={salaireFloor}
+                      afficherStatut={onglet !== 'a_traiter'}
+                      dateColonne={colonneDatePourOnglet(onglet)}
                     />
                   ))}
                 </AnimatePresence>
@@ -167,6 +258,11 @@ export function OfferList({
                 onPrecedent={() => onPageChange(page - 1)}
                 suivantDisponible={fin < total}
                 precedentDisponible={page > 1}
+                numerotation={{
+                  page,
+                  pageCount: Math.max(1, Math.ceil(total / pageSize)),
+                  onPageChange,
+                }}
               />
             </>
           )}

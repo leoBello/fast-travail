@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardClient } from '../../data/client';
+import type { OffersListFilters } from '../../data/types';
 import { ligneOffre } from '../../data/test-fixtures';
 import { MatinScreen } from './MatinScreen';
 
@@ -77,8 +78,14 @@ describe('MatinScreen', () => {
     expect(screen.getByText('Offre C')).toBeDefined();
     expect(screen.getByText('1–3 sur 6')).toBeDefined();
 
+    // Onglet par défaut « À traiter » (tâche 10) : la ligne de compte suit
+    // désormais `compteOnglet`, pas `offresJugeesRienMasque` — cette
+    // dernière ne se dit QUE sur l'onglet « Toutes » (GUIDELINES §3.3).
+    // `totalCorpus` vient de `getStatutCounts` (`clientFactice` ci-dessus :
+    // 1258+0+0+6+1+0+0+7 = 1272), `total` de `listOffers` (mock non
+    // filtrant : 1269).
     await waitFor(() =>
-      expect(screen.getByText('1269 offres jugées, rien de masqué')).toBeDefined(),
+      expect(screen.getByText('1269 dans cet onglet, sur 1272 jugées')).toBeDefined(),
     );
     expect(screen.getByText('23 jamais ouvertes au-dessus de 50')).toBeDefined();
     expect(screen.getByText('3 jours de suite')).toBeDefined();
@@ -187,5 +194,40 @@ describe('MatinScreen', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: /Déplier/ })).not.toBeNull());
     expect(screen.queryByText('Offre A')).toBeNull();
+  });
+
+  it('changer d’onglet remet la liste en page 1 et envoie le bon statut', async () => {
+    const appels: OffersListFilters[] = [];
+    const client = {
+      ...clientFactice(),
+      listOffers: (filtres: OffersListFilters = {}) => {
+        appels.push(filtres);
+        return Promise.resolve({ rows: [], total: 0, page: 1, pageSize: 8 });
+      },
+    };
+
+    render(<MatinScreen client={client} onOuvrirOffre={vi.fn()} />);
+    await userEvent.click(await screen.findByRole('tab', { name: /Postulée/ }));
+
+    const dernier = appels.at(-1);
+    expect(dernier?.page).toBe(1);
+    expect(dernier?.statut).toEqual(['postulee']);
+  });
+
+  it('l’onglet par défaut demande les deux valeurs « à traiter »', async () => {
+    // Le piège que ce test ferme : `in` ne matche jamais `null`. Si l'onglet
+    // par défaut n'envoyait que `a_traiter`, l'écran s'ouvrirait sur une liste
+    // VIDE alors que 1 258 offres attendent — et rien ne le signalerait.
+    const appels: OffersListFilters[] = [];
+    const client = {
+      ...clientFactice(),
+      listOffers: (filtres: OffersListFilters = {}) => {
+        appels.push(filtres);
+        return Promise.resolve({ rows: [], total: 0, page: 1, pageSize: 8 });
+      },
+    };
+    render(<MatinScreen client={client} onOuvrirOffre={vi.fn()} />);
+    await screen.findAllByRole('tab');
+    expect(appels[0]?.statut).toEqual(['aucune', 'a_traiter']);
   });
 });

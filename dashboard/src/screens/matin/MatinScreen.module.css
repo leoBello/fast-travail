@@ -1,9 +1,15 @@
 .ecran {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* La PAGE défile désormais normalement (revue du 2026-09-10, sur écran
+     réel) : une coque à hauteur FIXE rognait la liste à zéro ligne visible
+     sur un portable, la zone mesurée recevant 0 px d'un parent qui ne lui en
+     donnait aucun. `min-height`, pas `height` : la coque occupe au moins un
+     écran plein, mais grandit avec son contenu au lieu de le couper.
+     `dvh`, jamais `vh` : sur mobile, `vh` compte la barre d'adresse
+     rétractée et ferait dépasser la hauteur minimale annoncée. */
+  min-height: 100dvh;
   padding: 0 28px 16px;
-  min-height: 0;
 }
 
 .barre {

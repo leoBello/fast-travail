@@ -2,15 +2,28 @@ import { useMemo, useState } from 'react';
 import type { DashboardClient } from '../../data/client';
 import type { OfferDashboardRow, SortField } from '../../data/types';
 import { t } from '../../i18n/i18n';
-import { useBrief, useConfig, useOffersList, useStats, useWorkModeCounts } from './hooks';
+import {
+  useBrief,
+  useConfig,
+  useOffersList,
+  useStats,
+  useStatutCounts,
+  useWorkModeCounts,
+} from './hooks';
 import type { FilterState } from './FilterPanel';
 import { FilterPanel } from './FilterPanel';
 import { MorningBand } from './MorningBand';
 import { OfferList } from './OfferList';
 import { ecrireRepli, lireRepli } from './repliStorage';
+import { comptePourOnglet, filtreStatutPourOnglet, ONGLET_PAR_DEFAUT } from './statusTabsLogic';
+import type { OngletId } from './statusTabsLogic';
 import styles from './MatinScreen.module.css';
 
-const LIST_PAGE_SIZE = 50;
+/** Fixe, plus mesurée : la page défile désormais normalement (revue du
+ * 2026-09-10, sur écran réel — une coque à hauteur fixe rognait la liste à
+ * zéro ligne visible sur un portable), donc la hauteur disponible ne veut
+ * plus rien dire. Dix lignes — au-delà, une page cesse d'être une page. */
+const LIST_PAGE_SIZE = 10;
 
 interface Props {
   client: DashboardClient;
@@ -135,19 +148,32 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
   }
 
   // ---- Liste « Toute la veille » ----
+  const [onglet, setOnglet] = useState<OngletId>(ONGLET_PAR_DEFAUT);
   const [sort, setSort] = useState<SortField>('final_score');
   const [listPage, setListPage] = useState(1);
   const [filtres, setFiltres] = useState<FilterState>({});
   const [filtresOuverts, setFiltresOuverts] = useState(false);
+  const [comptesStatutState] = useStatutCounts(client);
+
+  // `useMemo` obligatoire : `statut` est un TABLEAU, et il est la dépendance
+  // du `useCallback` d'`useOffersList`. Reconstruit à chaque rendu, il
+  // relancerait l'appel réseau à chaque `setState` de cet écran — exactement
+  // le défaut corrigé sur le client d'API dans `App.tsx` (CLAUDE.md).
+  const statut = useMemo(() => filtreStatutPourOnglet(onglet), [onglet]);
 
   const [listState, recargerListe] = useOffersList(client, {
     sort,
     page: listPage,
     pageSize: LIST_PAGE_SIZE,
+    statut,
     ...filtres,
   });
   const [countsState] = useWorkModeCounts(client);
 
+  function changerOnglet(suivant: OngletId) {
+    setOnglet(suivant);
+    setListPage(1);
+  }
   function changerFiltres(suivant: FilterState) {
     setFiltres(suivant);
     setListPage(1);
@@ -156,6 +182,15 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
     setSort(suivant);
     setListPage(1);
   }
+
+  const filtresActifs =
+    filtres.workMode !== undefined ||
+    filtres.engagement !== undefined ||
+    filtres.source !== undefined ||
+    filtres.agenticAi !== undefined;
+
+  const comptesStatut = comptesStatutState.statut === 'succes' ? comptesStatutState.donnees : null;
+  const totalCorpus = comptesStatut === null ? 0 : comptePourOnglet('toutes', comptesStatut);
 
   const listeOffres = listState.statut === 'succes' ? listState.donnees.rows : [];
   const listeTotal = listState.statut === 'succes' ? listState.donnees.total : 0;
@@ -228,6 +263,11 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
         erreur={listState.statut === 'erreur'}
         onReessayer={recargerListe}
         salaireFloor={salaireFloor}
+        onglet={onglet}
+        onOngletChange={changerOnglet}
+        comptesStatut={comptesStatut}
+        totalCorpus={totalCorpus}
+        filtresActifs={filtresActifs}
       />
     </div>
   );
