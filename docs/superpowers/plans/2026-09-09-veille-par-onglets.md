@@ -620,7 +620,7 @@ it('listOffers pose statut une fois par valeur (?statut=aucune&statut=a_traiter)
 - [ ] **Step 2 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/data/client.test.ts
+cd dashboard && npx vitest run src/data/client.test.ts
 ```
 
 Attendu : ÉCHEC — `client.getStatutCounts is not a function`.
@@ -709,7 +709,7 @@ export function useOffersList(
 - [ ] **Step 6 : lancer, vérifier que ça passe**
 
 ```bash
-npm --prefix dashboard run test -- --run src/data/client.test.ts
+cd dashboard && npx vitest run src/data/client.test.ts
 ```
 
 Attendu : PASS.
@@ -863,7 +863,7 @@ describe('StatusTabs', () => {
 - [ ] **Step 4 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/StatusTabs.test.tsx
+cd dashboard && npx vitest run src/screens/matin/StatusTabs.test.tsx
 ```
 
 Attendu : ÉCHEC — `Failed to resolve import "./StatusTabs"`.
@@ -1080,7 +1080,7 @@ Créer `dashboard/src/screens/matin/StatusTabs.module.css` — valeurs reprises 
 - [ ] **Step 7 : lancer, vérifier que ça passe**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/StatusTabs.test.tsx
+cd dashboard && npx vitest run src/screens/matin/StatusTabs.test.tsx
 ```
 
 Attendu : PASS, 8 tests.
@@ -1208,7 +1208,7 @@ describe('Pagination', () => {
 - [ ] **Step 3 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/Pagination.test.tsx
+cd dashboard && npx vitest run src/screens/matin/Pagination.test.tsx
 ```
 
 Attendu : ÉCHEC — `numerosDePage` n'est pas exporté.
@@ -1323,7 +1323,7 @@ Ajouter à `dashboard/src/screens/matin/Pagination.module.css` — valeurs repri
 - [ ] **Step 6 : lancer, vérifier que ça passe**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/Pagination.test.tsx
+cd dashboard && npx vitest run src/screens/matin/Pagination.test.tsx
 ```
 
 Attendu : PASS, 8 tests.
@@ -1420,7 +1420,7 @@ describe('usePageSizeAjustee', () => {
 - [ ] **Step 2 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/usePageSizeAjustee.test.ts
+cd dashboard && npx vitest run src/screens/matin/usePageSizeAjustee.test.ts
 ```
 
 Attendu : ÉCHEC — module introuvable.
@@ -1488,7 +1488,7 @@ export function usePageSizeAjustee(ref: RefObject<HTMLElement | null>): number {
 - [ ] **Step 4 : lancer, vérifier que ça passe**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/usePageSizeAjustee.test.ts
+cd dashboard && npx vitest run src/screens/matin/usePageSizeAjustee.test.ts
 ```
 
 Attendu : PASS, 4 tests.
@@ -1565,7 +1565,7 @@ describe('repliStorage', () => {
 - [ ] **Step 2 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/repliStorage.test.ts
+cd dashboard && npx vitest run src/screens/matin/repliStorage.test.ts
 ```
 
 Attendu : ÉCHEC — module introuvable.
@@ -1649,7 +1649,7 @@ Ajouter `replie: false` et `onToggleRepli: vi.fn()` aux valeurs par défaut du h
 - [ ] **Step 6 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/MorningBand.test.tsx
+cd dashboard && npx vitest run src/screens/matin/MorningBand.test.tsx
 ```
 
 Attendu : ÉCHEC — aucun bouton « Replier ».
@@ -1732,7 +1732,7 @@ Ajouter à `dashboard/src/screens/matin/MorningBand.module.css` :
 - [ ] **Step 9 : lancer, vérifier que ça passe**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/MorningBand.test.tsx src/screens/matin/repliStorage.test.ts
+cd dashboard && npx vitest run src/screens/matin/MorningBand.test.tsx src/screens/matin/repliStorage.test.ts
 ```
 
 Attendu : PASS.
@@ -1895,7 +1895,7 @@ it('une date d’étape absente se NOMME « non datée », jamais une case vide'
 - [ ] **Step 3 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/data/format.test.ts src/screens/matin/OfferRow.test.tsx
+cd dashboard && npx vitest run src/data/format.test.ts src/screens/matin/OfferRow.test.tsx
 ```
 
 Attendu : ÉCHEC — `formatDateCandidature` n'existe pas, et `afficherStatut` n'est pas une prop connue.
@@ -2002,7 +2002,7 @@ Dans `dashboard/src/screens/matin/OfferRow.tsx` :
 - [ ] **Step 6 : lancer, vérifier que ça passe**
 
 ```bash
-npm --prefix dashboard run test -- --run src/data/format.test.ts src/screens/matin/OfferRow.test.tsx
+cd dashboard && npx vitest run src/data/format.test.ts src/screens/matin/OfferRow.test.tsx
 ```
 
 Attendu : PASS.
@@ -2166,7 +2166,7 @@ it('l’onglet par défaut demande les deux valeurs « à traiter »', async () 
 - [ ] **Step 3 : lancer, vérifier l'échec**
 
 ```bash
-npm --prefix dashboard run test -- --run src/screens/matin/OfferList.test.tsx src/screens/matin/MatinScreen.test.tsx
+cd dashboard && npx vitest run src/screens/matin/OfferList.test.tsx src/screens/matin/MatinScreen.test.tsx
 ```
 
 Attendu : ÉCHEC — aucun `role="tab"` rendu.
@@ -2371,7 +2371,7 @@ Dans `dashboard/src/screens/matin/MatinScreen.module.css`, `.ecran` porte déjà
 - [ ] **Step 8 : lancer toute la suite du dashboard**
 
 ```bash
-npm --prefix dashboard run test -- --run
+cd dashboard && npx vitest run
 ```
 
 Attendu : PASS.
