@@ -1,13 +1,10 @@
 /*
- * « non publiée par la source » et « non précisée » : un texte discret, pas
- * un badge — la maquette (Composants.dc.html, classe `.absent`) les rend
- * comme une valeur manquante ordinaire, pas comme un fait à signaler.
+ * « non publiée par la source » et « non précisée » n'ont pas de classe ici :
+ * `Absence.tsx` compose `Absent` (`Card.module.css`, `.absent`), le rendu
+ * italique/faint que le kit porte déjà pour une valeur manquante ordinaire.
+ * Une seconde déclaration presque identique aurait été le dialecte que
+ * GUIDELINES §1 interdit.
  */
-.texte {
-  font-style: italic;
-  color: var(--color-text-faint);
-  font-size: var(--text-sm);
-}
 
 /*
  * « salaire non publié » : un jeton discontinu, pas un badge — la maquette

@@ -4,10 +4,14 @@ import { Absence } from './Absence';
 import type { AbsenceNature } from './Absence';
 
 describe('Absence', () => {
-  it('rend "non publiée" et "non précisée" comme un texte discret, pas un badge', () => {
+  it('rend "non publiée" et "non précisée" en composant `Absent`, pas en le réimplémentant', () => {
+    // Un second style italique/faint à côté de `Absent` (Card.tsx) aurait été
+    // le dialecte que GUIDELINES §1 interdit : `data-absent="true"` ne peut
+    // venir que de la vraie composition, pas d'une CSS qui l'imite.
     const { container } = render(<Absence nature="non-publiee">non publié par la source</Absence>);
     expect(screen.getByText('non publié par la source')).toBeDefined();
     expect(container.querySelector('[data-ton]')).toBeNull();
+    expect(container.querySelector('[data-absent="true"]')).not.toBeNull();
     expect(container.querySelector('[data-nature="non-publiee"]')).not.toBeNull();
   });
 

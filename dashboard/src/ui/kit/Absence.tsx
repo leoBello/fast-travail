@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Badge } from './Badge';
+import { Absent } from './Card';
 import styles from './Absence.module.css';
 
 /**
@@ -57,9 +58,13 @@ export function Absence({ nature, children }: Props) {
   switch (nature) {
     case 'non-publiee':
     case 'non-precisee':
+      // Composé sur `Absent` (`Card.tsx`), pas réimplémenté : c'est déjà le
+      // rendu du kit pour « une valeur manquante ordinaire, pas un fait à
+      // signaler » — un second style italique/faint à côté aurait été un
+      // dialecte (GUIDELINES §1).
       return (
-        <span className={styles.texte} data-nature={nature}>
-          {children}
+        <span data-nature={nature}>
+          <Absent>{children}</Absent>
         </span>
       );
     case 'salaire-non-publie':
