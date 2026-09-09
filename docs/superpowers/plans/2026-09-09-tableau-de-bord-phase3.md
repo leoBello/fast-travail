@@ -357,7 +357,7 @@ une reprise.
 ### Étapes
 
 - [ ] `src/i18n/fr.ts` — toutes les chaînes, y compris les libellés des sept
-      statuts, des quatre issues, des sept absences et des messages de vide.
+      statuts, des quatre issues, des huit absences et des messages de vide.
 - [ ] `t()` typée sur les clés de `fr.ts` : une clé inexistante doit être une
       **erreur de compilation**, pas une chaîne vide à l'exécution.
 - [ ] `i18n.test.ts` : aucune clé orpheline, aucune clé manquante.

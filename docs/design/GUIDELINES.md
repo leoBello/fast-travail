@@ -29,7 +29,7 @@ mesure.
 | **Les six étapes du suivi et la sortie** | `StatusBadge` les porte toutes ; on n'en dessine pas une septième. |
 | **Les quatre issues** | Un second axe, jamais une étape de plus. |
 | **Les badges de fait** | Télétravail, engagement, IA/agents, confiance. Un fait se rend par un `Badge`, pas par une phrase colorée. |
-| **Les sept absences** | Sept natures mesurées, sept rendus. Voir §3. |
+| **Les huit absences** | Huit natures mesurées, huit rendus. Voir §3. |
 | **Les infobulles** | Elles portent le *pourquoi*, jamais ce dont la décision dépend. |
 | **Les actions** | Une action primaire par écran, les autres en contour. Le lien vers l'annonce d'origine porte toujours l'icône de sortie : il quitte l'application. |
 
@@ -67,7 +67,7 @@ maquette à corriger.
 
 ### 3.1 Une absence se nomme, jamais elle ne se vide
 
-**Sept absences ont été mesurées en base**, et elles ont sept rendus parce
+**Huit absences ont été mesurées en base**, et elles ont huit rendus parce
 qu'elles ne disent pas la même chose :
 
 | Rendu | Ce que c'est | Compté |

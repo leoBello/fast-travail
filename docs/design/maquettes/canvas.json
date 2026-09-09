@@ -39,7 +39,7 @@
       "x": 0,
       "y": 1300,
       "w": 1280,
-      "text": "Les sept absences ne sont pas une figure de style : elles sont comptees.\n\nPiege evite en les mesurant : 539 offres ont une stack vide, et 539 offres sont en confiance basse. Les totaux coincident, LES ENSEMBLES NON — 295 seulement sont dans les deux cas, 244 de chaque cote different. Ecrire 'stack vide = texte tronque' aurait donc ete faux sur 244 offres, avec deux causes opposees rendues identiques a l'ecran."
+      "text": "Les huit absences ne sont pas une figure de style : elles sont comptees.\n\nPiege evite en les mesurant : 539 offres ont une stack vide, et 539 offres sont en confiance basse. Les totaux coincident, LES ENSEMBLES NON — 295 seulement sont dans les deux cas, 244 de chaque cote different. Ecrire 'stack vide = texte tronque' aurait donc ete faux sur 244 offres, avec deux causes opposees rendues identiques a l'ecran."
     },
     {
       "id": "note-directions",

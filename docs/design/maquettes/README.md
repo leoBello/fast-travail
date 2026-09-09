@@ -4,7 +4,7 @@ Les maquettes qui précèdent le plan d'implémentation de la phase 3. Les règl
 qu'elles fixent sont dans [`../GUIDELINES.md`](../GUIDELINES.md), qui est
 contraignant.
 
-**Canvas publié** : <https://claude.ai/code/artifact/be80ac9f-af1b-4490-b2ce-b7813a4ea393>
+**Canvas publié** : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
 
 ---
 
@@ -17,7 +17,7 @@ Huit artboards, répartis en trois pages dans `canvas.json`.
 | `Main.dc.html` | Application | L'écran du matin : le brief du jour en trois cartes de décision, puis toute la veille en liste. |
 | `Detail.dc.html` | Application | Une offre en entier : le rang décomposé, les **deux jugements** d'un doublon, l'extraction, le suivi. |
 | `Suivi.dc.html` | Application | Les candidatures : l'entonnoir, le pipeline en colonnes, la série et le compteur anti-perte. |
-| `Composants.dc.html` | Système | Le vocabulaire : fondations, couple de scores, statuts, badges de fait, **les sept absences**, actions, infobulles, vides. |
+| `Composants.dc.html` | Système | Le vocabulaire : fondations, couple de scores, statuts, badges de fait, **les huit absences**, actions, infobulles, vides. |
 | `Etats.dc.html` | Système | Les états qui décident : le jour zéro, la panne de collecte, le compteur qu'on ne peut pas construire, les filtres, le réglage des poids. |
 | `DirectionA.dc.html` | Directions | « Les trois cartes » — comparer d'un coup. **Portée aujourd'hui par `Main`.** |
 | `DirectionB.dc.html` | Directions | « Une à la fois » — décider vite, sans comparer. |
