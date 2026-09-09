@@ -20,3 +20,18 @@
   margin: var(--space-1) 0 0;
   line-height: 1.5;
 }
+
+/*
+ * Le détail SUPERPOSÉ à l'écran du matin (tâche 8, revue) : `MatinScreen`
+ * reste monté dessous, son état local survit à l'aller-retour. `--z-panel`
+ * était réservé sans consommateur depuis la tâche 3 (theme.css) — en voici
+ * un. Sous `--z-tooltip` (30) : une infobulle ouverte À L'INTÉRIEUR du
+ * panneau doit rester visible par-dessus lui.
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg);
+  overflow-y: auto;
+  z-index: var(--z-panel);
+}

@@ -16,13 +16,20 @@
  * ÉCART assumé avec la copie source : quatre tokens propres à une autre
  * application (`--color-seg-presence/-vitalite/-joignabilite/-empty`, la
  * jauge de « présence / vitalité / joignabilité » du CRM prospeo — un
- * vocabulaire sans équivalent ici), et deux tokens que rien dans ce dépôt ne
- * consomme encore (`--z-panel`, réservé au panneau de détail des tâches 7-9 ;
- * `--text-xl`, entre `--text-lg` et `--text-2xl`) ne sont pas repris
- * maintenant. `theme.test.ts` fait respecter « aucun token sans
+ * vocabulaire sans équivalent ici), et un token que rien dans ce dépôt ne
+ * consomme encore (`--text-xl`, entre `--text-lg` et `--text-2xl`) ne sont
+ * pas repris maintenant. `theme.test.ts` fait respecter « aucun token sans
  * consommateur » : les déclarer sans usage ferait échouer ce garde-fou pour
- * de mauvaises raisons. Ils reviendront, valeur inchangée, avec le composant
- * ou l'écran qui en aura besoin — voir le rapport de tâche 3.
+ * de mauvaises raisons. Il reviendra, valeur inchangée, avec le composant ou
+ * l'écran qui en aura besoin — voir le rapport de tâche 3.
+ *
+ * `--z-panel` (ci-dessous) N'A PAS suivi cette règle « valeur inchangée » :
+ * `App.module.css` (tâche 8, revue) en est le premier consommateur, mais
+ * l'arbre de travail de ce dépôt ne contient pas la source `prospeo` — sa
+ * vraie valeur n'a pas pu être vérifiée. `20` est choisi ici, sous
+ * `--z-tooltip` (30) pour qu'une infobulle ouverte à l'intérieur du panneau
+ * reste visible par-dessus lui. Si la valeur prospeo diffère, c'est ce
+ * commentaire qu'il faut corriger, pas le composant qui la consomme.
  */
 
 :root {
@@ -66,6 +73,7 @@
   --text-lg: 15px;
   --text-2xl: 24px;
 
+  --z-panel: 20;
   --z-tooltip: 30;
 
   /* L'ombre d'un calque flottant se lit contre son fond : dense sur le thème

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Absence } from '../../ui/kit/Absence';
+import { Badge } from '../../ui/kit/Badge';
 import { Tooltip } from '../../ui/kit/Tooltip';
 import { badgeSeniorite, formatCompensation } from '../../data/format';
 import type { OfferDashboardRow } from '../../data/types';
@@ -71,7 +72,11 @@ export function ExtractionSection({ offer }: Props) {
               intitule={t('matin.uniteIncertaineBadge')}
               contenu={t('matin.uniteIncertaineInfobulle')}
             >
-              <span className={styles.montantBarre}>{compensation.texte}</span>
+              <span>
+                <Badge ton="alerte" taille="compacte" discontinu>
+                  <span className={styles.montantBarre}>{compensation.texte}</span>
+                </Badge>
+              </span>
             </Tooltip>
           ) : (
             <Absence nature="salaire-non-publie">{t('absences.salaire-non-publie')}</Absence>

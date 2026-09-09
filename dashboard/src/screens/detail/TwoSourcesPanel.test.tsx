@@ -135,6 +135,30 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     expect(screen.getByText('2 annonces')).toBeDefined();
   });
 
+  it(
+    'un groupe de PLUS de deux jugements affiche le retenu et TOUS les masqués — ' +
+      'jamais seulement le premier (le composant est générique, pas figé à deux)',
+    () => {
+      const { container } = render(
+        <TwoSourcesPanel
+          offerId="b"
+          judgements={[
+            jugementOffre({ id: 'a', source: 'adzuna' }),
+            jugementOffre({ id: 'b', source: 'free_work' }),
+            jugementOffre({ id: 'c', source: 'france_travail' }),
+          ]}
+        />,
+      );
+
+      expect(screen.getByText('3 annonces')).toBeDefined();
+      expect(container.querySelectorAll('[data-retenu="true"]').length).toBe(1);
+      const masquees = container.querySelectorAll('[data-retenu="false"]');
+      expect(masquees.length).toBe(2);
+      const idsMasques = [...masquees].map((el) => el.getAttribute('data-offer-id')).sort();
+      expect(idsMasques).toEqual(['a', 'c']);
+    },
+  );
+
   it("signale quand les deux sources divergent sur la nature du montant, jamais quand elles s'accordent", () => {
     const { rerender, container } = render(
       <TwoSourcesPanel

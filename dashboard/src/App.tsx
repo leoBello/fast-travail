@@ -38,6 +38,19 @@ function construireClient():
  * de porter). Conséquence assumée : un `F5` sur le détail revient à l'écran
  * du matin plutôt que de rouvrir la même offre — documenté dans le rapport
  * de tâche, pas un défaut caché.
+ *
+ * **`MatinScreen` reste monté en permanence** (revue de tâche 8) : le
+ * détail se SUPERPOSE, il ne remplace jamais. Le rendu conditionnel
+ * précédent démontait `MatinScreen` à l'ouverture d'une offre, ce qui en
+ * jetait tout l'état local (filtres, tri, page de la bande, page de la
+ * liste, panneau ouvert) — perdu à CHAQUE aller-retour, pas seulement au
+ * `F5`. Remonter cet état au-dessus de la bascule (dans `App`) aurait exigé
+ * de faire transiter par props tout ce que `MatinScreen`/`OfferList`/
+ * `FilterPanel` gèrent déjà eux-mêmes, en touchant leurs interfaces déjà
+ * testées — un refactor plus large et plus risqué pour le même résultat
+ * pratique. Superposer coûte deux lignes et zéro risque sur le reste de
+ * l'arbre : `MatinScreen` continue de vivre sous l'overlay, son état
+ * survit intact au retour.
  */
 export function App() {
   const { client, erreur } = construireClient();
@@ -55,14 +68,15 @@ export function App() {
 
   return (
     <MotionRoot>
-      {offreOuverte === null ? (
-        <MatinScreen client={client} onOuvrirOffre={setOffreOuverte} />
-      ) : (
-        <DetailScreen
-          client={client}
-          offerId={offreOuverte}
-          onRetour={() => setOffreOuverte(null)}
-        />
+      <MatinScreen client={client} onOuvrirOffre={setOffreOuverte} />
+      {offreOuverte === null ? null : (
+        <div className={styles.overlay}>
+          <DetailScreen
+            client={client}
+            offerId={offreOuverte}
+            onRetour={() => setOffreOuverte(null)}
+          />
+        </div>
       )}
     </MotionRoot>
   );

@@ -104,7 +104,7 @@ function JudgementCard({ judgement, retenu }: { judgement: OfferScoredRow; reten
           {confiance.label}
         </Badge>
         {texteCoupe === null ? (
-          <Badge ton="neutre" taille="compacte" discontinu>
+          <Badge ton="neutre" taille="compacte">
             {t('detail.texteIntegral')}
           </Badge>
         ) : (

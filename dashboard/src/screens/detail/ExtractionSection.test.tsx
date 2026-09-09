@@ -36,6 +36,14 @@ describe('ExtractionSection', () => {
         />,
       );
       expect(screen.getByText('12 k€/an').className).toMatch(/montantBarre/);
+      // Le montant barré seul ne suffit pas (GUIDELINES §3.6 : « le montant
+      // barré, AVEC le badge "unité incertaine" ») — la revue a signalé un
+      // premier passage où ce test ne vérifiait que le trait, pas le badge,
+      // et passait alors même que le badge manquait. `data-ton`/
+      // `data-discontinu` sont les attributs que `Badge` pose réellement
+      // (Badge.tsx) : les affirmer prouve la présence du badge lui-même, pas
+      // seulement du style visuel qu'il porterait de toute façon.
+      expect(container.querySelector('[data-ton="alerte"][data-discontinu="true"]')).not.toBeNull();
 
       rerender(
         <ExtractionSection
