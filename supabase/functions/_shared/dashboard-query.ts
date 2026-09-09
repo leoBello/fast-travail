@@ -210,6 +210,47 @@ export async function getWorkModeCounts(db: DbClient): Promise<WorkModeCounts> {
   return counts;
 }
 
+/**
+ * La valeur de filtre « aucune décision » — une offre sans ligne
+ * `offer_applications`, donc `candidature_statut` nul.
+ *
+ * Miroir EXACT de `WORK_MODE_UNSPECIFIED` : le même problème (une colonne
+ * nullable qu'un `in` ne matche jamais) appelle la même réponse, et deux
+ * conventions différentes pour la même chose seraient un dialecte de plus.
+ * N'entre en collision avec aucune valeur d'`APPLICATION_STATUSES`.
+ */
+export const STATUT_UNDECIDED = 'aucune';
+export type StatutFilter = ApplicationStatus | typeof STATUT_UNDECIDED;
+
+/** Les huit valeurs de statut chiffrées : les sept étapes, plus « aucune
+ * décision ». TOUJOURS les huit clefs, y compris à zéro — un onglet à zéro
+ * se lit « 0 », il ne disparaît pas (GUIDELINES §3.3). */
+export type StatutCounts = Record<StatutFilter, number>;
+
+/**
+ * `GET /statut-counts` : un seul balayage pour les huit nombres.
+ *
+ * Voir la migration `20260910060000` pour le pourquoi : sept
+ * `GET /offers?statut=…&pageSize=1` coûteraient sept balayages du corpus,
+ * le coût d'une lecture d'`offers_dashboard` ne dépendant pas de `pageSize`.
+ */
+export async function getStatutCounts(db: DbClient): Promise<StatutCounts> {
+  const { data, error } = await db.from('offers_dashboard_status_counts').select('statut, total');
+  if (error) throw new Error(`comptage par statut : ${error.message}`);
+
+  const counts = Object.fromEntries(
+    [...APPLICATION_STATUSES, STATUT_UNDECIDED].map((statut) => [statut, 0]),
+  ) as StatutCounts;
+  for (const row of (data ?? []) as { statut: string; total: number | string }[]) {
+    // Une valeur que la vue rendrait sans que le code la connaisse est
+    // ignorée plutôt qu'ajoutée : le contrat de sortie est fermé sur les huit
+    // clefs, et une neuvième ferait mentir le type sans que rien ne le
+    // signale. Même règle que `getWorkModeCounts`.
+    if (row.statut in counts) counts[row.statut as StatutFilter] = Number(row.total);
+  }
+  return counts;
+}
+
 export interface Pagination {
   page: number;
   pageSize: number;

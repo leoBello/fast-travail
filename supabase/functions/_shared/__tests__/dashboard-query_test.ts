@@ -4,6 +4,7 @@ import {
   getConfig,
   getOfferDetail,
   getStats,
+  getStatutCounts,
   getWorkModeCounts,
   importCandidateProfile,
   listOffers,
@@ -1112,4 +1113,66 @@ Deno.test('getWorkModeCounts remonte une erreur de base plutôt que des zéros',
   const { db } = fakeDbForWorkModeCounts(null, { message: 'base indisponible' });
 
   await assertRejects(() => getWorkModeCounts(db), Error, 'comptage par mode de travail');
+});
+
+// --------------------------------------------------------------------------
+// getStatutCounts
+// --------------------------------------------------------------------------
+
+function fakeDbForStatutCounts(
+  rows: { statut: string; total: number | string }[] | null,
+  error?: { message: string },
+): { db: DbClient; tablesLues: string[] } {
+  const tablesLues: string[] = [];
+  const db = {
+    from(table: string) {
+      tablesLues.push(table);
+      return {
+        select: (_cols: string) => Promise.resolve({ data: rows, error: error ?? null }),
+      };
+    },
+  } as unknown as DbClient;
+  return { db, tablesLues };
+}
+
+Deno.test('getStatutCounts — lit la vue de comptage, jamais offers_dashboard', async () => {
+  const { db, tablesLues } = fakeDbForStatutCounts([{ statut: 'aucune', total: 1258 }]);
+  await getStatutCounts(db);
+  assertEquals(tablesLues, ['offers_dashboard_status_counts']);
+});
+
+Deno.test('getStatutCounts — complète à 0 les huit clefs, y compris absentes de la vue', async () => {
+  const { db } = fakeDbForStatutCounts([
+    { statut: 'aucune', total: 1258 },
+    { statut: 'postulee', total: 6 },
+  ]);
+  const counts = await getStatutCounts(db);
+  assertEquals(counts, {
+    aucune: 1258,
+    a_traiter: 0,
+    retenue: 0,
+    postulee: 6,
+    relancee: 0,
+    entretien: 0,
+    terminee: 0,
+    ecartee: 0,
+  });
+});
+
+Deno.test('getStatutCounts — un total rendu en chaîne est converti en nombre', async () => {
+  const { db } = fakeDbForStatutCounts([{ statut: 'ecartee', total: '7' }]);
+  const counts = await getStatutCounts(db);
+  assertEquals(counts.ecartee, 7);
+});
+
+Deno.test('getStatutCounts — une valeur inconnue de la vue est ignorée, jamais ajoutée', async () => {
+  const { db } = fakeDbForStatutCounts([{ statut: 'inventee', total: 3 }]);
+  const counts = await getStatutCounts(db);
+  assertEquals(Object.keys(counts).length, 8);
+  assertEquals('inventee' in counts, false);
+});
+
+Deno.test('getStatutCounts — une erreur de lecture est propagée, jamais avalée', async () => {
+  const { db } = fakeDbForStatutCounts(null, { message: 'boom' });
+  await assertRejects(() => getStatutCounts(db), Error, 'comptage par statut');
 });
