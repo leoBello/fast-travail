@@ -107,6 +107,47 @@ describe('DetailScreen', () => {
     expect(screen.queryByText('Vue sur deux sources')).toBeNull();
   });
 
+  it(
+    'les badges confiance et texte-coupé sont visibles au niveau du détail même sur un ' +
+      'groupe de taille 1 — constat I2, revue finale : TwoSourcesPanel (seul porteur avant ' +
+      'correctif) ne monte pas quand group_size === 1',
+    async () => {
+      const client = clientFactice({
+        getOfferDetail: vi.fn().mockResolvedValue({
+          offer: ligneOffre({
+            id: 'off-1',
+            group_size: 1,
+            truncated_input: true,
+            confidence: 'basse',
+          }),
+          groupJudgements: [],
+          application: null,
+        }),
+      });
+      render(<DetailScreen client={client} offerId="off-1" onRetour={() => {}} />);
+
+      await waitFor(() => expect(screen.getByText('Développeur React')).toBeDefined());
+      expect(screen.queryByText('Vue sur deux sources')).toBeNull();
+      expect(screen.getByText('Confiance basse')).toBeDefined();
+      expect(screen.getByText('Texte coupé à 500 car.')).toBeDefined();
+    },
+  );
+
+  it('le badge texte-coupé est absent quand le texte reçu est complet', async () => {
+    const client = clientFactice({
+      getOfferDetail: vi.fn().mockResolvedValue({
+        offer: ligneOffre({ id: 'off-1', truncated_input: false, confidence: 'haute' }),
+        groupJudgements: [],
+        application: null,
+      }),
+    });
+    render(<DetailScreen client={client} offerId="off-1" onRetour={() => {}} />);
+
+    await waitFor(() => expect(screen.getByText('Développeur React')).toBeDefined());
+    expect(screen.getByText('Confiance haute')).toBeDefined();
+    expect(screen.queryByText('Texte coupé à 500 car.')).toBeNull();
+  });
+
   it('"Retenir cette offre" ouvre puis retient — recharge ensuite le détail', async () => {
     const user = userEvent.setup();
     const client = clientFactice();

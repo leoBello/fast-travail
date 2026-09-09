@@ -2,8 +2,10 @@ import { useState } from 'react';
 import type { DashboardClient } from '../../data/client';
 import type { ApplicationOutcome, ApplicationStatus } from '../../data/types';
 import {
+  badgeConfiance,
   badgeSeniorite,
   badgesDeFaits,
+  badgeTexteCoupe,
   formatEmployeur,
   formatLieu,
   formatPublication,
@@ -135,6 +137,12 @@ export function DetailScreen({ client, offerId, onRetour }: Props) {
   const lieu = formatLieu(offer);
   const publication = formatPublication(offer.published_at);
   const seniorite = badgeSeniorite(offer.seniority);
+  // Remontes au niveau du detail, pas seulement dans `TwoSourcesPanel` (monte
+  // uniquement si `group_size > 1`) : sur le perimetre mesure, 501 des 1 245
+  // lignes affichees sont tronquees SANS second jugement, et n'auraient donc
+  // jamais montre ce signal (constat I2, revue finale de branche phase 3).
+  const confiance = badgeConfiance(offer);
+  const texteCoupe = badgeTexteCoupe(offer);
 
   return (
     <div className={styles.ecran}>
@@ -203,6 +211,14 @@ export function DetailScreen({ client, offerId, onRetour }: Props) {
         <Badge ton={seniorite.ton} point>
           {seniorite.label}
         </Badge>
+        <Badge ton={confiance.ton} point>
+          {confiance.label}
+        </Badge>
+        {texteCoupe === null ? null : (
+          <Badge ton={texteCoupe.ton} discontinu>
+            {texteCoupe.label}
+          </Badge>
+        )}
       </div>
 
       <RankSection offer={offer} />

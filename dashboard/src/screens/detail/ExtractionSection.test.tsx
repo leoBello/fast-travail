@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ExtractionSection } from './ExtractionSection';
 import { ligneOffre } from '../../data/test-fixtures';
+import { t } from '../../i18n/i18n';
 
 describe('ExtractionSection', () => {
   it('nomme chaque champ absent plutôt que de laisser une case vide (GUIDELINES §3.1)', () => {
@@ -91,7 +92,11 @@ describe('ExtractionSection', () => {
   );
 
   it('distingue « texte coupé » (Adzuna tronqué) d’« aucune techno reconnue » (texte complet)', () => {
-    const { rerender } = render(
+    // Portee sur `.stackBloc` : depuis le correctif I2, un texte tronque sans
+    // rien detecte porte DESORMAIS trois absences « texte coupe » (IA/agents,
+    // technos non desirees, ET stack) — ce test-ci ne porte que sur la
+    // derniere, deja couverte par son propre test ailleurs dans ce fichier.
+    const { rerender, container } = render(
       <ExtractionSection
         offer={ligneOffre({
           truncated_input: true,
@@ -114,7 +119,8 @@ describe('ExtractionSection', () => {
         cvSkills={[]}
       />,
     );
-    expect(screen.getByText('Non détectable — texte coupé')).toBeDefined();
+    const stackBloc = container.querySelector('[class*="stackBloc"]');
+    expect(stackBloc?.textContent).toContain('Non détectable — texte coupé');
 
     rerender(
       <ExtractionSection
@@ -174,4 +180,116 @@ describe('ExtractionSection', () => {
     render(<ExtractionSection offer={ligneOffre()} salaireFloor={40000} cvSkills={[]} />);
     expect(screen.getByText('Aucune')).toBeDefined();
   });
+
+  it('affiche « Non » (IA/agents) quand le texte reçu est complet', () => {
+    render(
+      <ExtractionSection
+        offer={ligneOffre({ truncated_input: false })}
+        salaireFloor={40000}
+        cvSkills={[]}
+      />,
+    );
+    expect(screen.getByText('Non')).toBeDefined();
+  });
+
+  // Constat I2 (revue finale de branche, phase 3) : « Aucune » et « Non »
+  // affirmaient une absence FACTUELLE (rien trouvé) même quand le texte reçu
+  // était tronqué à 500 caractères (Adzuna) — une absence *de lecture*
+  // rendue comme une absence *de fait*. Vérifie que ces deux champs suivent
+  // désormais la même garde que le bloc `stack`, juste en dessous.
+  it(
+    'ne dit PAS « Aucune » (technos non désirées) sur un texte tronqué sans techno non ' +
+      'désirée détectée : rend l’absence « texte coupé », pas un fait',
+    () => {
+      const { container } = render(
+        <ExtractionSection
+          offer={ligneOffre({
+            truncated_input: true,
+            extraction: {
+              stack: [],
+              seniority: null,
+              work_mode: null,
+              engagement: null,
+              duration_months: null,
+              compensation_kind: null,
+              compensation_min: null,
+              compensation_max: null,
+              agentic_ai: false,
+              unwanted_tech: [],
+              domain: null,
+              confidence: 'basse',
+            },
+          })}
+          salaireFloor={40000}
+          cvSkills={[]}
+        />,
+      );
+      expect(screen.queryByText('Aucune')).toBeNull();
+      expect(container.querySelectorAll('[data-nature="texte-coupe"]').length).toBeGreaterThan(0);
+    },
+  );
+
+  it(
+    'ne dit PAS « Non » (IA/agents) sur un texte tronqué sans mention IA détectée : rend ' +
+      'l’absence « texte coupé », pas un fait',
+    () => {
+      const { container } = render(
+        <ExtractionSection
+          offer={ligneOffre({
+            truncated_input: true,
+            extraction: {
+              stack: [],
+              seniority: null,
+              work_mode: null,
+              engagement: null,
+              duration_months: null,
+              compensation_kind: null,
+              compensation_min: null,
+              compensation_max: null,
+              agentic_ai: false,
+              unwanted_tech: [],
+              domain: null,
+              confidence: 'basse',
+            },
+          })}
+          salaireFloor={40000}
+          cvSkills={[]}
+        />,
+      );
+      expect(screen.queryByText('Non')).toBeNull();
+      expect(container.querySelectorAll('[data-nature="texte-coupe"]').length).toBeGreaterThan(0);
+    },
+  );
+
+  it(
+    'affiche bien « Aucune »/« Non » sur un texte tronqué quand une techno non désirée ou ' +
+      'l’IA sont malgré tout détectées : un FAIT positif, texte tronqué ou pas',
+    () => {
+      render(
+        <ExtractionSection
+          offer={ligneOffre({
+            truncated_input: true,
+            extraction: {
+              stack: [],
+              seniority: null,
+              work_mode: null,
+              engagement: null,
+              duration_months: null,
+              compensation_kind: null,
+              compensation_min: null,
+              compensation_max: null,
+              agentic_ai: true,
+              unwanted_tech: ['php'],
+              domain: null,
+              confidence: 'basse',
+            },
+          })}
+          salaireFloor={40000}
+          cvSkills={[]}
+        />,
+      );
+      expect(screen.getByText('php')).toBeDefined();
+      expect(screen.getByText(t('iaAgents.badge'))).toBeDefined();
+    },
+  );
 });

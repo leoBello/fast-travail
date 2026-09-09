@@ -97,10 +97,26 @@ export function ExtractionSection({ offer, salaireFloor, cvSkills }: Props) {
           )}
         </Fait>
         <Fait libelle={t('detail.champIaAgents')}>
-          {offer.agentic_ai ? t('iaAgents.badge') : t('detail.non')}
+          {offer.agentic_ai ? (
+            t('iaAgents.badge')
+          ) : offer.truncated_input ? (
+            // Meme garde que le bloc `stack` plus bas : un texte tronque a
+            // 500 caracteres (Adzuna) ne permet pas d'affirmer « Non », faute
+            // d'avoir pu lire l'annonce en entier (constat I2, revue finale
+            // de branche phase 3).
+            <Absence nature="texte-coupe">{t('absences.texte-coupe')}</Absence>
+          ) : (
+            t('detail.non')
+          )}
         </Fait>
         <Fait libelle={t('detail.champTechnosNonDesirees')}>
-          {unwanted.length === 0 ? t('detail.aucune') : unwanted.join(', ')}
+          {unwanted.length > 0 ? (
+            unwanted.join(', ')
+          ) : offer.truncated_input ? (
+            <Absence nature="texte-coupe">{t('absences.texte-coupe')}</Absence>
+          ) : (
+            t('detail.aucune')
+          )}
         </Fait>
       </div>
 
