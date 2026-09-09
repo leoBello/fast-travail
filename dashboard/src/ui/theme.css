@@ -23,13 +23,15 @@
  * de mauvaises raisons. Il reviendra, valeur inchangée, avec le composant ou
  * l'écran qui en aura besoin — voir le rapport de tâche 3.
  *
- * `--z-panel` (ci-dessous) N'A PAS suivi cette règle « valeur inchangée » :
- * `App.module.css` (tâche 8, revue) en est le premier consommateur, mais
- * l'arbre de travail de ce dépôt ne contient pas la source `prospeo` — sa
- * vraie valeur n'a pas pu être vérifiée. `20` est choisi ici, sous
- * `--z-tooltip` (30) pour qu'une infobulle ouverte à l'intérieur du panneau
- * reste visible par-dessus lui. Si la valeur prospeo diffère, c'est ce
- * commentaire qu'il faut corriger, pas le composant qui la consomme.
+ * `--z-panel` (ci-dessous) revient avec `App.module.css` (tâche 8), son
+ * premier consommateur, et il porte bien la valeur prospeo : **10**, vérifiée
+ * dans `prospeo/apps/dashboard/src/ui/theme.css:67`. La tâche 8 l'avait posé
+ * à `20` en croyant la source inaccessible — elle est dans un dépôt voisin,
+ * pas dans cet arbre de travail. 10 satisfait la même contrainte (rester sous
+ * `--z-tooltip` à 30, pour qu'une infobulle ouverte dans le panneau reste
+ * visible par-dessus lui), et aucun autre `z-index` littéral n'existe dans
+ * `dashboard/src` — vérifié. La règle « tokens repris tels quels » tient donc
+ * sans exception.
  */
 
 :root {
@@ -73,7 +75,7 @@
   --text-lg: 15px;
   --text-2xl: 24px;
 
-  --z-panel: 20;
+  --z-panel: 10;
   --z-tooltip: 30;
 
   /* L'ombre d'un calque flottant se lit contre son fond : dense sur le thème

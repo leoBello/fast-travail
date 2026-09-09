@@ -1119,11 +1119,28 @@ Canvas : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
 | 3 | Thème et vocabulaire d'interface, avec les tests de garde-fous | ✅ `ba0604f..12bdb7d` |
 | 4 | i18n | ✅ `12bdb7d..dbaec57` |
 | 5 | Vue `offers_dashboard` — repli et élection par confiance | ✅ `dbaec57..4a157ed` |
-| 6 | Edge Function `api-dashboard` | ⬜ |
-| 7 | L'écran du matin | ⬜ |
-| 8 | Le détail d'une offre | ⬜ |
+| 6 | Edge Function `api-dashboard` | ✅ `ed190e5..36e6a08` |
+| 7 | L'écran du matin | ✅ `36e6a08..0f2d14a` |
+| 8 | Le détail d'une offre | ✅ `0f2d14a..193f37b` |
 | 9 | Le suivi et la gamification | ⬜ |
-| 10 | Déploiement, mesure, documentation | ⬜ |
+| 10 | **Combler la dette d'API** *(ajoutée le 2026-09-09)* | ⬜ |
+| 11 | Déploiement, mesure, documentation | ⬜ |
+
+**Une onzième tâche a été ajoutée en cours de route, et c'est une erreur du
+plan qui l'impose.** Ma spécification de l'API en tâche 6 était trop courte :
+trois tâches successives — 7, 8 et bientôt 9 — s'y sont heurtées, et trois
+revues indépendantes ont vérifié à la source que les manques venaient de là,
+pas des implémenteurs. Six éléments que les maquettes approuvées promettent ne
+sont pas construisibles : la provenance (« Trouvée par »), les technos du CV
+distinguées, **le bouton d'import du CV demandé au brief initial**, le seuil
+`salaire_floor` recopié en dur côté navigateur, « décidées aujourd'hui » qui
+tient par un `localStorage`, et les filtres multi-valeurs qui rendraient
+possible « full remote **ou** non précisé ».
+
+Aucun ne fait perdre une offre — rien n'est masqué par défaut. Mais trois
+figurent nommément dans le brief. La leçon, pour les phases suivantes : **une
+spécification d'API s'écrit en partant des écrans qu'elle doit servir**, pas
+de la liste des tables disponibles.
 
 ### Ce que les cinq premières tâches ont mesuré
 

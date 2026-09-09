@@ -576,7 +576,69 @@ condition, pas comme une option.
 
 ---
 
-## Tâche 10 : Déploiement, mesure, documentation
+## Tâche 10 : Combler la dette d'API
+
+**Objectif** : rendre construisible ce que les maquettes approuvées promettent
+et que l'API ne permet pas. **Tranché avec Léo le 2026-09-09**, après que trois
+tâches successives se soient heurtées au même mur.
+
+### Pourquoi cette tâche existe
+
+La spécification de l'API en tâche 6 était **trop courte**, et c'est une erreur
+du plan, pas des implémenteurs. Trois revues indépendantes ont vérifié à la
+source que les manques venaient bien de là. Six éléments en découlent :
+
+| Manque | Ce qu'il ampute |
+|---|---|
+| `found_by_labels` / `trusted_query` | La section « Trouvée par » du détail |
+| `profile_skills` | Les technos du CV distinguées dans la stack |
+| Écriture sur `candidate_profile` + `profile_version` | **Le bouton d'import du CV**, demandé au brief initial |
+| `scoring_weights.salaire_floor` | Le seuil « unité incertaine », recopié en dur côté navigateur |
+| « Décidées aujourd'hui » | Le compteur tient par `localStorage`, pas par une vérité serveur |
+| Filtres multi-valeurs | « full remote **ou** non précisé » est impossible |
+
+Aucun ne fait perdre une offre — rien n'est masqué par défaut. Mais trois
+figurent nommément dans le brief initial, et les maquettes les dessinent.
+
+### Étapes
+
+- [ ] **Une route de configuration** exposant les poids réglables dont
+      l'interface a besoin — au minimum `salaire_floor`. Elle supprime la
+      duplication `SALAIRE_FLOOR_DUPLIQUE` de `dashboard/src/data/format.ts`,
+      et avec elle le test de dérive qui ne couvrait que la valeur semée.
+- [ ] **La provenance dans le détail** : `found_by_labels` et `trusted_query`.
+      Ces colonnes vivent sur `offers_shortlist` / `offers_ranked`, pas sur
+      `offers_scored` — **vérifier d'où les tirer sans casser le coût
+      mesuré** (`offers_dashboard` est à 93-100 ms). Mesurer après.
+- [ ] **`profile_skills`** pour distinguer à l'écran les technos présentes
+      dans le CV. La maquette les montre en vert avec « En vert, les N
+      technologies présentes dans votre CV ».
+- [ ] **L'import du CV** : une route d'écriture sur `candidate_profile`, et le
+      compte d'offres portant un `profile_version` antérieur.
+      **Rappel de la décision tranchée** : l'import met à jour le CV et **ne
+      rejuge rien**. Aucun bouton pour rejuger. Est interdit tout libellé ou
+      état de chargement laissant croire que les scores ont été mis à jour.
+- [ ] **« Décidées aujourd'hui »** dans `/stats`, compté sur
+      `status_changed_at` en **heure de Paris** — jamais en UTC, c'est le piège
+      corrigé en tâche 6. Remplace le `localStorage` de la tâche 7.
+- [ ] **Les filtres multi-valeurs** : accepter plusieurs valeurs par dimension
+      et composer un `OU`. C'est ce qui rend possible « full remote **ou** non
+      précisé », la requête réellement utile quand `work_mode` est nul sur
+      **863 offres, 68 % du corpus**. Repasser `FilterPanel` en cases à cocher
+      à cette occasion — les radios de la tâche 7 n'étaient qu'un pis-aller
+      honnête devant une API mono-valeur.
+- [ ] Redéployer et **réprouver les trois codes** (401 / 403 / 200).
+- [ ] `npm run verify` au vert, les deux moitiés.
+
+### Le piège à ne pas repayer
+
+**Un test unitaire ne prouve rien sur un client d'API.** Toute route nouvelle
+se termine par un appel réel contre la fonction déployée, sortie brute au
+rapport. C'est la leçon de la phase 2, et la tâche 6 l'a respectée.
+
+---
+
+## Tâche 11 : Déploiement, mesure, documentation
 
 - [ ] Déployer `api-dashboard`, poser `DASHBOARD_TOKEN` par
       `npx supabase secrets set`. **Ne recopier sa valeur nulle part.**
