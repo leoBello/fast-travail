@@ -500,6 +500,39 @@ Deno.test('listOffers — aucun filtre : aucun appel de restriction (rien ne mas
   }
 });
 
+Deno.test('listOffers — statut = [aucune] seul : .is(candidature_statut, null), pas de .or', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, statut: ['aucune'] });
+  assertEquals(calls.find((c) => c.method === 'is')?.args, ['candidature_statut', null]);
+  assertEquals(calls.some((c) => c.method === 'or'), false);
+});
+
+Deno.test("listOffers — statut = [aucune, a_traiter] : composé en OU (c'est l'onglet « À traiter »)", async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, statut: ['aucune', 'a_traiter'] });
+  assertEquals(
+    calls.find((c) => c.method === 'or')?.args,
+    ['candidature_statut.is.null,candidature_statut.in.(a_traiter)'],
+  );
+  // Jamais un `.in`/`.is` séparé EN PLUS du `.or` : deux appels successifs de
+  // PostgREST se combinent en ET, jamais en OU — la liste serait vide.
+  assertEquals(calls.some((c) => c.method === 'is'), false);
+  assertEquals(calls.some((c) => c.method === 'in' && c.args[0] === 'candidature_statut'), false);
+});
+
+Deno.test('listOffers — statut sans « aucune » : .in seul, comportement inchangé', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, statut: ['postulee'] });
+  assertEquals(
+    calls.find((c) => c.method === 'in' && c.args[0] === 'candidature_statut')?.args,
+    ['candidature_statut', ['postulee']],
+  );
+  assertEquals(calls.some((c) => c.method === 'or'), false);
+});
+
 // --------------------------------------------------------------------------
 // getStats — decidedToday (tâche 10, remplace le localStorage de la tâche 7)
 // --------------------------------------------------------------------------

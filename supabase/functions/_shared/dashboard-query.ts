@@ -97,7 +97,9 @@ export interface OffersListFilters {
   sort: SortField;
   page: number;
   pageSize: number;
-  statut?: ApplicationStatus[];
+  /** Accepte `STATUT_UNDECIDED` en plus des sept statuts : `in` ne matche
+   * jamais `null`, et l'onglet « À traiter » porte 1 258 offres sur 1 272. */
+  statut?: StatutFilter[];
   workMode?: WorkModeFilter[];
   engagement?: Engagement[];
   source?: Source[];
@@ -128,7 +130,25 @@ export async function listOffers(db: DbClient, filters: OffersListFilters): Prom
   let query = db.from('offers_dashboard').select('*', { count: 'exact' });
 
   if (filters.statut !== undefined && filters.statut.length > 0) {
-    query = query.in('candidature_statut', filters.statut);
+    // Même composition que `workMode` plus bas, et pour la même raison :
+    // `in` ne matche JAMAIS `null`. L'onglet « À traiter » envoie deux
+    // valeurs — `aucune` (jamais ouverte) et `a_traiter` (ouverte sans
+    // décision, posé par `openOffer`) — qui doivent se composer en OU. Deux
+    // appels PostgREST successifs se combineraient en ET et rendraient une
+    // liste vide, sans la moindre erreur.
+    const contientSansDecision = filters.statut.includes(STATUT_UNDECIDED);
+    const statutsConnus = filters.statut.filter(
+      (v): v is ApplicationStatus => v !== STATUT_UNDECIDED,
+    );
+    if (contientSansDecision && statutsConnus.length > 0) {
+      query = query.or(
+        `candidature_statut.is.null,candidature_statut.in.(${statutsConnus.join(',')})`,
+      );
+    } else if (contientSansDecision) {
+      query = query.is('candidature_statut', null);
+    } else {
+      query = query.in('candidature_statut', statutsConnus);
+    }
   }
   if (filters.engagement !== undefined && filters.engagement.length > 0) {
     query = query.in('engagement', filters.engagement);
