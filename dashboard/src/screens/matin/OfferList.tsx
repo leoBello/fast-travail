@@ -152,6 +152,8 @@ export function OfferList({
                       key={offer.id}
                       offer={offer}
                       onOuvrir={onOuvrirOffre}
+                      afficherStatut={false}
+                      dateColonne="publiee"
                       salaireFloor={salaireFloor}
                     />
                   ))}

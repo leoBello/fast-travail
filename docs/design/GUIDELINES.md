@@ -83,7 +83,9 @@ maquette à corriger.
 ### 3.1 Une absence se nomme, jamais elle ne se vide
 
 **Huit absences ont été mesurées en base**, et elles ont huit rendus parce
-qu'elles ne disent pas la même chose :
+qu'elles ne disent pas la même chose. Une neuvième s'y ajoute depuis la tâche
+9 (barre d'onglets de « Toute la veille ») — voir l'encadré après le
+tableau :
 
 | Rendu | Ce que c'est | Compté |
 |---|---|---:|
@@ -95,6 +97,14 @@ qu'elles ne disent pas la même chose :
 | **unité incertaine** | le nombre existe, son unité non (P22) | 102 |
 | **Hors périmètre — jamais lue** | collectée, jamais soumise à l'IA | 2 877 |
 | **Jugement en échec** | l'appel a échoué (P16) | 0 aujourd'hui |
+| *non datée* | l'étape existe, sa date non — un statut posé sans elle | 1 |
+
+> **La neuvième absence ne porte pas sur l'offre, mais sur la candidature.**
+> Les huit premières qualifient ce qu'une annonce dit ou tait ; celle-ci
+> qualifie ce que le SUIVI a enregistré. Elle ne recouvre donc aucune des
+> huit : une date d'étape n'est ni publiée par une source, ni dégagée d'un
+> texte par le modèle. Mesuré le 2026-09-09 : la seule offre au statut
+> `relancee` du corpus a `last_followup_at` nul.
 
 **Le piège, payé une fois pendant la conception** : 539 offres ont une `stack`
 vide, et 539 offres sont en confiance basse. Les totaux coïncident — **les

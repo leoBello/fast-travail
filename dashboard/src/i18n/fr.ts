@@ -66,13 +66,17 @@ export const fr = {
   } satisfies Record<Issue, string>,
 
   /**
-   * Les huit absences (`AbsenceNature`, `Absence.tsx`), mesurées en base
-   * (GUIDELINES §3.1). `texte-coupe` et `aucune-techno` produisent la
+   * Les neuf absences (`AbsenceNature`, `Absence.tsx`). Huit mesurées en
+   * base (GUIDELINES §3.1). `texte-coupe` et `aucune-techno` produisent la
    * **même donnée** (`stack = []`) pour deux causes opposées — leurs
    * libellés sont délibérément aussi éloignés que possible pour qu'aucune
    * lecture rapide ne les confonde : l'un dit que l'information est
    * **absente du texte reçu**, l'autre qu'elle est **absente du texte
    * complet**. Voir le rapport de tâche pour le détail de ce choix.
+   *
+   * `non-datee` (tâche 9) est la neuvième, et ne recouvre aucune des huit :
+   * elle qualifie ce que le SUIVI a enregistré, pas ce qu'une annonce dit ou
+   * tait — une date d'étape n'a ni source ni modèle derrière elle.
    */
   absences: {
     'non-publiee': 'non publié par la source',
@@ -83,6 +87,12 @@ export const fr = {
     'unite-incertaine': 'unité incertaine',
     'hors-perimetre': 'Hors périmètre — jamais lue',
     'echec-jugement': 'Jugement en échec',
+    // Une NEUVIÈME absence, et elle ne recouvre aucune des huit : la date de
+    // l'étape n'a été ni publiée par une source (elle ne vient pas d'une
+    // annonce) ni « non précisée » par le modèle (il ne la produit pas). Elle
+    // n'a simplement pas été enregistrée au moment où le statut a été posé.
+    // Mesuré : la seule offre `relancee` du corpus a `last_followup_at` nul.
+    'non-datee': 'non datée',
   } satisfies Record<AbsenceNature, string>,
 
   /**
@@ -254,6 +264,18 @@ export const fr = {
     colEmployeur: 'Employeur',
     colLieu: 'Lieu',
     colPubliee: 'Publiée',
+    // Les colonnes contextuelles (tâche 9) : sur tout onglet autre que
+    // « À traiter », la 5e colonne (`colLieu` ci-dessus) cède la place au
+    // statut, et la 6e (`colPubliee`) à la date de l'étape — voir
+    // `DateColonne`, `data/format.ts`.
+    colStatut: 'Statut',
+    colPostulee: 'Postulée',
+    colRelancee: 'Relancée',
+    colEntretien: 'Entretien',
+    // La 5e colonne quand `candidature_statut` est nul : une absence NOMMÉE
+    // (GUIDELINES §3.1), jamais une case vide — distincte de `statuts.*`, qui
+    // ne couvre que les statuts CONNUS.
+    sansDecision: 'sans décision',
     // La barre d'onglets de « Toute la veille » (`Main.dc.html`, bloc
     // « barre d'onglets »). Libellés DÉDIÉS, distincts de `statuts.*` :
     // `statuts.*` qualifie UNE offre (`StatusBadge` sur une ligne), un
