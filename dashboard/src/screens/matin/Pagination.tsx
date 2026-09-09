@@ -1,5 +1,13 @@
 import { t } from '../../i18n/i18n';
+import { numerosDePage } from './paginationLogic';
+import type { PaginationNumerotee } from './paginationLogic';
 import styles from './Pagination.module.css';
+
+// `numerosDePage` est une fonction pure : elle vit dans `paginationLogic.ts`,
+// pas ici, et n'est pas réexportée (`react-refresh/only-export-components`,
+// voir le commentaire de ce fichier). Seul le type traverse, ce que
+// `allowConstantExport` autorise.
+export type { PaginationNumerotee } from './paginationLogic';
 
 interface Props {
   debut: number;
@@ -9,6 +17,7 @@ interface Props {
   onPrecedent: () => void;
   suivantDisponible: boolean;
   precedentDisponible: boolean;
+  numerotation?: PaginationNumerotee;
 }
 
 /**
@@ -29,6 +38,7 @@ export function Pagination({
   onPrecedent,
   suivantDisponible,
   precedentDisponible,
+  numerotation,
 }: Props) {
   return (
     <div className={styles.pagination}>
@@ -39,6 +49,27 @@ export function Pagination({
           {t('matin.precedentes')}
         </button>
       ) : null}
+      {numerotation === undefined
+        ? null
+        : numerosDePage(numerotation.page, numerotation.pageCount).map((entree, index) =>
+            entree === 'ellipse' ? (
+              <span key={`ellipse-${index}`} className={styles.ellipse} aria-hidden="true">
+                {t('matin.ellipsePages')}
+              </span>
+            ) : (
+              <button
+                key={entree}
+                type="button"
+                className={styles.numero}
+                data-actif={entree === numerotation.page ? 'oui' : undefined}
+                aria-current={entree === numerotation.page ? 'page' : undefined}
+                aria-label={t('matin.pageNumero', entree)}
+                onClick={() => numerotation.onPageChange(entree)}
+              >
+                {entree}
+              </button>
+            ),
+          )}
       <button
         type="button"
         className={styles.bouton}

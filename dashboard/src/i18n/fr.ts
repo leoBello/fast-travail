@@ -227,6 +227,9 @@ export const fr = {
     suivantes: 'Suivantes',
     precedentes: 'Précédentes',
     pagination: (debut: number, fin: number, total: number) => `${debut}–${fin} sur ${total}`,
+    pageNumero: (n: number) => `Page ${n}`,
+    ellipsePages: '…',
+    parPage: (n: number) => `${n} par page — ce que la fenêtre tient`,
     toutesLaVeille: 'Toute la veille',
     offresJugeesRienMasque: (n: number) =>
       `${n} offre${n === 1 ? '' : 's'} jugée${n === 1 ? '' : 's'}, rien de masqué`,

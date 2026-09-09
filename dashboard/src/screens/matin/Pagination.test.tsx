@@ -1,0 +1,69 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { Pagination } from './Pagination';
+import { numerosDePage } from './paginationLogic';
+
+describe('numerosDePage', () => {
+  it('rend toutes les pages quand il y en a peu', () => {
+    expect(numerosDePage(1, 5)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('replie le milieu par une ellipse quand il y en a beaucoup', () => {
+    expect(numerosDePage(1, 158)).toEqual([1, 2, 3, 4, 'ellipse', 158]);
+  });
+
+  it('garde la page courante entourée de ses voisines', () => {
+    expect(numerosDePage(63, 158)).toEqual([1, 'ellipse', 62, 63, 64, 'ellipse', 158]);
+  });
+
+  it('ne rend rien quand il n’y a qu’une page', () => {
+    expect(numerosDePage(1, 1)).toEqual([]);
+  });
+});
+
+describe('Pagination', () => {
+  const base = {
+    debut: 1,
+    fin: 8,
+    total: 1258,
+    onSuivant: vi.fn(),
+    onPrecedent: vi.fn(),
+    suivantDisponible: true,
+    precedentDisponible: false,
+  };
+
+  it('sans numérotation : aucun bouton de page (le rendu de la bande)', () => {
+    render(<Pagination {...base} />);
+    expect(screen.queryByRole('button', { name: 'Page 2' })).toBeNull();
+  });
+
+  it('avec numérotation : la page courante porte aria-current', () => {
+    render(
+      <Pagination {...base} numerotation={{ page: 1, pageCount: 158, onPageChange: vi.fn() }} />,
+    );
+    expect(screen.getByRole('button', { name: 'Page 1' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
+  });
+
+  it('un clic sur un numéro remonte cette page', async () => {
+    const onPageChange = vi.fn();
+    render(<Pagination {...base} numerotation={{ page: 1, pageCount: 158, onPageChange }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Page 3' }));
+    expect(onPageChange).toHaveBeenCalledWith(3);
+  });
+
+  it('une seule page : aucun numéro affiché', () => {
+    render(
+      <Pagination
+        {...base}
+        fin={6}
+        total={6}
+        suivantDisponible={false}
+        numerotation={{ page: 1, pageCount: 1, onPageChange: vi.fn() }}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Page 1' })).toBeNull();
+  });
+});
