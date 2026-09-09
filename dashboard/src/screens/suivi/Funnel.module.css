@@ -1,0 +1,132 @@
+.section {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.entete {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.titre {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.horaire {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.segments {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.segment {
+  flex: 4 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+/* Les cinq étapes rétrécissent visuellement — une forme d'entonnoir, pas une
+   proportion littérale des valeurs (`GUIDELINES §4` : la mise en page n'est
+   pas testable mécaniquement, la maquette approuvée en est la référence). */
+.segment:nth-child(2) {
+  flex-grow: 3;
+}
+.segment:nth-child(3) {
+  flex-grow: 2;
+}
+.segment:nth-child(4),
+.segment:nth-child(5) {
+  flex-grow: 1;
+}
+
+.pastille {
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+}
+
+.pastille[data-etape='collectees'] {
+  background: color-mix(in srgb, var(--color-text-muted) 14%, transparent);
+}
+.pastille[data-etape='lues'] {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
+.pastille[data-etape='seuil'] {
+  background: color-mix(in srgb, var(--color-info) 22%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 42%, transparent);
+}
+.pastille[data-etape='retenues'] {
+  background: color-mix(in srgb, var(--color-success) 22%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 42%, transparent);
+}
+.pastille[data-etape='postulees'] {
+  background: color-mix(in srgb, var(--color-success) 35%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 60%, transparent);
+}
+
+.nombre {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.libelle {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding-left: 2px;
+}
+
+/* L'état de chargement : cinq segments neutres, AUCUN chiffre — jamais un
+   entonnoir qui affirmerait un 0 avant que /stats ait répondu. */
+.segmentChargement {
+  flex: 1 1 0;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--color-border);
+}
+
+.note {
+  margin: 13px 0 0;
+  padding-top: 11px;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  line-height: 1.55;
+}
+
+.reessayer {
+  margin-top: var(--space-3);
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+  background: transparent;
+}
+
+.reessayer:hover {
+  background: var(--color-bg);
+}

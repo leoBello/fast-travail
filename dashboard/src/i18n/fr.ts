@@ -335,4 +335,72 @@ export const fr = {
     ecarteeNote: 'Cette offre a été écartée du suivi.',
     choisirIssue: "Quelle a été l'issue ?",
   },
+
+  /**
+   * Le suivi des candidatures et la gamification (tâche 9, `Suivi.dc.html`) :
+   * l'entonnoir, le pipeline en colonnes, la série, le compteur anti-perte,
+   * le taux de réponse. Les libellés déjà couverts ailleurs (statuts, badges
+   * de faits, absences) ne sont pas dupliqués ici.
+   */
+  suivi: {
+    titre: 'Mes candidatures',
+    sousTitre: 'Ce que la veille a produit, et où chaque piste en est.',
+    voirLaVeille: 'Voir la veille',
+
+    chargement: 'Chargement…',
+    chargementDetail: 'Les données sont en cours de récupération.',
+    erreurChargement: 'Le chargement a échoué',
+    erreurChargementDetail: "La connexion à l'API a échoué. Réessayez dans un instant.",
+    reessayer: 'Réessayer',
+
+    // « Cette nuit, pendant que le PC était éteint » — l'entonnoir. Les
+    // heures de cron sont celles des migrations `20260907230557` (France
+    // Travail, 6 h), `20260908002651` (Adzuna, 6 h 30) et `20260909050000`
+    // (scoring, 7 h) : un fait du dépôt, pas une estimation.
+    entonnoirTitre: 'Cette nuit, pendant que le PC était éteint',
+    entonnoirHoraire: 'collecte 6 h & 6 h 30 · jugement 7 h',
+    entonnoirNote:
+      'Les trois premiers nombres sont comptés en base. Les deux derniers viennent de vos ' +
+      "décisions : ils valent 0 tant que vous n'avez rien retenu, et l'entonnoir le dit " +
+      "plutôt que de s'effondrer.",
+    etapeCollectees: 'collectées en tout',
+    etapeLues: "à portée, donc lues par l'IA",
+    etapeSeuil: (seuil: number) => `au-dessus de ${seuil}`,
+    etapeRetenues: 'retenues',
+    etapePostulees: 'postulées',
+
+    colonneAutres: (n: number) => `+ ${n} autre${n === 1 ? '' : 's'}`,
+    colonneVideTitre: 'Rien pour le moment',
+    colonneVideDetail: 'Aucune offre à ce statut.',
+
+    relanceDue: 'relance due',
+    envoyeeAujourdhui: "envoyée aujourd'hui",
+    envoyeeIlYA: (n: number) => `envoyée il y a ${n} j`,
+    relanceeAujourdhui: "relancée aujourd'hui",
+    relanceeIlYA: (n: number) => `relancée il y a ${n} j`,
+    entretienLe: (date: string) => `entretien le ${date}`,
+
+    serieTitre: 'Série',
+    serieNote:
+      'Compte les jours avec au moins une candidature envoyée. Lire des offres ne la ' +
+      "maintient pas — c'est voulu.",
+    // Le libellé de chaque case du calendrier de la série — le nom du jour
+    // vient d'`Intl.DateTimeFormat`, jamais écrit en dur (GUIDELINES §3.8).
+    serieJourEnvoyee: (jour: string) => `${jour} : candidature envoyée`,
+    serieJourVide: (jour: string) => `${jour} : aucune candidature envoyée`,
+
+    antiPerteTitre: 'Jamais ouvertes',
+    antiPerteSeuil: (seuil: number) => `au-dessus de ${seuil}`,
+    antiPerteNote:
+      "Une offre affichée en trop se repère d'un coup d'œil ; une offre jamais affichée est " +
+      'perdue. Ce nombre descend à 0 quand vous avez tout regardé.',
+    antiPerteParcourir: 'Les parcourir',
+
+    reponseTitre: 'réponses reçues',
+    reponseBrut: (reponses: number, envois: number) => `${reponses} / ${envois}`,
+    reponseNoteBrut: (seuil: number) =>
+      `Trop peu d'envois pour en tirer un taux. Le chiffre s'affiche brut jusqu'à ${seuil} ` +
+      'candidatures.',
+    reponseTaux: (pct: number) => `${pct} %`,
+  },
 };

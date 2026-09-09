@@ -5,6 +5,7 @@ import { t } from './i18n/i18n';
 import { DetailScreen } from './screens/detail/DetailScreen';
 import { MatinScreen } from './screens/matin/MatinScreen';
 import { MotionRoot } from './screens/matin/MotionRoot';
+import { SuiviScreen } from './screens/suivi/SuiviScreen';
 import styles from './App.module.css';
 
 /** Construit le client, ou capture l'erreur — jamais de JSX à l'intérieur du
@@ -51,10 +52,19 @@ function construireClient():
  * pratique. Superposer coûte deux lignes et zéro risque sur le reste de
  * l'arbre : `MatinScreen` continue de vivre sous l'overlay, son état
  * survit intact au retour.
+ *
+ * **Le suivi des candidatures** (tâche 9, `SuiviScreen`) suit le même choix :
+ * un second overlay, superposé à `MatinScreen` plutôt qu'un remplacement, et
+ * monté AVANT `DetailScreen` dans l'arbre ci-dessous — ouvrir le détail
+ * d'une offre DEPUIS le suivi (une carte de pipeline) doit le peindre
+ * PAR-DESSUS le suivi, pas dessous ; deux éléments `position: fixed` de même
+ * `z-index` (`--z-panel`) se départagent par l'ordre du DOM, donc par
+ * l'ordre d'écriture ici.
  */
 export function App() {
   const { client, erreur } = construireClient();
   const [offreOuverte, setOffreOuverte] = useState<string | null>(null);
+  const [suiviOuvert, setSuiviOuvert] = useState(false);
 
   if (client === null) {
     return (
@@ -68,7 +78,20 @@ export function App() {
 
   return (
     <MotionRoot>
-      <MatinScreen client={client} onOuvrirOffre={setOffreOuverte} />
+      <MatinScreen
+        client={client}
+        onOuvrirOffre={setOffreOuverte}
+        onVoirSuivi={() => setSuiviOuvert(true)}
+      />
+      {!suiviOuvert ? null : (
+        <div className={styles.overlay}>
+          <SuiviScreen
+            client={client}
+            onRetour={() => setSuiviOuvert(false)}
+            onOuvrirOffre={setOffreOuverte}
+          />
+        </div>
+      )}
       {offreOuverte === null ? null : (
         <div className={styles.overlay}>
           <DetailScreen

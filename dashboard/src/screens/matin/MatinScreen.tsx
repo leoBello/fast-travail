@@ -17,6 +17,11 @@ interface Props {
   /** Ouvre le détail d'une offre (tâche 8, `DetailScreen`) — fourni par
    * `App.tsx`, qui possède la navigation entre les deux écrans. */
   onOuvrirOffre: (id: string) => void;
+  /** Ouvre le suivi des candidatures (tâche 9, `SuiviScreen`). Optionnel,
+   * même principe que `OfferCard.onOuvrir` : un test qui rend `MatinScreen`
+   * isolément n'a pas à le fournir, et le bouton reste alors simplement
+   * absent plutôt que de planter sur un callback manquant. */
+  onVoirSuivi?: () => void;
 }
 
 /**
@@ -28,7 +33,7 @@ interface Props {
  * `OfferList`, `OfferCard`, `FilterPanel` restent des composants
  * présentés (props → rendu), testables sans client réel.
  */
-export function MatinScreen({ client, onOuvrirOffre }: Props) {
+export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
   // ---- Bande « Ce matin » ----
   const [briefPage, setBriefPage] = useState(1);
   const [briefState, recargerBrief] = useBrief(client, briefPage);
@@ -138,6 +143,12 @@ export function MatinScreen({ client, onOuvrirOffre }: Props) {
       <header className={styles.barre}>
         <span className={styles.nom}>{t('app.nom')}</span>
         <span className={styles.tagline}>{t('app.tagline')}</span>
+        <div className={styles.spacer} />
+        {onVoirSuivi === undefined ? null : (
+          <button type="button" className={styles.suiviBouton} onClick={onVoirSuivi}>
+            {t('suivi.titre')}
+          </button>
+        )}
       </header>
 
       {erreurDecision ? (
