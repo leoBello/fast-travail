@@ -25,9 +25,11 @@ import type { Confiance, EngagementConnu, Issue, TeletravailConnu } from './doma
  */
 export const fr = {
   app: {
-    // Échafaudage de `App.tsx` (tâche 1) : aucun écran, mais soumis à la
-    // même règle — aucune chaîne affichée en dur, même provisoire.
-    echafaudage: 'fast-travail — tableau de bord (échafaudage)',
+    nom: 'fast-travail',
+    tagline: 'veille',
+    erreurConfigTitre: 'Configuration manquante',
+    erreurConfigDetail:
+      'Les variables VITE_DASHBOARD_API_URL, VITE_SUPABASE_ANON_KEY et VITE_DASHBOARD_TOKEN doivent être définies (voir dashboard/.env.example).',
   },
 
   /**
@@ -104,6 +106,16 @@ export const fr = {
     badge: 'IA / agents',
   },
 
+  /** Les quatre sources de collecte (`Source`, `data/types.ts`), pour
+   * l'affichage sous le nom de l'employeur (`Main.dc.html`, cartes et
+   * lignes de liste). */
+  sources: {
+    france_travail: 'France Travail',
+    adzuna: 'Adzuna',
+    free_work: 'Free-Work',
+    collective: 'Collective.work',
+  },
+
   /**
    * Les trois niveaux de confiance (`Confidence` de `scoring-types.ts`),
    * plus l'infobulle de la confiance basse (Composants.dc.html,
@@ -157,7 +169,16 @@ export const fr = {
       `${n} offre${n === 1 ? '' : 's'} à ${seuil} ou plus vous attend${n === 1 ? '' : 'ent'}. ` +
       `Aucune n'a encore été regardée.`,
     decidees: (n: number) => `${n} décidée${n === 1 ? '' : 's'}`,
+    // `n` = décidées, `total` = taille de la bande « Ce matin » au chargement
+    // (tâche 7, MorningBand) : l'infobulle/aria de la progression, pour le
+    // cas NON zéro — `ariaAucuneDecidee` ci-dessous reste le libellé du cas
+    // zéro, volontairement distinct plutôt qu'un « 0 sur N » générique.
+    ariaDecidees: (n: number, total: number) =>
+      `${n} offre${n === 1 ? '' : 's'} décidée${n === 1 ? '' : 's'} sur ${total}`,
     serieNonCommencee: 'série non commencée',
+    // `n` = jours de suite avec au moins une candidature envoyée (jamais
+    // lue) — le pendant non-zéro de `serieNonCommencee`.
+    serieJours: (n: number) => `${n} jour${n === 1 ? '' : 's'} de suite`,
     ariaAucuneDecidee: 'aucune offre décidée',
     ariaAucuneSerie: 'aucune série',
     serieDemarreTitre: 'La série démarre à votre première candidature',
@@ -166,5 +187,73 @@ export const fr = {
     aucunHistoriqueTitre: 'Aucun historique de candidature',
     aucunHistoriqueDetail:
       "L'entonnoir affiche ses trois premiers nombres, comptés en base, et laisse les deux derniers à 0.",
+  },
+
+  /**
+   * Vocabulaire propre à l'écran du matin (tâche 7, `Main.dc.html`) : la
+   * bande « Ce matin », l'en-tête et les colonnes de « Toute la veille », le
+   * panneau de filtres. Les libellés de faits déjà couverts ailleurs
+   * (télétravail, engagement, IA/agents, confiance — voir plus haut) ne sont
+   * pas dupliqués ici.
+   */
+  matin: {
+    rang: 'rang',
+    corresp: 'corresp.',
+    ecarter: 'Écarter',
+    garder: 'Garder',
+    ouvrirAnnonce: "Ouvrir l'annonce d'origine",
+    // Le résumé RÉGULIER de la bande (une ou plusieurs offres déjà
+    // décidées peuvent coexister avec ce qui reste) — distinct de
+    // `jourZero.resume`, qui affirme "Aucune n'a encore été regardée" et ne
+    // vaut donc que le tout premier jour, jamais recopié ici.
+    resume: (n: number) =>
+      `${n} offre${n === 1 ? '' : 's'} au-dessus de 50 sans décision. Les autres attendent dans la liste.`,
+    suivantes: 'Suivantes',
+    precedentes: 'Précédentes',
+    pagination: (debut: number, fin: number, total: number) => `${debut}–${fin} sur ${total}`,
+    toutesLaVeille: 'Toute la veille',
+    offresJugeesRienMasque: (n: number) =>
+      `${n} offre${n === 1 ? '' : 's'} jugée${n === 1 ? '' : 's'}, rien de masqué`,
+    antiPerte: (n: number) => `${n} jamais ouverte${n === 1 ? '' : 's'} au-dessus de 50`,
+    antiPerteZero: 'Rien laissé de côté au-dessus de 50',
+    triRang: 'Tri : rang',
+    triCorrespondance: 'Tri : correspondance',
+    filtres: 'Filtres',
+    fermerFiltres: 'Fermer les filtres',
+    reinitialiserFiltres: 'Réinitialiser',
+    colRang: 'Rang',
+    colCorr: 'Corr.',
+    colIntitule: 'Intitulé',
+    colEmployeur: 'Employeur',
+    colLieu: 'Lieu',
+    colPubliee: 'Publiée',
+    sources: (n: number) => `${n} sources`,
+    // Fait distinct de l'absence `absences.texte-coupe` (celle-ci porte sur
+    // `stack` vide) : ce badge dit que LE TEXTE REÇU par le modèle est
+    // tronqué (`truncated_input`), quelle que soit la stack détectée.
+    texteCoupe500: 'Texte coupé à 500 car.',
+    filtreModeTravail: 'Mode de travail',
+    filtreEngagement: 'Type de contrat',
+    filtreSource: 'Source',
+    filtreAgentique: 'IA / agents',
+    joursPublication: (n: number) => `${n} j`,
+    ageAujourdhui: "aujourd'hui",
+    tjm: (v: number) => `${v} €/j`,
+    salaire: (kiloeuros: number) => `${kiloeuros} k€/an`,
+    uniteIncertaineBadge: 'unité incertaine',
+    uniteIncertaineInfobulle:
+      "Le montant existe, mais son unité (TJM ou salaire annuel) n'a pas pu être confirmée (P22).",
+    bonusRemuneration: 'rémunération',
+    bonusDuree: 'longue durée',
+    malusTechnos: 'technos non désirées',
+    malusFraicheur: 'fraîcheur',
+    chargement: 'Chargement…',
+    compteEnAttente: '…',
+    erreurChargement: 'Le chargement a échoué',
+    erreurChargementDetail: "La connexion à l'API a échoué. Réessayez dans un instant.",
+    reessayer: 'Réessayer',
+    decisionEchouee: "La décision n'a pas pu être enregistrée. L'offre reste dans la bande.",
+    listeVideTitre: 'Aucune offre ne correspond',
+    listeVideDetail: 'Essayez de retirer un filtre — la liste complète ne masque rien par défaut.',
   },
 };

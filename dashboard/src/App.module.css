@@ -1,0 +1,22 @@
+.erreurConfig {
+  max-width: 480px;
+  margin: 80px auto;
+  padding: var(--space-5) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.titre {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+}
+
+.detail {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+  line-height: 1.5;
+}

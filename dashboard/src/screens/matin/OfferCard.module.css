@@ -1,0 +1,143 @@
+.carte {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-width: 0;
+}
+
+.entete {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.spacer {
+  flex-grow: 1;
+}
+
+.titre {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.entreprise {
+  margin-top: 5px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.source {
+  color: var(--color-text-faint);
+}
+
+/* Séparateur purement décoratif — généré en CSS plutôt qu'en texte JSX
+   littéral (GUIDELINES §3.8 : aucune chaîne affichée en dur). */
+.source::before {
+  content: '\00B7';
+  margin-right: 7px;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.montantBarre {
+  text-decoration: line-through;
+}
+
+.verdict {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  border-left: 2px solid var(--color-border-strong);
+  padding-left: 10px;
+}
+
+.jetonsEtAbsences {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.remplissage {
+  flex-grow: 1;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--color-border-strong);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  flex-grow: 1;
+}
+
+.bouton:disabled {
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.bouton:not(:disabled):hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+}
+
+.boutonPrimaire {
+  composes: bouton;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.boutonPrimaire:disabled {
+  opacity: 0.55;
+  color: var(--color-bg);
+}
+
+.boutonIcone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 34px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+  background: transparent;
+  flex: none;
+}
+
+.boutonIcone:disabled {
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.boutonIcone:not(:disabled):hover {
+  background: var(--color-surface-2);
+}
