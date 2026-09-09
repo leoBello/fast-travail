@@ -19,7 +19,15 @@ import { routeDashboardRequest } from '../_shared/dashboard-api.ts';
  *    construction.
  * 3. RLS actif sans policy sur toutes les tables — la clé `anon` ne lit rien
  *    directement ; seule la clé `service_role`, injectée par la plateforme
- *    dans CETTE fonction et qui n'en sort jamais, le peut.
+ *    dans CETTE fonction et qui n'en sort jamais, le peut. Ça inclut les VUES
+ *    du tableau de bord (`offers_dashboard`, `offers_scored`,
+ *    `offer_display_groups`, `offer_application_state`) : une vue s'exécute
+ *    par défaut avec les droits de son PROPRIÉTAIRE, pas de l'appelant, et
+ *    contournerait donc le RLS des tables sans l'option
+ *    `security_invoker = on` posée dessus par la migration
+ *    `20260910020000_views_security_invoker.sql` — vérifié en base (constat
+ *    I1, revue finale de branche phase 3) : `anon` y rendait tout le corpus
+ *    avant ce correctif.
  */
 function requireEnv(name: string): string {
   const value = Deno.env.get(name);
