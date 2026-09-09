@@ -476,10 +476,40 @@ export async function patchApplication(
   return { outcome: 'updated', row: updated as Row };
 }
 
+/**
+ * Les statuts qui comptent comme « au moins retenue » — l'étage `retained`
+ * de l'entonnoir. `retenue` est le premier échelon du pipeline séquentiel
+ * (`SuiviSection.PIPELINE`, `dashboard/`) : l'interface ne fait avancer
+ * qu'un cran à la fois, jamais de saut, donc un statut plus avancé implique
+ * d'avoir été `retenue` au passage. Exclut `a_traiter` (jamais décidée) et
+ * `ecartee` (sortie possible à TOUT moment du pipeline, y compris avant
+ * `retenue` — `MatinScreen.decider('ecarter')` l'atteint directement depuis
+ * `a_traiter` sans jamais passer par `retenue`) : la base ne conservant que
+ * le statut COURANT, pas l'historique, une candidature écartée ne peut pas
+ * être classée avec certitude comme « déjà retenue puis écartée » — voir
+ * constat I3, revue finale de branche phase 3.
+ */
+const RETAINED_OR_LATER = new Set<ApplicationStatus>([
+  'retenue',
+  'postulee',
+  'relancee',
+  'entretien',
+  'terminee',
+]);
+
 export interface StatsResult {
   /** Les trois premiers comptés en base ; les deux derniers viennent des
    * décisions et valent 0 tant qu'aucune n'a été prise — jamais masqués
-   * (GUIDELINES.md §3.3). */
+   * (GUIDELINES.md §3.3).
+   *
+   * `retained` et `applied` sont CUMULATIFS, pas le statut courant (constat
+   * I3, revue finale de branche phase 3) : un entonnoir compte ce qui est
+   * PASSÉ PAR une étape, pas ce qui y stationne. Compter `byStatus.retenue`
+   * ferait retomber « retenues » à 0 dès qu'une candidature avance à
+   * `postulee` — perdant le fait qu'elle EST passée par `retenue`.
+   * `applied` réutilise `sent` (`applied_at is not null`), déjà cumulatif et
+   * déjà exposé par `responseRate.sent` plus bas ; `retained` utilise
+   * `RETAINED_OR_LATER` (voir sa doc) faute d'un équivalent horodaté. */
   funnel: {
     collected: number;
     scored: number;
@@ -625,6 +655,7 @@ export async function getStats(db: DbClient, now: Date = new Date()): Promise<St
   ) as Record<ApplicationStatus, number>;
   let responses = 0;
   let sent = 0;
+  let retained = 0;
   let decidedToday = 0;
   const sentDays = new Set<string>();
   const todayKey = parisDateKey(now);
@@ -635,6 +666,7 @@ export async function getStats(db: DbClient, now: Date = new Date()): Promise<St
       sent += 1;
       sentDays.add(parisDateKey(new Date(app.applied_at)));
     }
+    if (RETAINED_OR_LATER.has(app.status as ApplicationStatus)) retained += 1;
     if (app.status !== 'a_traiter' && parisDateKey(new Date(app.status_changed_at)) === todayKey) {
       decidedToday += 1;
     }
@@ -645,8 +677,10 @@ export async function getStats(db: DbClient, now: Date = new Date()): Promise<St
       collected,
       scored,
       aboveThreshold: aboveThresholdCount ?? 0,
-      retained: byStatus.retenue,
-      applied: byStatus.postulee,
+      // Cumulatifs, tous les deux — voir la doc de `StatsResult.funnel` et de
+      // `RETAINED_OR_LATER` (constat I3, revue finale de branche phase 3).
+      retained,
+      applied: sent,
     },
     byStatus,
     streak: computeStreak(sentDays, now),

@@ -572,6 +572,104 @@ Deno.test('getStats — decidedToday à zéro le dit, jamais masqué', async () 
 });
 
 // --------------------------------------------------------------------------
+// getStats — funnel.retained / funnel.applied CUMULATIFS (constat I3, revue
+// finale de branche phase 3). Avant correctif : `retained = byStatus.retenue`
+// et `applied = byStatus.postulee` — le seul statut COURANT, qui retombe à 0
+// dès qu'une candidature avance d'un cran. Ces tests éprouvent l'arithmétique
+// elle-même, pas seulement le cas 0 (le seul couvert avant, voir le constat).
+// --------------------------------------------------------------------------
+
+Deno.test(
+  'getStats — funnel.retained compte TOUTE candidature ayant atteint « retenue » ou plus, ' +
+    'pas seulement celles encore AU statut « retenue »',
+  async () => {
+    const applications: Row[] = [
+      // Encore au statut retenue : compte.
+      {
+        status: 'retenue',
+        outcome: null,
+        applied_at: null,
+        status_changed_at: '2026-09-01T00:00:00Z',
+      },
+      // Avancée à postulee : DOIT compter aussi — c'est le bug corrigé.
+      {
+        status: 'postulee',
+        outcome: null,
+        applied_at: '2026-09-02T00:00:00Z',
+        status_changed_at: '2026-09-02T00:00:00Z',
+      },
+      // Avancée jusqu'à terminee : compte toujours.
+      {
+        status: 'terminee',
+        outcome: 'offre_recue',
+        applied_at: '2026-09-03T00:00:00Z',
+        status_changed_at: '2026-09-04T00:00:00Z',
+      },
+      // Jamais décidée : ne compte pas.
+      {
+        status: 'a_traiter',
+        outcome: null,
+        applied_at: null,
+        status_changed_at: '2026-09-01T00:00:00Z',
+      },
+      // Écartée directement depuis a_traiter (MatinScreen.decider) : ne
+      // compte pas — la base ne garde aucune trace d'un passage par
+      // « retenue » qui n'a jamais eu lieu ici.
+      {
+        status: 'ecartee',
+        outcome: null,
+        applied_at: null,
+        status_changed_at: '2026-09-01T00:00:00Z',
+      },
+    ];
+    const db = buildStatsDb(applications);
+    const stats = await getStats(db, new Date('2026-09-09T10:00:00Z'));
+    assertEquals(stats.funnel.retained, 3);
+  },
+);
+
+Deno.test(
+  'getStats — funnel.applied compte TOUTE candidature ayant un applied_at, même avancée ' +
+    'au-delà de « postulee » ou depuis écartée',
+  async () => {
+    const applications: Row[] = [
+      // Encore au statut postulee : compte.
+      {
+        status: 'postulee',
+        outcome: null,
+        applied_at: '2026-09-01T00:00:00Z',
+        status_changed_at: '2026-09-01T00:00:00Z',
+      },
+      // Avancée à relancee : DOIT compter aussi — c'est le bug corrigé.
+      {
+        status: 'relancee',
+        outcome: null,
+        applied_at: '2026-09-02T00:00:00Z',
+        status_changed_at: '2026-09-03T00:00:00Z',
+      },
+      // Envoyée puis écartée : applied_at reste posé, compte toujours — un
+      // envoi réel a bien eu lieu.
+      {
+        status: 'ecartee',
+        outcome: null,
+        applied_at: '2026-09-04T00:00:00Z',
+        status_changed_at: '2026-09-05T00:00:00Z',
+      },
+      // Simplement retenue, jamais envoyée : ne compte pas.
+      {
+        status: 'retenue',
+        outcome: null,
+        applied_at: null,
+        status_changed_at: '2026-09-01T00:00:00Z',
+      },
+    ];
+    const db = buildStatsDb(applications);
+    const stats = await getStats(db, new Date('2026-09-09T10:00:00Z'));
+    assertEquals(stats.funnel.applied, 3);
+  },
+);
+
+// --------------------------------------------------------------------------
 // getConfig — poids réglables, profil actif, compétences (tâche 10)
 // --------------------------------------------------------------------------
 
