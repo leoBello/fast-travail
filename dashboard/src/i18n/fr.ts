@@ -446,8 +446,17 @@ export const fr = {
     staleCountLabel: 'Offres jugées sous un autre profil',
     // `n` = offres jugées sous une version DIFFÉRENTE du profil actif —
     // jamais recompté côté client, toujours ce que `GET /config` a mesuré.
+    //
+    // Depuis le correctif C1 (revue finale de branche, phase 3), ce nombre
+    // NE bouge plus tout seul : le cron ignore les changements de CV, donc
+    // ces offres restent jugées sous l'ancien profil tant que personne ne le
+    // demande explicitement. Le dire ici évite l'impression fausse que ça se
+    // résorbera au prochain passage du cron — c'est un geste volontaire, pas
+    // une attente.
     offresProfilAnterieur: (n: number) =>
-      `${n} offre${n === 1 ? '' : 's'} jugée${n === 1 ? '' : 's'} sous un profil antérieur.`,
+      `${n} offre${n === 1 ? '' : 's'} jugée${n === 1 ? '' : 's'} sous un profil antérieur — ` +
+      `reste${n === 1 ? '' : 'nt'} ainsi tant qu'aucun rejugement volontaire n'est lancé ` +
+      '(npm run score:backfill -- --rejudge-stale-profile).',
     aucuneOffreProfilAnterieur: 'Aucune offre jugée sous un profil antérieur.',
 
     champLabel: 'Nom du CV',

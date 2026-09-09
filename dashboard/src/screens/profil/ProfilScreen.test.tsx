@@ -50,7 +50,7 @@ describe('ProfilScreen — l’import du CV (tâche 10)', () => {
 
     await waitFor(() => expect(screen.getByText('CV Léo Bello')).toBeDefined());
     expect(screen.getByText('version cv-2026-09-08')).toBeDefined();
-    expect(screen.getByText('42 offres jugées sous un profil antérieur.')).toBeDefined();
+    expect(screen.getByText(/^42 offres jugées sous un profil antérieur —/)).toBeDefined();
   });
 
   it('aucun profil actif : le dit, jamais une case vide', async () => {
@@ -102,8 +102,10 @@ describe('ProfilScreen — l’import du CV (tâche 10)', () => {
       // Aucun mot ne doit évoquer un jugement/score/rejugement dans la
       // confirmation — seulement le fait de l'import et le compte inchangé.
       expect(screen.getByText(/Aucune offre n'a été rejugée/)).toBeDefined();
-      expect(screen.getByText('1269 offres jugées sous un profil antérieur.')).toBeDefined();
-      // Aucun bouton pour rejuger, nulle part sur l'écran.
+      expect(screen.getByText(/^1269 offres jugées sous un profil antérieur —/)).toBeDefined();
+      // Aucun bouton pour rejuger, nulle part sur l'écran : le rejugement
+      // volontaire reste une commande (`npm run score:backfill --
+      // --rejudge-stale-profile`), jamais un geste possible depuis la SPA.
       expect(screen.queryByRole('button', { name: /rejuger/i })).toBeNull();
     },
   );

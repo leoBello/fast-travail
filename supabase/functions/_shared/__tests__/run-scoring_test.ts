@@ -3,6 +3,7 @@ import { runScoring, WRITE_CHUNK_SIZE } from '../run-scoring.ts';
 import type { DbClient } from '../db.ts';
 import { ClaudeApiError, type ClaudeResult } from '../claude.ts';
 import type { LogLevel } from '../logger.ts';
+import { PROMPT_VERSION } from '../scoring-prompt.ts';
 import type { OfferJudgement, OfferToScore } from '../scoring-types.ts';
 
 function candidate(id: string, over: Partial<OfferToScore> = {}): OfferToScore {
@@ -32,6 +33,8 @@ function candidate(id: string, over: Partial<OfferToScore> = {}): OfferToScore {
 
 interface Recorded {
   upserts: Record<string, unknown>[][];
+  /** Dernier filtre `.or(...)` passe a `offers_ai_candidates` (voir C1). */
+  orFilter: string | null;
 }
 
 interface FakeDbOptions {
@@ -41,11 +44,33 @@ interface FakeDbOptions {
   onUpsert?: (rows: Record<string, unknown>[]) => { error: { message: string } | null };
 }
 
+/**
+ * Simule (a minima) la semantique de `.or()` de PostgREST pour les champs
+ * utilises ici : chaque condition est `champ.op.valeur`, separees par des
+ * virgules et combinees en OU. Sans ça, un test qui passe un `includeStaleProfile`
+ * different ne verifierait que le libelle du filtre, jamais son EFFET — ce
+ * qui est exactement le point de C1.
+ */
+function applyOrFilter(rows: OfferToScore[], filter: string): OfferToScore[] {
+  const conditions = filter.split(',').map((c) => {
+    const [field, op, value] = c.split('.');
+    return { field: field as keyof OfferToScore, op, value };
+  });
+  return rows.filter((row) =>
+    conditions.some(({ field, op, value }) => {
+      const actual = row[field];
+      if (op === 'is') return value === 'null' ? actual === null : false;
+      if (op === 'neq') return actual !== value;
+      return false;
+    })
+  );
+}
+
 function fakeDb(
   candidates: OfferToScore[],
   opts: FakeDbOptions = {},
 ): { db: DbClient; rec: Recorded } {
-  const rec: Recorded = { upserts: [] };
+  const rec: Recorded = { upserts: [], orFilter: null };
   const db = {
     from(table: string) {
       if (table === 'candidate_profile') {
@@ -80,11 +105,15 @@ function fakeDb(
       if (table === 'offers_ai_candidates') {
         return {
           select: () => ({
-            or: () => ({
-              order: () => ({
-                limit: () => Promise.resolve({ data: candidates, error: null }),
-              }),
-            }),
+            or: (filter: string) => {
+              rec.orFilter = filter;
+              return {
+                order: () => ({
+                  limit: () =>
+                    Promise.resolve({ data: applyOrFilter(candidates, filter), error: null }),
+                }),
+              };
+            },
           }),
         };
       }
@@ -401,4 +430,74 @@ Deno.test('une profile_version contenant une virgule casse la selection : echec 
     Error,
     'virgule',
   );
+});
+
+// --- C1 : un changement de CV seul ne doit pas rendre le corpus candidat ---
+// (revue finale de branche, phase 3). Les deux tests suivants portent sur le
+// meme candidat — deja juge sous le PROMPT_VERSION courant, mais sous un
+// profile_version perime — et verifient les deux sens de `includeStaleProfile`.
+
+function staleProfileCandidate(): OfferToScore {
+  return candidate('a', {
+    scored_prompt_version: PROMPT_VERSION,
+    scored_profile_version: 'cv-0-perime',
+  });
+}
+
+Deno.test('un profile_version perime seul ne produit AUCUN candidat par defaut (cron)', async () => {
+  const { db, rec } = fakeDb([staleProfileCandidate()], { profileVersion: 'cv-1' });
+
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: 10,
+    concurrency: 1,
+    dryRun: false,
+    callClaude: () => Promise.resolve(judgement(80)),
+  });
+
+  assertEquals(summary.candidates, 0);
+  assertEquals(summary.scored, 0);
+  // Le filtre envoye a PostgREST ne doit meme pas porter la condition sur
+  // scored_profile_version : elle serait sans effet ici, mais son ABSENCE est
+  // le point verifie (voir C1 — la condition ne doit exister qu'a la demande).
+  assertEquals(rec.orFilter?.includes('scored_profile_version'), false);
+});
+
+Deno.test('le meme profile_version perime PRODUIT un candidat avec includeStaleProfile: true', async () => {
+  const { db, rec } = fakeDb([staleProfileCandidate()], { profileVersion: 'cv-1' });
+
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: 10,
+    concurrency: 1,
+    dryRun: false,
+    includeStaleProfile: true,
+    callClaude: () => Promise.resolve(judgement(80)),
+  });
+
+  assertEquals(summary.candidates, 1);
+  assertEquals(summary.scored, 1);
+  assertEquals(rec.orFilter?.includes('scored_profile_version.neq.cv-1'), true);
+});
+
+Deno.test('includeStaleProfile: true n altere pas l amorcage d offres jamais jugees', async () => {
+  // Offre jamais jugee (scored_prompt_version null) : elle doit rester
+  // selectionnee que l'option soit activee ou non — c'est le cas de
+  // l'amorçage initial, que C1 ne doit pas casser.
+  const { db, rec } = fakeDb([candidate('never-scored')], { profileVersion: 'cv-1' });
+
+  const summary = await runScoring({
+    db,
+    claude,
+    limit: 10,
+    concurrency: 1,
+    dryRun: false,
+    includeStaleProfile: true,
+    callClaude: () => Promise.resolve(judgement(80)),
+  });
+
+  assertEquals(summary.candidates, 1);
+  assertEquals(rec.orFilter?.includes('scored_prompt_version.is.null'), true);
 });

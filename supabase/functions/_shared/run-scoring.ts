@@ -38,6 +38,19 @@ export interface ScoringDeps {
    * de les laisser persister, pas a « tester sans depenser ».
    */
   dryRun: boolean;
+  /**
+   * Par defaut `false` (ou absent) : un changement de `profile_version` seul
+   * (import d'un nouveau CV) ne rend AUCUNE offre candidate. C'est le
+   * reglage du cron `score-daily` — il ignore les changements de CV, voir la
+   * doc de `runScoring`.
+   *
+   * Mettre `true` AJOUTE au filtre les offres dont `scored_profile_version`
+   * differe du profil actif : c'est le rejugement volontaire et PAYANT que
+   * `CLAUDE.md` decrit (~1 269+ offres, ~1 centime piece). Seul
+   * `npm run score:backfill --rejudge-stale-profile` doit le passer a
+   * `true` ; l'Edge Function `score-offers` (le cron) ne le passe jamais.
+   */
+  includeStaleProfile?: boolean;
   callClaude?: CallClaude;
 }
 
@@ -124,10 +137,24 @@ function assertSafeForOrFilter(value: string, label: string): void {
 }
 
 /**
- * Scoring idempotent et reprenable. Il n'y a pas de « mode backfill » : la
- * selection est « les offres eligibles pas encore jugees DANS LA VERSION
- * COURANTE du prompt et du profil ». Relancer jusqu'a ce que `candidates`
+ * Scoring idempotent et reprenable. Par defaut, la selection est « les
+ * offres jamais jugees, OU jugees sous un PROMPT_VERSION different » —
+ * PAS un `profile_version` different. Relancer jusqu'a ce que `candidates`
  * rende 0 amorce tout le corpus, et une coupure ne coute que le lot en cours.
+ *
+ * Ce choix est deliberé (revue finale de branche, phase 3, constat C1) :
+ * `candidate_profile` change a chaque import de CV depuis le tableau de bord,
+ * en ecrivant une nouvelle ligne avec un nouveau `profile_version`. Si le cron
+ * quotidien traitait ça comme une invalidation, importer un CV rendrait
+ * candidat tout le corpus (~1 390 offres), et `score-daily` (limit 100) en
+ * repaierait 100/jour pendant deux semaines en ECRASANT les scores affiches
+ * (upsert `on conflict offer_id`) — alors que l'ecran promet l'inverse :
+ * « les jugements deja payes restent valides tels quels ». Le cron ne doit
+ * donc JAMAIS repayer sur un simple changement de CV.
+ *
+ * Le rejugement volontaire reste possible via `deps.includeStaleProfile`
+ * (voir sa doc) : c'est l'operation que CLAUDE.md decrit comme payante et
+ * deliberee, jamais celle que declenche un import de CV.
  */
 export async function runScoring(deps: ScoringDeps): Promise<ScoringSummary> {
   const call = deps.callClaude ?? defaultCallClaude;
@@ -151,13 +178,22 @@ export async function runScoring(deps: ScoringDeps): Promise<ScoringSummary> {
   assertSafeForOrFilter(PROMPT_VERSION, 'PROMPT_VERSION');
   assertSafeForOrFilter(profile.profile_version, 'candidate_profile.profile_version');
 
+  // Conditions de base : jamais jugee, ou jugee sous un autre PROMPT_VERSION.
+  // La condition sur `scored_profile_version` n'est ajoutee QUE si demandee
+  // explicitement (`includeStaleProfile`) : voir la doc de `runScoring` et
+  // celle du champ pour le pourquoi (constat C1 de la revue finale).
+  const orConditions = [
+    'scored_prompt_version.is.null',
+    `scored_prompt_version.neq.${PROMPT_VERSION}`,
+  ];
+  if (deps.includeStaleProfile) {
+    orConditions.push(`scored_profile_version.neq.${profile.profile_version}`);
+  }
+
   const { data: candidateRows, error: candidatesError } = await deps.db
     .from('offers_ai_candidates')
     .select('*')
-    .or(
-      `scored_prompt_version.is.null,scored_prompt_version.neq.${PROMPT_VERSION},` +
-        `scored_profile_version.neq.${profile.profile_version}`,
-    )
+    .or(orConditions.join(','))
     .order('published_at', { ascending: false })
     .limit(deps.limit);
   if (candidatesError) throw new Error(`lecture des candidats : ${candidatesError.message}`);
