@@ -60,6 +60,21 @@ la forme est déjà fixée.
 suivre obligerait à afficher un fait que le code ne peut pas rendre vrai (§3).
 Dans ce cas, l'écart se documente ici, avec sa raison.
 
+### Les écarts acceptés, et pourquoi
+
+**Les tailles de police du couple de scores.** La maquette écrit `30px` pour
+`final` et `17px` pour `fit` ; le code utilise `--text-2xl` (24px) et
+`--text-lg` (15px). Ces deux valeurs de maquette **n'existent dans aucune
+échelle** — ni celle de ce dépôt, ni celle de prospeo. Les suivre au pixel près
+aurait obligé à inventer deux tokens hors échelle, ce que la règle « les tokens
+sont repris tels quels » interdit précisément.
+
+**La maquette a tort ici, et c'est un défaut de la maquette, pas du code** :
+elle a été dessinée en pixels littéraux plutôt qu'en tokens. Si elle est un
+jour reprise, c'est elle qu'il faut aligner sur l'échelle — pas l'inverse. Un
+composant important ne doit **jamais** justifier une valeur hors échelle par
+« la maquette le disait ».
+
 ## 3. Les règles qui priment sur la maquette
 
 Elles ne sont pas négociables, et une maquette qui les contredirait est une
@@ -194,9 +209,25 @@ jugements.
 
 ### 3.7 La couleur n'est jamais le seul indicateur d'un état
 
-Tout badge porte un point **et** un mot. Toute pastille porte un `aria-label`.
-Une pastille réduite à sa couleur est illisible pour huit pour cent des hommes,
-et pour tout le monde en impression noir et blanc.
+**Tout badge porte un mot**, sans exception. Et la couleur doit toujours être
+doublée par **au moins un indice non coloré** : un point, ou une forme de
+bordure. Toute pastille porte un `aria-label`. Une pastille réduite à sa
+couleur est illisible pour huit pour cent des hommes, et pour tout le monde en
+impression noir et blanc.
+
+> **Précision du 2026-09-09, née d'une contradiction dans ce document.** Ce
+> paragraphe disait « tout badge porte un point **et** un mot », sans
+> condition — et la maquette approuvée dessine « Écartée » **sans point**, en
+> trait discontinu. Une revue a signalé l'écart au lieu de choisir en silence.
+>
+> C'est la règle qui était trop absolue, pas la maquette. Le trait discontinu
+> **est** un indice non coloré, et il en dit plus qu'un point : il marque une
+> **sortie** du parcours, là où toutes les autres pastilles marquent une
+> étape. Imposer le point aurait effacé cette distinction pour satisfaire la
+> lettre d'une règle dont l'objet est ailleurs.
+>
+> Ce qui reste intangible : le **mot**, et le fait que la couleur ne soit
+> jamais seule. La forme que prend le second indice est un choix de dessin.
 
 **La confiance basse est en ambre, jamais en rouge** : elle ne signale pas une
 offre douteuse, elle signale un texte coupé. Le modèle avait interdiction d'en
