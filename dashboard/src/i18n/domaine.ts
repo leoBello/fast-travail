@@ -37,3 +37,8 @@ export type EngagementConnu = 'freelance' | 'cdi' | 'cdd' | 'autre';
 
 /** `Confidence` (`scoring-types.ts`) — jamais `null`, contrairement aux deux précédents. */
 export type Confiance = 'haute' | 'moyenne' | 'basse';
+
+/** Les valeurs connues de `Seniority` (`data/types.ts`, miroir de
+ * `scoring-types.ts`), sans le `null` qu'il porte — même principe que
+ * `TeletravailConnu`/`EngagementConnu` ci-dessus (tâche 8). */
+export type SenioriteConnue = 'junior' | 'confirme' | 'senior' | 'lead';

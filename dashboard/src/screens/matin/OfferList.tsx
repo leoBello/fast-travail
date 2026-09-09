@@ -17,6 +17,10 @@ export interface OfferListProps {
   onPageChange: (page: number) => void;
   sort: SortField;
   onSortChange: (sort: SortField) => void;
+  /** Ouvre le détail d'une offre (tâche 8). Requis — `MatinScreen` le
+   * fournit toujours, seuls les tests unitaires d'`OfferList` isolé s'en
+   * passent (`OfferRow.onOuvrir`, lui, reste optionnel). */
+  onOuvrirOffre: (id: string) => void;
   /** Le compteur anti-perte (`/stats.neverOpened`) : offres au-dessus de 50
    * jamais ouvertes — indépendant des filtres actifs (GUIDELINES §3.3, un
    * compteur qui se nomme à zéro plutôt qu'un silence). Sans signification
@@ -60,6 +64,7 @@ export function OfferList({
   onPageChange,
   sort,
   onSortChange,
+  onOuvrirOffre,
   neverOpened,
   statsChargement,
   filtresOuverts,
@@ -139,7 +144,7 @@ export function OfferList({
               <motion.div layout>
                 <AnimatePresence initial={false}>
                   {offers.map((offer) => (
-                    <OfferRow key={offer.id} offer={offer} />
+                    <OfferRow key={offer.id} offer={offer} onOuvrir={onOuvrirOffre} />
                   ))}
                 </AnimatePresence>
               </motion.div>

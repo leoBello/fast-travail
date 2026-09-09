@@ -1,0 +1,118 @@
+.ecran {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 28px var(--space-5);
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.retour {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  padding: 4px 0;
+}
+
+.retour:hover {
+  color: var(--color-text);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.headerTexte {
+  min-width: 0;
+  flex-grow: 1;
+}
+
+.titre {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.sousTitre {
+  margin-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  flex-wrap: wrap;
+}
+
+.employeur {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.point {
+  width: 3px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-faint);
+  flex: none;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--color-border-strong);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  align-self: flex-start;
+}
+
+.bouton:hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+}
+
+.boutonPrimaire {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-bg);
+  background: var(--color-accent);
+  flex: none;
+}
+
+.boutonPrimaire:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.boutonPrimaire:not(:disabled):hover {
+  filter: brightness(1.1);
+}

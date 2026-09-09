@@ -23,3 +23,26 @@ const formateurParis = new Intl.DateTimeFormat('en-CA', {
 export function parisDateKey(date: Date = new Date()): string {
   return formateurParis.format(date);
 }
+
+/**
+ * « 7 septembre » — jour et mois en heure de Paris, en toutes lettres.
+ *
+ * `Intl.DateTimeFormat('fr-FR', …)` plutôt qu'un tableau de noms de mois
+ * écrit à la main : un global standard du langage n'est pas une chaîne en
+ * dur (même raisonnement que le formateur ci-dessus), et il évite de
+ * réinventer — mal — l'accord des mois français.
+ */
+const formateurDateLongue = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  day: 'numeric',
+  month: 'long',
+});
+
+/** `null`/date invalide → `null`, laissant l'appelant décider du rendu
+ * (une date de suivi absente est un cas normal, pas une erreur à propager). */
+export function formatDateLongue(iso: string | null): string | null {
+  if (iso === null) return null;
+  const parsed = Date.parse(iso);
+  if (Number.isNaN(parsed)) return null;
+  return formateurDateLongue.format(new Date(parsed));
+}

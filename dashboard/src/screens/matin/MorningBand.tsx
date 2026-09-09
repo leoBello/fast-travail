@@ -27,6 +27,10 @@ export interface MorningBandProps {
    * réseau sont indépendants et peuvent résoudre à des moments différents. */
   streakChargement: boolean;
   onDecision: (offer: OfferDashboardRow, decision: 'garder' | 'ecarter') => void;
+  /** Ouvre le détail d'une offre (tâche 8). Requis, contrairement au
+   * `onOuvrir` optionnel d'`OfferCard` : `MatinScreen` le fournit toujours,
+   * seuls les tests unitaires d'`OfferCard` isolé s'en passent. */
+  onOuvrirOffre: (id: string) => void;
   offresEnTraitement: ReadonlySet<string>;
   /** Vrai tant que `/brief` n'a JAMAIS répondu — voir la note sur `total`. */
   chargement: boolean;
@@ -58,6 +62,7 @@ export function MorningBand({
   streakDays,
   streakChargement,
   onDecision,
+  onOuvrirOffre,
   offresEnTraitement,
   chargement,
   erreur,
@@ -106,6 +111,7 @@ export function MorningBand({
                   enTraitement={offresEnTraitement.has(offer.id)}
                   onGarder={() => onDecision(offer, 'garder')}
                   onEcarter={() => onDecision(offer, 'ecarter')}
+                  onOuvrir={onOuvrirOffre}
                 />
               ))}
             </AnimatePresence>

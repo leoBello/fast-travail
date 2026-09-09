@@ -14,23 +14,52 @@ import styles from './OfferRow.module.css';
 
 interface Props {
   offer: OfferDashboardRow;
+  /** Ouvre le détail de l'offre (tâche 8, `Detail.dc.html`). Optionnel : les
+   * tests qui rendent `OfferRow` isolément n'ont pas à le fournir, et la
+   * ligne reste alors simplement lisible, sans geste possible — même
+   * principe d'extension sans rupture que `Card.extra`. */
+  onOuvrir?: (id: string) => void;
 }
 
 /**
  * Une ligne de « Toute la veille » (`Main.dc.html`).
  *
- * Lecture seule : la ligne n'ouvre rien (tâche 8, détail d'une offre, hors
- * périmètre) — pas de point d'accroche construit ici au-delà de ce que la
- * maquette dessine déjà (le grain n'a pas de bouton).
+ * Cliquable dès que `onOuvrir` est fourni (tâche 8) : `.row` est déjà un
+ * conteneur `grid` sans enfant interactif, donc `role="button"` + `tabIndex`
+ * + la gestion clavier ci-dessous suffisent à en faire un point d'accroche
+ * accessible sans changer sa mise en page — un vrai `<button>` grid-conteneur
+ * marcherait tout aussi bien visuellement, mais casserait le survol déjà
+ * posé par CSS sur `.row` sans reprise de styles.
  */
-export function OfferRow({ offer }: Props) {
+export function OfferRow({ offer, onOuvrir }: Props) {
   const employeur = formatEmployeur(offer);
   const lieu = formatLieu(offer);
   const publication = formatPublication(offer.published_at);
   const compensation = formatCompensation(offer);
 
+  function ouvrir() {
+    onOuvrir?.(offer.id);
+  }
+
   return (
-    <motion.div layout className={styles.row} data-offer-id={offer.id}>
+    <motion.div
+      layout
+      className={styles.row}
+      data-offer-id={offer.id}
+      role={onOuvrir === undefined ? undefined : 'button'}
+      tabIndex={onOuvrir === undefined ? undefined : 0}
+      onClick={onOuvrir === undefined ? undefined : ouvrir}
+      onKeyDown={
+        onOuvrir === undefined
+          ? undefined
+          : (evenement) => {
+              if (evenement.key === 'Enter' || evenement.key === ' ') {
+                evenement.preventDefault();
+                ouvrir();
+              }
+            }
+      }
+    >
       <span className={styles.rang}>{offer.final_score}</span>
       <span className={styles.corr}>{offer.fit_score}</span>
       <div className={styles.intitule}>

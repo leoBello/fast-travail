@@ -168,10 +168,84 @@ export interface ApplicationRow {
   created_at: string;
 }
 
+/**
+ * Un jugement individuel d'`offers_scored` (tâche 8, `getOfferDetail` /
+ * `supabase/functions/_shared/dashboard-query.ts`) : une ligne par SOURCE du
+ * groupe d'affichage, `offer.id` compris. Miroir de la vue `offers_scored`
+ * (migration `20260909040000_remuneration_par_nature_et_plafond_technos.sql`)
+ * — mêmes colonnes qu'`OfferDashboardRow` moins `display_key`, `group_size`,
+ * `group_sources` et les `candidature_*`, qui n'existent qu'au niveau du
+ * GROUPE (`offers_dashboard`), pas d'un jugement pris isolément.
+ */
+export interface OfferScoredRow {
+  id: string;
+  source: Source;
+  title: string | null;
+  company_name: string | null;
+  city: string | null;
+  department: string | null;
+  url: string | null;
+  published_at: string | null;
+  fit_score: number;
+  verdict: string;
+  engagement: Engagement | null;
+  work_mode: WorkMode | null;
+  seniority: Seniority;
+  domain: string | null;
+  confidence: 'haute' | 'moyenne' | 'basse';
+  agentic_ai: boolean;
+  duration_months: number | null;
+  compensation_kind: CompensationKind;
+  compensation_min: number | null;
+  compensation_max: number | null;
+  unwanted_count: number;
+  truncated_input: boolean;
+  age_days: number;
+  extraction: OfferExtraction;
+  bonus_engagement: number;
+  bonus_remote: number;
+  bonus_remuneration: number;
+  bonus_duree: number;
+  bonus_agentique: number;
+  malus_technos: number;
+  malus_fraicheur: number;
+  final_score: number;
+}
+
+/**
+ * `offer_application_state` (migration `20260910000000_offer_applications.sql`) :
+ * l'état de candidature déjà PROPAGÉ au groupe d'affichage — `application_offer_id`
+ * dit quelle ligne `offer_applications` porte réellement l'état, et `heritee`
+ * (`offer_id <> application_offer_id`) dit si cet état vient d'une AUTRE
+ * annonce du même groupe que celle affichée. `notes` et `status_changed_at`
+ * ne sont délibérément pas sur `offers_dashboard` (une vue de liste n'a pas à
+ * porter un champ de texte libre — CLAUDE.md) : ils n'arrivent qu'ici.
+ */
+export interface OfferApplicationState {
+  offer_id: string;
+  application_offer_id: string;
+  status: ApplicationStatus;
+  outcome: ApplicationOutcome | null;
+  opened_at: string;
+  status_changed_at: string;
+  applied_at: string | null;
+  last_followup_at: string | null;
+  interview_at: string | null;
+  notes: string | null;
+  heritee: boolean;
+}
+
 export interface OfferDetail {
   offer: OfferDashboardRow;
-  groupJudgements: Record<string, unknown>[];
-  application: (Record<string, unknown> & { offer_id: string }) | null;
+  /** Un jugement par source du groupe, trié confiance décroissante puis
+   * `final_score` décroissant (même ordre que `dashboard-query.ts`). Le
+   * jugement RETENU n'est pas forcément `[0]` au pixel près de l'ordre
+   * d'élection complet d'`offers_dashboard` (qui départage aussi par longueur
+   * de description) : le identifier par `id === offer.id` plutôt que par
+   * position est plus sûr — voir `TwoSourcesPanel`. */
+  groupJudgements: OfferScoredRow[];
+  /** `null` si aucune candidature n'a jamais été ouverte pour ce groupe. */
+  application: OfferApplicationState | null;
 }
 
 export interface ApplicationPatchInput {

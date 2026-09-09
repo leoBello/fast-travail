@@ -1,6 +1,12 @@
 import type { AbsenceNature } from '../ui/kit/Absence';
 import type { SuiviStatus } from '../ui/kit/StatusBadge';
-import type { Confiance, EngagementConnu, Issue, TeletravailConnu } from './domaine';
+import type {
+  Confiance,
+  EngagementConnu,
+  Issue,
+  SenioriteConnue,
+  TeletravailConnu,
+} from './domaine';
 
 /**
  * Le dictionnaire français — seule langue pour l'instant (GUIDELINES §3.8).
@@ -105,6 +111,16 @@ export const fr = {
   iaAgents: {
     badge: 'IA / agents',
   },
+
+  /** La séniorité (`Seniority`, `data/types.ts`) et son cas nul — même
+   * logique que `teletravail`/`engagement` (tâche 8, en-tête du détail). */
+  seniorite: {
+    junior: 'Junior',
+    confirme: 'Confirmé',
+    senior: 'Senior',
+    lead: 'Lead',
+    nonPrecise: 'Séniorité non précisée',
+  } satisfies Record<SenioriteConnue, string> & Record<'nonPrecise', string>,
 
   /** Les quatre sources de collecte (`Source`, `data/types.ts`), pour
    * l'affichage sous le nom de l'employeur (`Main.dc.html`, cartes et
@@ -256,5 +272,67 @@ export const fr = {
     decisionEchouee: "La décision n'a pas pu être enregistrée. L'offre reste dans la bande.",
     listeVideTitre: 'Aucune offre ne correspond',
     listeVideDetail: 'Essayez de retirer un filtre — la liste complète ne masque rien par défaut.',
+  },
+
+  /**
+   * Vocabulaire propre au détail d'une offre (tâche 8, `Detail.dc.html`) :
+   * le rang décomposé, le bloc à deux jugements, l'extraction, le fil de
+   * suivi. Les libellés déjà couverts ailleurs (badges de faits, absences,
+   * confiance, statuts, issues, sources) ne sont pas dupliqués ici.
+   */
+  detail: {
+    retour: 'Retour',
+    voirAnnonce: "Voir l'annonce",
+    chargement: 'Chargement…',
+    chargementDetail: "Le détail de l'offre est en cours de récupération.",
+    erreurChargement: 'Le chargement a échoué',
+    erreurChargementDetail: "La connexion à l'API a échoué. Réessayez dans un instant.",
+    reessayer: 'Réessayer',
+    introuvableTitre: 'Offre introuvable',
+    introuvableDetail: "Cette offre n'existe pas, ou plus, dans le corpus.",
+    actionEchouee: "L'action n'a pas pu être enregistrée. Réessayez.",
+
+    pourquoiCeRang: 'Pourquoi cette offre est à ce rang',
+    rangExplication:
+      'La correspondance vient du modèle et ne bouge pas. Les six autres viennent de vos ' +
+      'préférences : les changer reclasse tout le corpus sans rien repayer.',
+
+    deuxSources: 'Vue sur deux sources',
+    nAnnonces: (n: number) => `${n} annonces`,
+    deuxSourcesExplication:
+      'La même mission a été jugée deux fois, sur deux textes de longueurs différentes. ' +
+      "C'est le jugement le mieux informé qui est retenu, pas le mieux noté.",
+    retenu: 'Retenu',
+    masque: 'Masqué',
+    texteIntegral: 'Texte intégral',
+    uniteTrancheeNote:
+      "Les deux annonces ne s'accordent pas sur la nature du montant (TJM ou salaire). Le " +
+      'jugement retenu, mieux informé, fait foi.',
+
+    ceQueLAnnonceDit: "Ce que l'annonce dit",
+    champEngagement: 'Engagement',
+    champModeTravail: 'Mode de travail',
+    champSeniorite: 'Séniorité',
+    champDuree: 'Durée',
+    champRemuneration: 'Rémunération',
+    champDomaine: 'Domaine',
+    champIaAgents: 'IA / agents',
+    champTechnosNonDesirees: 'Technos non désirées',
+    dureeMois: (n: number) => `${n} mois`,
+    aucune: 'Aucune',
+    non: 'Non',
+    stackDetectee: (n: number) => `Stack détectée — ${n} technologie${n === 1 ? '' : 's'}`,
+
+    ouJEnSuis: "Où j'en suis",
+    retenirOffre: 'Retenir cette offre',
+    ecarterOffre: 'Écarter cette offre',
+    marquerPostulee: 'Marquer comme postulée',
+    marquerRelancee: 'Marquer comme relancée',
+    marquerEntretien: 'Passer en entretien',
+    marquerTerminee: 'Marquer comme terminée',
+    depuisLe: (date: string) => `le ${date}`,
+    heriteeNote: "Cet état vient d'une autre annonce du même groupe.",
+    ecarteeNote: 'Cette offre a été écartée du suivi.',
+    choisirIssue: "Quelle a été l'issue ?",
   },
 };

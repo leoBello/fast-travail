@@ -22,6 +22,13 @@ interface Props {
    * désactive les deux boutons pour ne jamais envoyer deux décisions à la
    * fois sur la même offre. */
   enTraitement: boolean;
+  /** Ouvre le détail de l'offre (tâche 8, `Detail.dc.html`). Optionnel,
+   * même principe que `OfferRow.onOuvrir` : sans lui, le titre reste du
+   * texte simple plutôt qu'un geste. Porté par le TITRE, pas par la carte
+   * entière — celle-ci contient déjà des boutons et un lien (`Garder`,
+   * `Écarter`, l'annonce d'origine), et un élément interactif ne peut pas en
+   * envelopper un autre sans DOM invalide. */
+  onOuvrir?: (id: string) => void;
 }
 
 /**
@@ -34,7 +41,7 @@ interface Props {
  * (titre, badges, verdict) s'intercale entre les deux, comme la maquette le
  * dessine.
  */
-export function OfferCard({ offer, onGarder, onEcarter, enTraitement }: Props) {
+export function OfferCard({ offer, onGarder, onEcarter, enTraitement, onOuvrir }: Props) {
   const employeur = formatEmployeur(offer);
   const compensation = formatCompensation(offer);
   const texteCoupe = badgeTexteCoupe(offer);
@@ -80,8 +87,12 @@ export function OfferCard({ offer, onGarder, onEcarter, enTraitement }: Props) {
         <div className={styles.titre}>
           {offer.title === null || offer.title.trim() === '' ? (
             <Absence nature="non-publiee">{t('absences.non-publiee')}</Absence>
-          ) : (
+          ) : onOuvrir === undefined ? (
             offer.title
+          ) : (
+            <button type="button" className={styles.titreLien} onClick={() => onOuvrir(offer.id)}>
+              {offer.title}
+            </button>
           )}
         </div>
         <div className={styles.entreprise}>

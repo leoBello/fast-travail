@@ -45,7 +45,7 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
 describe('MatinScreen', () => {
   it('charge et affiche la bande "Ce matin" et "Toute la veille" avec les données du client', async () => {
     const client = clientFactice();
-    render(<MatinScreen client={client} />);
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
 
     await waitFor(() => expect(screen.getByText('Offre A')).toBeDefined());
     expect(screen.getByText('Offre B')).toBeDefined();
@@ -62,7 +62,7 @@ describe('MatinScreen', () => {
   it('"Garder" appelle openOffer puis patchApplication({ status: "retenue" }), et retire la carte', async () => {
     const user = userEvent.setup();
     const client = clientFactice();
-    render(<MatinScreen client={client} />);
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
 
     await waitFor(() => expect(screen.getByText('Offre A')).toBeDefined());
     const carteA = screen.getByText('Offre A').closest('article')!;
@@ -76,7 +76,7 @@ describe('MatinScreen', () => {
   it('"Écarter" envoie le statut "ecartee"', async () => {
     const user = userEvent.setup();
     const client = clientFactice();
-    render(<MatinScreen client={client} />);
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
 
     await waitFor(() => expect(screen.getByText('Offre B')).toBeDefined());
     const carteB = screen.getByText('Offre B').closest('article')!;
@@ -90,7 +90,7 @@ describe('MatinScreen', () => {
   it('une décision qui échoue laisse la carte en place et affiche un message', async () => {
     const user = userEvent.setup();
     const client = clientFactice({ openOffer: vi.fn().mockRejectedValue(new Error('panne')) });
-    render(<MatinScreen client={client} />);
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
 
     await waitFor(() => expect(screen.getByText('Offre C')).toBeDefined());
     const carteC = screen.getByText('Offre C').closest('article')!;

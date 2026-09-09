@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { DashboardClient } from './data/client';
 import { dashboardClientFromEnv } from './data/client';
 import { t } from './i18n/i18n';
+import { DetailScreen } from './screens/detail/DetailScreen';
 import { MatinScreen } from './screens/matin/MatinScreen';
 import { MotionRoot } from './screens/matin/MotionRoot';
 import styles from './App.module.css';
@@ -28,9 +30,18 @@ function construireClient():
  * clone sans secrets, y compris cet environnement de test), un message
  * nommé remplace l'écran plutôt qu'un plantage : GUIDELINES §3.1, une
  * absence se nomme, jamais elle ne se vide.
+ *
+ * **La navigation entre l'écran du matin et le détail d'une offre** (tâche 8)
+ * vit ICI, sous la forme d'un simple état — pas d'URL adressable (pas de
+ * routeur, comme le dépôt a déjà choisi Vite plutôt que Next.js pour éviter
+ * tout ce qu'une application mono-utilisateur servie en local n'a pas besoin
+ * de porter). Conséquence assumée : un `F5` sur le détail revient à l'écran
+ * du matin plutôt que de rouvrir la même offre — documenté dans le rapport
+ * de tâche, pas un défaut caché.
  */
 export function App() {
   const { client, erreur } = construireClient();
+  const [offreOuverte, setOffreOuverte] = useState<string | null>(null);
 
   if (client === null) {
     return (
@@ -44,7 +55,15 @@ export function App() {
 
   return (
     <MotionRoot>
-      <MatinScreen client={client} />
+      {offreOuverte === null ? (
+        <MatinScreen client={client} onOuvrirOffre={setOffreOuverte} />
+      ) : (
+        <DetailScreen
+          client={client}
+          offerId={offreOuverte}
+          onRetour={() => setOffreOuverte(null)}
+        />
+      )}
     </MotionRoot>
   );
 }

@@ -1,7 +1,7 @@
 import type { BadgeTon } from '../ui/kit/Badge';
 import type { ScoreJeton } from '../ui/kit/Score';
 import { t } from '../i18n/i18n';
-import type { OfferDashboardRow } from './types';
+import type { CompensationKind, OfferDashboardRow, Seniority } from './types';
 
 /**
  * Fonctions pures qui traduisent une ligne `offers_dashboard` en faits
@@ -46,7 +46,15 @@ const TON_CONFIANCE: Record<OfferDashboardRow['confidence'], BadgeTon> = {
   basse: 'alerte',
 };
 
-export function badgeConfiance(row: OfferDashboardRow): FaitBadge {
+/**
+ * `Pick<…>` plutôt que la ligne complète : `TwoSourcesPanel` (tâche 8)
+ * applique ce badge à un `OfferScoredRow` (un jugement individuel du
+ * groupe), qui ne porte pas les colonnes `candidature_*`/`group_*` d'une
+ * `OfferDashboardRow`. Élargir la forme acceptée à ce que la fonction LIT
+ * réellement rend les deux appelants valides sans dupliquer le badge — même
+ * donnée, même rendu, quelle que soit la ligne qui la porte.
+ */
+export function badgeConfiance(row: Pick<OfferDashboardRow, 'confidence'>): FaitBadge {
   return {
     cle: 'confiance',
     ton: TON_CONFIANCE[row.confidence],
@@ -55,8 +63,9 @@ export function badgeConfiance(row: OfferDashboardRow): FaitBadge {
 }
 
 /** Distinct de l'absence `stack` (`texte-coupe`, kit `Absence`) : ce badge
- * porte le FAIT `truncated_input`, pas une valeur de champ manquante. */
-export function badgeTexteCoupe(row: OfferDashboardRow): FaitBadge | null {
+ * porte le FAIT `truncated_input`, pas une valeur de champ manquante.
+ * `Pick<…>`, même raison que `badgeConfiance` ci-dessus. */
+export function badgeTexteCoupe(row: Pick<OfferDashboardRow, 'truncated_input'>): FaitBadge | null {
   if (!row.truncated_input) return null;
   return { cle: 'texte-coupe', ton: 'alerte', label: t('matin.texteCoupe500'), discontinu: true };
 }
@@ -69,6 +78,21 @@ export function badgesDeFaits(row: OfferDashboardRow): FaitBadge[] {
   return [badgeTeletravail(row), badgeEngagement(row), badgeAgentique(row)].filter(
     (badge): badge is FaitBadge => badge !== null,
   );
+}
+
+/**
+ * La séniorité, toujours en badge — y compris quand elle est inconnue
+ * (tâche 8, en-tête du détail). Distinct de `badgeTeletravail`/
+ * `badgeEngagement` ci-dessus, qui rendent `null` (aucun badge) sur une
+ * valeur inconnue : la maquette (`Detail.dc.html`) dessine explicitement une
+ * pastille « Séniorité non précisée » plutôt que de la faire disparaître —
+ * un choix propre à cet écran, pas une règle générale du kit.
+ */
+export function badgeSeniorite(seniority: Seniority): FaitBadge {
+  if (seniority === null) {
+    return { cle: 'seniorite', ton: 'neutre', label: t('seniorite.nonPrecise') };
+  }
+  return { cle: 'seniorite', ton: 'neutre', label: t(`seniorite.${seniority}`) };
 }
 
 export type Employeur = { connu: true; texte: string } | { connu: false };
@@ -109,17 +133,38 @@ export const SALAIRE_FLOOR_DUPLIQUE = 40000;
 export type Compensation =
   { kind: 'connu'; texte: string } | { kind: 'incertain'; texte: string } | { kind: 'absent' };
 
-export function formatCompensation(row: OfferDashboardRow): Compensation {
-  const valeur = row.compensation_max ?? row.compensation_min ?? null;
-  if (row.compensation_kind === null || valeur === null) return { kind: 'absent' };
+/**
+ * Le cœur des trois rendus (GUIDELINES §3.6), sur les trois valeurs brutes
+ * plutôt que sur une `OfferDashboardRow` entière — pour que `TwoSourcesPanel`
+ * (tâche 8) puisse l'appliquer telle quelle à un `OfferScoredRow` (un
+ * jugement individuel du groupe), qui porte les mêmes trois champs sous une
+ * forme distincte. `formatCompensation` ci-dessous n'est plus qu'un appel à
+ * celle-ci : aucun comportement ne change, l'extraction rend seulement la
+ * logique réutilisable sans la dupliquer (GUIDELINES §1, « le kit s'étend »).
+ */
+export function formatCompensationValeurs(
+  kind: CompensationKind,
+  min: number | null,
+  max: number | null,
+): Compensation {
+  const valeur = max ?? min ?? null;
+  if (kind === null || valeur === null) return { kind: 'absent' };
 
-  if (row.compensation_kind === 'tjm') {
+  if (kind === 'tjm') {
     return { kind: 'connu', texte: t('matin.tjm', valeur) };
   }
 
-  // compensation_kind === 'salaire'
+  // kind === 'salaire'
   const texte = t('matin.salaire', Math.round(valeur / 1000));
   return valeur < SALAIRE_FLOOR_DUPLIQUE ? { kind: 'incertain', texte } : { kind: 'connu', texte };
+}
+
+export function formatCompensation(row: OfferDashboardRow): Compensation {
+  return formatCompensationValeurs(
+    row.compensation_kind,
+    row.compensation_min,
+    row.compensation_max,
+  );
 }
 
 export type Publication = { connu: true; texte: string } | { connu: false };

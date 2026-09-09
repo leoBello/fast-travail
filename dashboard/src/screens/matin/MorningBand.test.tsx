@@ -21,6 +21,7 @@ function props(partiel: Partial<ComponentProps<typeof MorningBand>> = {}) {
     streakDays: 0,
     streakChargement: false,
     onDecision: vi.fn(),
+    onOuvrirOffre: vi.fn(),
     offresEnTraitement: new Set<string>(),
     chargement: false,
     erreur: false,

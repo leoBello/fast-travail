@@ -14,6 +14,7 @@ function props(partiel: Partial<ComponentProps<typeof OfferList>> = {}) {
     onPageChange: vi.fn(),
     sort: 'final_score' as const,
     onSortChange: vi.fn(),
+    onOuvrirOffre: vi.fn(),
     neverOpened: 23,
     statsChargement: false,
     filtresOuverts: false,

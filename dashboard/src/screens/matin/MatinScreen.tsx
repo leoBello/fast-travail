@@ -14,6 +14,9 @@ const LIST_PAGE_SIZE = 50;
 
 interface Props {
   client: DashboardClient;
+  /** Ouvre le détail d'une offre (tâche 8, `DetailScreen`) — fourni par
+   * `App.tsx`, qui possède la navigation entre les deux écrans. */
+  onOuvrirOffre: (id: string) => void;
 }
 
 /**
@@ -25,7 +28,7 @@ interface Props {
  * `OfferList`, `OfferCard`, `FilterPanel` restent des composants
  * présentés (props → rendu), testables sans client réel.
  */
-export function MatinScreen({ client }: Props) {
+export function MatinScreen({ client, onOuvrirOffre }: Props) {
   // ---- Bande « Ce matin » ----
   const [briefPage, setBriefPage] = useState(1);
   const [briefState, recargerBrief] = useBrief(client, briefPage);
@@ -152,6 +155,7 @@ export function MatinScreen({ client }: Props) {
         streakDays={streakDays}
         streakChargement={statsState.statut === 'chargement'}
         onDecision={decider}
+        onOuvrirOffre={onOuvrirOffre}
         offresEnTraitement={enTraitement}
         chargement={briefState.statut === 'chargement'}
         erreur={briefState.statut === 'erreur'}
@@ -166,6 +170,7 @@ export function MatinScreen({ client }: Props) {
         onPageChange={setListPage}
         sort={sort}
         onSortChange={changerTri}
+        onOuvrirOffre={onOuvrirOffre}
         neverOpened={neverOpened}
         statsChargement={statsState.statut === 'chargement'}
         filtresOuverts={filtresOuverts}
