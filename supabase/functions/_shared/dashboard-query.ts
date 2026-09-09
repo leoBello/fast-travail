@@ -73,6 +73,13 @@ export const BRIEF_THRESHOLD = 50;
 
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
+/** Plafond de `page`, au même titre que `MAX_PAGE_SIZE` pour `pageSize` —
+ * sans lui, une valeur qui dépasse la précision d'un nombre JS (`Number()`
+ * sur une chaîne de centaines de chiffres rend `Infinity`) passe la validation
+ * de type (`>= min` est vrai pour `Infinity`) et atteint `range()` telle
+ * quelle. Bornée, comme `pageSize` — pas rejetée : voir la revue de la
+ * tâche 6. */
+export const MAX_PAGE = 100_000;
 
 export type Row = Record<string, unknown>;
 
@@ -247,10 +254,37 @@ export type OpenOfferResult =
   | { outcome: 'created'; row: Row }
   | { outcome: 'already_open'; row: Row };
 
-/** `POST /offers/:id/open` : crée la ligne `a_traiter` si absente. Cible
- * directement `:id` — la table n'est pas group-aware par construction (voir
- * la tâche 1) ; c'est `getOfferDetail`/`offer_application_state` qui portent
- * la propagation au groupe pour la LECTURE. */
+/** Résout l'`offer_id` qui porte réellement la candidature du GROUPE
+ * d'affichage auquel `offerId` appartient, via `offer_application_state`
+ * (jointure `INNER` : pas de ligne du tout si personne dans le groupe n'a de
+ * candidature). `null` si le groupe n'a encore aucune candidature nulle
+ * part.
+ *
+ * Existe pour que `openOffer` et `patchApplication` n'écrivent JAMAIS sur
+ * l'id littéral de l'URL sans avoir d'abord vérifié que le groupe n'a pas
+ * déjà sa candidature ailleurs — voir la revue de la tâche 6 : sans cette
+ * résolution, agir sur un id qui n'est plus l'élu du groupe (l'élection
+ * change, voir `offers_dashboard`) crée une SECONDE ligne plus fraîche, que
+ * `offer_application_state` se met alors à préférer pour tout le groupe :
+ * l'état affiché RÉGRESSE en silence (ex. `entretien` → `a_traiter`). */
+async function resolveGroupApplicationOfferId(
+  db: DbClient,
+  offerId: string,
+): Promise<string | null> {
+  const { data, error } = await db
+    .from('offer_application_state')
+    .select('application_offer_id')
+    .eq('offer_id', offerId)
+    .maybeSingle();
+  if (error) throw new Error(`lecture de l'état du groupe : ${error.message}`);
+  return (data as { application_offer_id: string } | null)?.application_offer_id ?? null;
+}
+
+/** `POST /offers/:id/open` : crée la ligne `a_traiter` si le GROUPE n'a
+ * encore aucune candidature nulle part — pas seulement `:id`. Une candidature
+ * déjà ouverte sur une autre offre du même groupe (l'élection a pu bouger
+ * depuis) compte comme déjà ouverte ; ne rien créer de plus, sous peine de
+ * doublon (voir `resolveGroupApplicationOfferId`). */
 export async function openOffer(db: DbClient, offerId: string): Promise<OpenOfferResult> {
   const { data: offerRow, error: offerError } = await db
     .from('offers')
@@ -260,13 +294,16 @@ export async function openOffer(db: DbClient, offerId: string): Promise<OpenOffe
   if (offerError) throw new Error(`vérification de l'offre : ${offerError.message}`);
   if (!offerRow) return { outcome: 'offer_not_found' };
 
-  const { data: existing, error: existingError } = await db
-    .from('offer_applications')
-    .select('*')
-    .eq('offer_id', offerId)
-    .maybeSingle();
-  if (existingError) throw new Error(`lecture de la candidature : ${existingError.message}`);
-  if (existing) return { outcome: 'already_open', row: existing as Row };
+  const existingId = await resolveGroupApplicationOfferId(db, offerId);
+  if (existingId) {
+    const { data: existing, error: existingError } = await db
+      .from('offer_applications')
+      .select('*')
+      .eq('offer_id', existingId)
+      .single();
+    if (existingError) throw new Error(`lecture de la candidature : ${existingError.message}`);
+    return { outcome: 'already_open', row: existing as Row };
+  }
 
   const { data: inserted, error: insertError } = await db
     .from('offer_applications')
@@ -304,16 +341,28 @@ export type PatchApplicationResult = { outcome: 'not_found' } | { outcome: 'upda
  * Exige que la ligne existe déjà — `POST /offers/:id/open` la crée si elle
  * est absente. Ne pas fusionner les deux : l'ouverture et la mise à jour
  * sont deux actions distinctes du tableau de bord.
+ *
+ * **Group-aware** : écrit sur la ligne qui porte RÉELLEMENT la candidature du
+ * groupe (`offer_application_state.application_offer_id`), jamais sur l'id
+ * littéral de l'URL si celui-ci n'est plus l'élu du groupe. Sans ça, un
+ * `PATCH` sur une offre qui vient de perdre l'élection rendrait 404 (« aucune
+ * candidature ») alors que le `GET` venait de montrer un état existant —
+ * poussant l'utilisateur vers `POST /open`, qui créerait alors une seconde
+ * ligne plus fraîche et ferait régresser tout le groupe (voir la revue de la
+ * tâche 6 et `resolveGroupApplicationOfferId`).
  */
 export async function patchApplication(
   db: DbClient,
   offerId: string,
   patch: ApplicationPatchInput,
 ): Promise<PatchApplicationResult> {
+  const targetId = await resolveGroupApplicationOfferId(db, offerId);
+  if (!targetId) return { outcome: 'not_found' };
+
   const { data: current, error: currentError } = await db
     .from('offer_applications')
     .select('*')
-    .eq('offer_id', offerId)
+    .eq('offer_id', targetId)
     .maybeSingle();
   if (currentError) throw new Error(`lecture de la candidature : ${currentError.message}`);
   if (!current) return { outcome: 'not_found' };
@@ -343,7 +392,14 @@ export async function patchApplication(
   const update: Row = {};
   if (patch.status !== undefined) {
     update.status = patch.status;
-    update.status_changed_at = new Date().toISOString();
+    // Seulement sur une VRAIE transition. `offer_application_state` élit la
+    // candidature la plus fraîche du groupe par `status_changed_at desc` : le
+    // bouger sur un statut inchangé agrandirait sans raison la fenêtre
+    // pendant laquelle un id périmé (voir `resolveGroupApplicationOfferId`)
+    // pourrait sembler plus « à jour » qu'il ne l'est. Revu par la tâche 6.
+    if (patch.status !== currentRow.status) {
+      update.status_changed_at = new Date().toISOString();
+    }
   }
   if ('outcome' in patch) update.outcome = patch.outcome;
   if ('appliedAt' in patch) update.applied_at = patch.appliedAt;
@@ -358,7 +414,7 @@ export async function patchApplication(
   const { data: updated, error: updateError } = await db
     .from('offer_applications')
     .update(update)
-    .eq('offer_id', offerId)
+    .eq('offer_id', targetId)
     .select()
     .single();
   if (updateError) throw new Error(`mise à jour de la candidature : ${updateError.message}`);
@@ -391,33 +447,73 @@ async function countExact(db: DbClient, table: string): Promise<number> {
 }
 
 const RECENT_DAYS_WINDOW = 7;
+const STREAK_TIME_ZONE = 'Europe/Paris';
 
-function toDateOnly(d: Date): string {
-  return d.toISOString().slice(0, 10);
+// `Intl` est un global standard du langage, pas un accès à l'espace de noms
+// du runtime : ce formateur ne casse pas la neutralité de ce fichier.
+const parisDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: STREAK_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/** Clé de jour calendaire en heure de PARIS (`YYYY-MM-DD`), jamais en UTC.
+ *
+ * Revu par la tâche 6 : une clé en UTC mentait dans les deux sens autour de
+ * minuit heure de Paris (UTC+1 ou +2 selon la saison). Exemple mesuré : un
+ * envoi à 00 h 30 heure de Paris (22 h 30 UTC la veille en été) tombait, en
+ * UTC, sur le MÊME jour qu'un envoi de la veille en fin d'après-midi — la
+ * série avalait un jour réellement sauté. Symétriquement, un envoi à 00 h 30
+ * heure de Paris pouvait retomber, en UTC, sur un jour déjà couvert : l'action
+ * de l'utilisateur sur ce qu'il vit comme « aujourd'hui » n'incrémentait
+ * rien, et une série vivante se cassait. C'est un compteur de motivation
+ * (GUIDELINES.md §3.3) : un chiffre qui ment dans un sens ou dans l'autre est
+ * pire qu'un chiffre absent. */
+export function parisDateKey(date: Date): string {
+  return parisDateFormatter.format(date);
+}
+
+/** Calculatrice de calendrier pure : construit un instant à MINUIT UTC du
+ * jour "YYYY-MM-DD" donné, uniquement pour additionner/soustraire des jours
+ * civils via les accesseurs UTC. Jamais interprété comme un instant réel, et
+ * jamais reformaté autrement qu'en Y/M/D — aucun DST ne peut donc y fausser
+ * un calcul, puisqu'aucune heure n'y est jamais lue. */
+function previousDateKey(key: string): string {
+  const [year, month, day] = key.split('-').map(Number);
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  calendar.setUTCDate(calendar.getUTCDate() - 1);
+  const y = calendar.getUTCFullYear();
+  const m = String(calendar.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(calendar.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 /** Jours avec au moins une candidature ENVOYÉE (`applied_at`), jamais lue
  * (GUIDELINES.md §3.3 : lire des offres ne maintient pas la série). Le jour
  * courant sans envoi ne casse pas la série — il n'est simplement pas encore
- * compté, comme un jeu qui n'a pas encore été joué aujourd'hui. */
+ * compté, comme un jeu qui n'a pas encore été joué aujourd'hui. Les clés de
+ * `sentDays` DOIVENT être produites par `parisDateKey` (voir `getStats`) :
+ * cette fonction ne reconvertit rien, elle ne fait que comparer des clés. */
 export function computeStreak(
   sentDays: ReadonlySet<string>,
   today: Date = new Date(),
 ): { days: number; recentDays: { date: string; sent: boolean }[] } {
-  const recentDays: { date: string; sent: boolean }[] = [];
-  for (let i = RECENT_DAYS_WINDOW - 1; i >= 0; i -= 1) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    const iso = toDateOnly(d);
-    recentDays.push({ date: iso, sent: sentDays.has(iso) });
-  }
+  const todayKey = parisDateKey(today);
 
-  const cursor = new Date(today);
-  if (!sentDays.has(toDateOnly(cursor))) cursor.setUTCDate(cursor.getUTCDate() - 1);
+  const dayKeys: string[] = [todayKey];
+  for (let i = 1; i < RECENT_DAYS_WINDOW; i += 1) {
+    dayKeys.push(previousDateKey(dayKeys[i - 1]));
+  }
+  dayKeys.reverse();
+  const recentDays = dayKeys.map((date) => ({ date, sent: sentDays.has(date) }));
+
+  let cursor = todayKey;
+  if (!sentDays.has(cursor)) cursor = previousDateKey(cursor);
   let days = 0;
-  while (sentDays.has(toDateOnly(cursor))) {
+  while (sentDays.has(cursor)) {
     days += 1;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    cursor = previousDateKey(cursor);
   }
   return { days, recentDays };
 }
@@ -464,7 +560,7 @@ export async function getStats(db: DbClient): Promise<StatsResult> {
     if (app.outcome) responses += 1;
     if (app.applied_at) {
       sent += 1;
-      sentDays.add(app.applied_at.slice(0, 10));
+      sentDays.add(parisDateKey(new Date(app.applied_at)));
     }
   }
 

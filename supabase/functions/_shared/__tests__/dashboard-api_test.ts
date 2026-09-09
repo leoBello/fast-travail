@@ -1,5 +1,6 @@
 import { assertEquals } from '@std/assert';
 import { routeDashboardRequest } from '../dashboard-api.ts';
+import { MAX_PAGE } from '../dashboard-query.ts';
 import type { DbClient } from '../db.ts';
 
 /**
@@ -94,6 +95,18 @@ Deno.test('GET /offers — pageSize au-dessus du maximum : bornée, pas rejetée
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.pageSize, 100);
+});
+
+Deno.test('GET /offers — page bien au-dessus du maximum : bornée, pas rejetée (régression de la revue de la tâche 6)', async () => {
+  // Une chaîne de 300 chiffres passe la regex d'entier positif ; sans
+  // plafond sur `page`, `Number()` la convertit en `Infinity`, qui satisfait
+  // `>= 1` et échappait donc à la validation.
+  const db = fakeDb({}, { data: [], error: null, count: 0 });
+  const hugePage = '9'.repeat(300);
+  const res = await routeDashboardRequest(req('GET', `/offers?page=${hugePage}`), { db });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.page, MAX_PAGE);
 });
 
 Deno.test('GET /offers/:id — identifiant non UUID : 400, base non touchée', async () => {
@@ -228,10 +241,9 @@ Deno.test('POST /offers/:id/open — offre inconnue : 404', async () => {
 });
 
 Deno.test('POST /offers/:id/open — création : 201', async () => {
-  // `chain()` générique ne peut pas distinguer la vérification d'existence
-  // (`maybeSingle`, doit rendre `null`) de la lecture après insertion
-  // (`single`, doit rendre la ligne créée) : elles portent la même table.
-  // Ce cas précis a donc son propre double, comme `fakeDbForOpen` dans
+  // `chain()` générique ne peut pas distinguer les différents appels portés
+  // par la même table (l'état du groupe, puis l'insertion) : ce cas précis a
+  // donc son propre double, comme `fakeDbForOpen` dans
   // `dashboard-query_test.ts`.
   const db = {
     from(table: string) {
@@ -242,11 +254,15 @@ Deno.test('POST /offers/:id/open — création : 201', async () => {
           }),
         };
       }
-      if (table === 'offer_applications') {
+      if (table === 'offer_application_state') {
         return {
           select: () => ({
             eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
           }),
+        };
+      }
+      if (table === 'offer_applications') {
+        return {
           insert: (row: Record<string, unknown>) => ({
             select: () => ({
               single: () => Promise.resolve({ data: { ...row, status: 'a_traiter' }, error: null }),
@@ -261,9 +277,9 @@ Deno.test('POST /offers/:id/open — création : 201', async () => {
   assertEquals(res.status, 201);
 });
 
-Deno.test('PATCH /offers/:id/application — candidature absente : 404', async () => {
+Deno.test('PATCH /offers/:id/application — candidature absente PARTOUT dans le groupe : 404', async () => {
   const db = fakeDb(
-    { offer_applications: { data: null, error: null } },
+    { offer_application_state: { data: null, error: null } },
     { data: null, error: null },
   );
   const res = await routeDashboardRequest(
@@ -272,6 +288,68 @@ Deno.test('PATCH /offers/:id/application — candidature absente : 404', async (
   );
   assertEquals(res.status, 404);
 });
+
+const OTHER_UUID = '22222222-2222-2222-2222-222222222222';
+
+Deno.test(
+  'PATCH /offers/:id/application — la candidature existe sur UNE AUTRE offre du groupe : 200, ' +
+    'écrit sur cette ligne-là (régression de la revue de la tâche 6)',
+  async () => {
+    const db = {
+      from(table: string) {
+        if (table === 'offer_application_state') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve({ data: { application_offer_id: OTHER_UUID }, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'offer_applications') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve({
+                    data: {
+                      offer_id: OTHER_UUID,
+                      status: 'entretien',
+                      applied_at: '2026-09-01T00:00:00Z',
+                    },
+                    error: null,
+                  }),
+              }),
+            }),
+            update: (patchRow: Record<string, unknown>) => ({
+              eq: (_col: string, val: string) => {
+                assertEquals(val, OTHER_UUID); // jamais UUID (l'id littéral de l'URL)
+                return {
+                  select: () => ({
+                    single: () =>
+                      Promise.resolve({
+                        data: { offer_id: OTHER_UUID, status: 'entretien', ...patchRow },
+                        error: null,
+                      }),
+                  }),
+                };
+              },
+            }),
+          };
+        }
+        throw new Error(`table inattendue : ${table}`);
+      },
+    } as unknown as DbClient;
+    const res = await routeDashboardRequest(
+      req('PATCH', `/offers/${UUID}/application`, { notes: 'relance prévue' }),
+      { db },
+    );
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.offer_id, OTHER_UUID);
+  },
+);
 
 Deno.test('route inconnue : 404', async () => {
   const res = await routeDashboardRequest(req('GET', '/inconnue'), { db: untouchableDb() });

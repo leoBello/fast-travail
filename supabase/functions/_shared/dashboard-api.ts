@@ -13,6 +13,7 @@ import {
   getStats,
   listBrief,
   listOffers,
+  MAX_PAGE,
   MAX_PAGE_SIZE,
   openOffer,
   patchApplication,
@@ -109,13 +110,21 @@ function parseScoreParam(params: URLSearchParams, key: string): number | undefin
 }
 
 function parsePagination(params: URLSearchParams): { page: number; pageSize: number } {
-  const page = parseIntParam(params, 'page', { min: 1, fallback: 1 });
+  const rawPage = parseIntParam(params, 'page', { min: 1, fallback: 1 });
   const rawPageSize = parseIntParam(params, 'pageSize', { min: 1, fallback: DEFAULT_PAGE_SIZE });
-  // « Bornée », pas rejetée : une taille au-dessus du maximum est ramenée au
+  // « Bornée », pas rejetée : une valeur au-dessus du maximum est ramenée au
   // maximum plutôt que refusée — c'est le sens de « pagination bornée » du
   // brief, à la différence d'un tri ou d'un statut inconnus, qui eux sont
   // rejetés (aucun « bon » repli n'existe pour une énumération fermée).
-  return { page, pageSize: Math.min(rawPageSize, MAX_PAGE_SIZE) };
+  // `page` a le MÊME traitement que `pageSize`, pas seulement ce dernier :
+  // sans plafond, une chaîne de centaines de chiffres passe la regex d'entier
+  // positif, et `Number()` la convertit en `Infinity`, qui satisfait
+  // `>= min` — la revue de la tâche 6 l'a mesuré. `Math.min(Infinity, MAX_PAGE)`
+  // referme cette échappatoire au passage, sans logique séparée.
+  return {
+    page: Math.min(rawPage, MAX_PAGE),
+    pageSize: Math.min(rawPageSize, MAX_PAGE_SIZE),
+  };
 }
 
 function parseWorkModeParam(params: URLSearchParams): WorkModeFilter | undefined {
