@@ -12,6 +12,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
     expect(screen.getByText('100')).toBeDefined();
@@ -25,6 +26,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
     expect(container.querySelector('[data-nature="non-publiee"]')).not.toBeNull();
@@ -41,6 +43,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
     expect(container.querySelector('[data-nature="salaire-non-publie"]')).not.toBeNull();
@@ -57,6 +60,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
     // Le libellé "unité incertaine" vit dans l'infobulle (le pourquoi,
@@ -73,6 +77,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
     expect(container.querySelector('[data-ton="alerte"]')).not.toBeNull();
@@ -88,6 +93,7 @@ describe('OfferCard', () => {
         onGarder={onGarder}
         onEcarter={onEcarter}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
 
@@ -107,6 +113,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={true}
+        salaireFloor={40000}
       />,
     );
     expect(screen.getByRole('button', { name: 'Garder' })).toHaveProperty('disabled', true);
@@ -120,6 +127,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
     const lien = screen.getByRole('link', { name: "Ouvrir l'annonce d'origine" });
@@ -135,6 +143,7 @@ describe('OfferCard', () => {
         onGarder={() => {}}
         onEcarter={() => {}}
         enTraitement={false}
+        salaireFloor={40000}
       />,
     );
     expect(screen.queryByRole('link', { name: "Ouvrir l'annonce d'origine" })).toBeNull();

@@ -14,6 +14,8 @@ describe('ExtractionSection', () => {
           duration_months: null,
           domain: null,
         })}
+        salaireFloor={40000}
+        cvSkills={[]}
       />,
     );
     expect(container.querySelectorAll('[data-nature="non-precisee"]').length).toBe(5);
@@ -26,6 +28,8 @@ describe('ExtractionSection', () => {
       const { rerender, container } = render(
         <ExtractionSection
           offer={ligneOffre({ compensation_kind: 'tjm', compensation_min: 450 })}
+          salaireFloor={40000}
+          cvSkills={[]}
         />,
       );
       expect(screen.getByText('450 €/j')).toBeDefined();
@@ -33,6 +37,8 @@ describe('ExtractionSection', () => {
       rerender(
         <ExtractionSection
           offer={ligneOffre({ compensation_kind: 'salaire', compensation_min: 12000 })}
+          salaireFloor={40000}
+          cvSkills={[]}
         />,
       );
       expect(screen.getByText('12 k€/an').className).toMatch(/montantBarre/);
@@ -52,6 +58,8 @@ describe('ExtractionSection', () => {
             compensation_min: null,
             compensation_max: null,
           })}
+          salaireFloor={40000}
+          cvSkills={[]}
         />,
       );
       expect(container.querySelector('[data-nature="salaire-non-publie"]')).not.toBeNull();
@@ -78,6 +86,8 @@ describe('ExtractionSection', () => {
             confidence: 'basse',
           },
         })}
+        salaireFloor={40000}
+        cvSkills={[]}
       />,
     );
     expect(screen.getByText('Non détectable — texte coupé')).toBeDefined();
@@ -101,6 +111,8 @@ describe('ExtractionSection', () => {
             confidence: 'haute',
           },
         })}
+        salaireFloor={40000}
+        cvSkills={[]}
       />,
     );
     expect(screen.getByText('Aucune techno reconnue')).toBeDefined();
@@ -125,6 +137,8 @@ describe('ExtractionSection', () => {
             confidence: 'haute',
           },
         })}
+        salaireFloor={40000}
+        cvSkills={[]}
       />,
     );
     expect(screen.getByText('Stack détectée — 2 technologies')).toBeDefined();
@@ -133,7 +147,7 @@ describe('ExtractionSection', () => {
   });
 
   it('affiche « Aucune » quand aucune techno non désirée', () => {
-    render(<ExtractionSection offer={ligneOffre()} />);
+    render(<ExtractionSection offer={ligneOffre()} salaireFloor={40000} cvSkills={[]} />);
     expect(screen.getByText('Aucune')).toBeDefined();
   });
 });

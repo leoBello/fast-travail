@@ -34,10 +34,18 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
       streak: { days: 3, recentDays: [] },
       neverOpened: 23,
       responseRate: { responses: 0, sent: 0 },
+      decidedToday: 2,
     }),
     getOfferDetail: vi.fn(),
     openOffer: vi.fn().mockResolvedValue({ offer_id: 'a', status: 'a_traiter' }),
     patchApplication: vi.fn().mockResolvedValue({ offer_id: 'a', status: 'retenue' }),
+    getConfig: vi.fn().mockResolvedValue({
+      scoringWeights: { salaire_floor: 40000 },
+      activeProfile: null,
+      cvSkills: [],
+      staleProfileOfferCount: 0,
+    }),
+    importCandidateProfile: vi.fn(),
     ...overrides,
   };
 }
@@ -120,4 +128,31 @@ describe('MatinScreen', () => {
     await user.click(bouton);
     expect(onVoirSuivi).toHaveBeenCalledOnce();
   });
+
+  it("n'affiche aucun bouton d'import du CV quand onImporterCv n'est pas fourni", () => {
+    const client = clientFactice();
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Importer mon CV' })).toBeNull();
+  });
+
+  it('le bouton d’en-tête "Importer mon CV" appelle onImporterCv au clic (tâche 10)', async () => {
+    const user = userEvent.setup();
+    const client = clientFactice();
+    const onImporterCv = vi.fn();
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} onImporterCv={onImporterCv} />);
+
+    const bouton = screen.getByRole('button', { name: 'Importer mon CV' });
+    await user.click(bouton);
+    expect(onImporterCv).toHaveBeenCalledOnce();
+  });
+
+  it(
+    'affiche "decidedToday" (vérité serveur de /stats, tâche 10) dans la bande — plus le ' +
+      'localStorage de la tâche 7',
+    async () => {
+      const client = clientFactice();
+      render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
+      await waitFor(() => expect(screen.getByText('2 décidées')).toBeDefined());
+    },
+  );
 });

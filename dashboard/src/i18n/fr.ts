@@ -322,6 +322,10 @@ export const fr = {
     aucune: 'Aucune',
     non: 'Non',
     stackDetectee: (n: number) => `Stack détectée — ${n} technologie${n === 1 ? '' : 's'}`,
+    // Tâche 10, `profile_skills` : `n` = technos de la stack présentes dans
+    // le CV (peu importe leur nombre, y compris 0 — aucune n'est masquée).
+    stackTechnosCv: (n: number) =>
+      `En vert, les ${n} technologie${n === 1 ? '' : 's'} présente${n === 1 ? '' : 's'} dans votre CV.`,
 
     ouJEnSuis: "Où j'en suis",
     retenirOffre: 'Retenir cette offre',
@@ -334,6 +338,10 @@ export const fr = {
     heriteeNote: "Cet état vient d'une autre annonce du même groupe.",
     ecarteeNote: 'Cette offre a été écartée du suivi.',
     choisirIssue: "Quelle a été l'issue ?",
+
+    // Provenance (tâche 10, `offers_ranked.found_by_labels`/`trusted_query`).
+    trouveePar: 'Trouvée par',
+    requeteConfiance: 'requête de confiance',
   },
 
   /**
@@ -406,5 +414,62 @@ export const fr = {
       `Trop peu d'envois pour en tirer un taux. Le chiffre s'affiche brut jusqu'à ${seuil} ` +
       'candidatures.',
     reponseTaux: (pct: number) => `${pct} %`,
+  },
+
+  /**
+   * L'import du CV (tâche 10, `POST /candidate-profile`) : demandé
+   * nommément au brief initial (« Un bouton pour importer mon CV »).
+   *
+   * **Décision tranchée, à respecter à la lettre (CLAUDE.md) : l'import met
+   * à jour le CV et ne rejuge RIEN.** Aucune chaîne ici ne doit laisser
+   * croire à un rejugement — `enregistrementEnCours` décrit une ÉCRITURE
+   * (le CV part en base), jamais un jugement ; `succesDetail` nomme
+   * explicitement ce que l'import NE fait PAS.
+   */
+  profil: {
+    importerCv: 'Importer mon CV',
+    titre: 'Importer mon CV',
+    sousTitre:
+      'Met à jour le CV utilisé pour juger les offres. Ne rejuge rien : les jugements déjà ' +
+      'payés restent valides tels quels.',
+    retour: 'Retour',
+
+    chargement: 'Chargement…',
+    chargementDetail: 'La configuration est en cours de récupération.',
+    erreurChargement: 'Le chargement a échoué',
+    erreurChargementDetail: "La connexion à l'API a échoué. Réessayez dans un instant.",
+    reessayer: 'Réessayer',
+
+    profilActifTitre: 'Profil actif',
+    aucunProfilActif: 'Aucun profil actif',
+    profilVersion: (version: string) => `version ${version}`,
+    staleCountLabel: 'Offres jugées sous un autre profil',
+    // `n` = offres jugées sous une version DIFFÉRENTE du profil actif —
+    // jamais recompté côté client, toujours ce que `GET /config` a mesuré.
+    offresProfilAnterieur: (n: number) =>
+      `${n} offre${n === 1 ? '' : 's'} jugée${n === 1 ? '' : 's'} sous un profil antérieur.`,
+    aucuneOffreProfilAnterieur: 'Aucune offre jugée sous un profil antérieur.',
+
+    champLabel: 'Nom du CV',
+    champCvTexte: 'Texte du CV',
+    champSeniorite: "Années d'expérience",
+    champProfileVersion: 'Version du profil',
+    profileVersionAide:
+      'Doit être différente de la version active — sans quoi les jugements passés et à venir ' +
+      'se mélangeraient sans rien pour les distinguer.',
+    boutonImporter: 'Importer',
+
+    // `enregistrementEnCours` décrit une ÉCRITURE en base — jamais un
+    // jugement en cours, qui n'existe pas dans ce flux (voir la note ci-dessus).
+    enregistrementEnCours: 'Enregistrement du CV…',
+    echecImport: "L'import a échoué. Le CV actif n'a pas changé.",
+
+    succesTitre: 'CV importé',
+    // Jamais de mention de score, de jugement ou de rejugement : l'import
+    // ne fait QUE ça, et l'écran doit le dire aussi explicitement que ce
+    // qu'il fait réellement.
+    succesDetail:
+      "Le CV actif a changé. Aucune offre n'a été rejugée — les scores existants restent " +
+      'ceux du profil précédent.',
   },
 };

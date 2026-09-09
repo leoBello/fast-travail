@@ -12,6 +12,9 @@ interface Props {
   offerId: string;
   /** Un jugement par source du groupe, `offerId` compris. */
   judgements: OfferScoredRow[];
+  /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
+   * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
+  salaireFloor: number | null;
 }
 
 /**
@@ -34,7 +37,7 @@ interface Props {
  * le score) — s'appuyer sur `offerId` reste correct même si les deux ordres
  * divergeaient un jour.
  */
-export function TwoSourcesPanel({ offerId, judgements }: Props) {
+export function TwoSourcesPanel({ offerId, judgements, salaireFloor }: Props) {
   if (judgements.length < 2) return null;
 
   const retenu = judgements.find((j) => j.id === offerId) ?? judgements[0];
@@ -58,9 +61,14 @@ export function TwoSourcesPanel({ offerId, judgements }: Props) {
       <p className={styles.explication}>{t('detail.deuxSourcesExplication')}</p>
 
       <div className={styles.grille}>
-        <JudgementCard judgement={retenu} retenu />
+        <JudgementCard judgement={retenu} retenu salaireFloor={salaireFloor} />
         {masques.map((judgement) => (
-          <JudgementCard key={judgement.id} judgement={judgement} retenu={false} />
+          <JudgementCard
+            key={judgement.id}
+            judgement={judgement}
+            retenu={false}
+            salaireFloor={salaireFloor}
+          />
         ))}
       </div>
 
@@ -69,11 +77,20 @@ export function TwoSourcesPanel({ offerId, judgements }: Props) {
   );
 }
 
-function JudgementCard({ judgement, retenu }: { judgement: OfferScoredRow; retenu: boolean }) {
+function JudgementCard({
+  judgement,
+  retenu,
+  salaireFloor,
+}: {
+  judgement: OfferScoredRow;
+  retenu: boolean;
+  salaireFloor: number | null;
+}) {
   const compensation = formatCompensationValeurs(
     judgement.compensation_kind,
     judgement.compensation_min,
     judgement.compensation_max,
+    salaireFloor,
   );
   const confiance = badgeConfiance(judgement);
   const texteCoupe = badgeTexteCoupe(judgement);

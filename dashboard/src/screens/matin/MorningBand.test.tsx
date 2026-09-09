@@ -18,6 +18,7 @@ function props(partiel: Partial<ComponentProps<typeof MorningBand>> = {}) {
     page: 1,
     onPageChange: vi.fn(),
     decidees: 0,
+    decideesChargement: false,
     streakDays: 0,
     streakChargement: false,
     onDecision: vi.fn(),
@@ -26,6 +27,7 @@ function props(partiel: Partial<ComponentProps<typeof MorningBand>> = {}) {
     chargement: false,
     erreur: false,
     onReessayer: vi.fn(),
+    salaireFloor: 40000,
     ...partiel,
   };
 }

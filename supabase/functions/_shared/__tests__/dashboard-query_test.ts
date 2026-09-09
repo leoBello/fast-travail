@@ -1,6 +1,11 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import {
   computeStreak,
+  getConfig,
+  getOfferDetail,
+  getStats,
+  importCandidateProfile,
+  listOffers,
   openOffer,
   parisDateKey,
   patchApplication,
@@ -411,4 +416,431 @@ Deno.test('ValidationError — instance de Error', () => {
     ValidationError,
     'message',
   );
+});
+
+// --------------------------------------------------------------------------
+// listOffers — filtres multi-valeurs (tâche 10)
+// --------------------------------------------------------------------------
+
+interface RecordedCall {
+  method: string;
+  args: unknown[];
+}
+
+/** Chaînable qui ENREGISTRE chaque appel de filtre plutôt que de les
+ * ignorer — `dashboard-api_test.ts` a un `chain()` générique pour les tests
+ * de ROUTAGE (peu importe la requête construite) ; celui-ci sert à prouver
+ * la requête elle-même, ce que `listOffers` demande vraiment à Postgres. */
+function recordingOffersDashboard(calls: RecordedCall[]): DbClient {
+  const node: Record<string, unknown> = {};
+  for (const method of ['select', 'eq', 'in', 'is', 'or', 'gte', 'order', 'range']) {
+    node[method] = (...args: unknown[]) => {
+      calls.push({ method, args });
+      return node;
+    };
+  }
+  node.then = (
+    onfulfilled?: ((value: unknown) => unknown) | null,
+    onrejected?: ((reason: unknown) => unknown) | null,
+  ) => Promise.resolve({ data: [], error: null, count: 0 }).then(onfulfilled, onrejected);
+  return { from: (_table: string) => node } as unknown as DbClient;
+}
+
+const BASE_FILTERS = { sort: 'final_score' as const, page: 1, pageSize: 20 };
+
+Deno.test('listOffers — workMode = [full_remote, non_precise] : composé en OU (or work_mode.is.null,work_mode.in.(...))', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, workMode: ['full_remote', 'non_precise'] });
+  const orCall = calls.find((c) => c.method === 'or');
+  assertEquals(orCall?.args, ['work_mode.is.null,work_mode.in.(full_remote)']);
+  // Jamais un `.in`/`.is` séparé en plus du `.or` composé, sous peine de
+  // ET au lieu de OU (deux appels `.eq`/`.in` successifs de PostgREST se
+  // combinent en ET, jamais en OU).
+  assertEquals(calls.some((c) => c.method === 'is'), false);
+});
+
+Deno.test('listOffers — workMode = [non_precise] seul : .is(work_mode, null), pas de .or', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, workMode: ['non_precise'] });
+  assertEquals(calls.find((c) => c.method === 'is')?.args, ['work_mode', null]);
+  assertEquals(calls.some((c) => c.method === 'or'), false);
+});
+
+Deno.test('listOffers — workMode = [full_remote, hybride] (aucun non_precise) : .in, pas de .or', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, workMode: ['full_remote', 'hybride'] });
+  assertEquals(
+    calls.find((c) => c.method === 'in' && c.args[0] === 'work_mode')?.args,
+    ['work_mode', ['full_remote', 'hybride']],
+  );
+  assertEquals(calls.some((c) => c.method === 'or'), false);
+});
+
+Deno.test('listOffers — statut à plusieurs valeurs : .in(candidature_statut, [...])', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, statut: ['retenue', 'postulee'] });
+  assertEquals(
+    calls.find((c) => c.method === 'in' && c.args[0] === 'candidature_statut')?.args,
+    ['candidature_statut', ['retenue', 'postulee']],
+  );
+});
+
+Deno.test('listOffers — aucun filtre : aucun appel de restriction (rien ne masque rien)', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, BASE_FILTERS);
+  for (const method of ['eq', 'in', 'is', 'or', 'gte']) {
+    assertEquals(calls.some((c) => c.method === method), false);
+  }
+});
+
+// --------------------------------------------------------------------------
+// getStats — decidedToday (tâche 10, remplace le localStorage de la tâche 7)
+// --------------------------------------------------------------------------
+
+function buildStatsDb(applications: Row[]): DbClient {
+  function countChain(count: number) {
+    return {
+      select: () => ({
+        gt: () => ({
+          is: () => Promise.resolve({ count, error: null }),
+          then: (
+            onf?: ((v: unknown) => unknown) | null,
+          ) => Promise.resolve({ count, error: null }).then(onf),
+        }),
+        then: (
+          onf?: ((v: unknown) => unknown) | null,
+        ) => Promise.resolve({ count, error: null }).then(onf),
+      }),
+    };
+  }
+  const db = {
+    from(table: string) {
+      if (table === 'offers') return countChain(0);
+      if (table === 'offers_scored') return countChain(0);
+      if (table === 'offers_dashboard') return countChain(0);
+      if (table === 'offer_applications') {
+        return {
+          select: () => Promise.resolve({ data: applications, error: null }),
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+  return db;
+}
+
+Deno.test('getStats — decidedToday compte les VRAIES transitions du jour (heure de Paris), pas les ouvertures', async () => {
+  const today = new Date('2026-09-09T10:00:00Z'); // midi Paris, sans ambiguïté
+  const applications: Row[] = [
+    // Décidée aujourd'hui : compte.
+    {
+      status: 'retenue',
+      outcome: null,
+      applied_at: null,
+      status_changed_at: '2026-09-09T09:00:00Z',
+    },
+    // Simplement OUVERTE aujourd'hui (status_changed_at posé par défaut à
+    // l'insertion), jamais décidée : ne compte PAS.
+    {
+      status: 'a_traiter',
+      outcome: null,
+      applied_at: null,
+      status_changed_at: '2026-09-09T08:00:00Z',
+    },
+    // Décidée hier : ne compte pas aujourd'hui.
+    {
+      status: 'ecartee',
+      outcome: null,
+      applied_at: null,
+      status_changed_at: '2026-09-08T09:00:00Z',
+    },
+  ];
+  const db = buildStatsDb(applications);
+  const stats = await getStats(db, today);
+  assertEquals(stats.decidedToday, 1);
+});
+
+Deno.test('getStats — decidedToday à zéro le dit, jamais masqué', async () => {
+  const db = buildStatsDb([]);
+  const stats = await getStats(db, new Date('2026-09-09T10:00:00Z'));
+  assertEquals(stats.decidedToday, 0);
+});
+
+// --------------------------------------------------------------------------
+// getConfig — poids réglables, profil actif, compétences (tâche 10)
+// --------------------------------------------------------------------------
+
+function fakeDbForConfig(opts: {
+  weights: { key: string; value: number }[];
+  activeProfile: Row | null;
+  skills: { term: string }[];
+  staleCount: number;
+}): DbClient {
+  return {
+    from(table: string) {
+      if (table === 'scoring_weights') {
+        return { select: () => Promise.resolve({ data: opts.weights, error: null }) };
+      }
+      if (table === 'candidate_profile') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () => Promise.resolve({ data: opts.activeProfile, error: null }),
+            }),
+          }),
+        };
+      }
+      if (table === 'profile_skills') {
+        return { select: () => Promise.resolve({ data: opts.skills, error: null }) };
+      }
+      if (table === 'offer_ai_scores') {
+        return {
+          select: () => ({
+            neq: () => Promise.resolve({ count: opts.staleCount, error: null }),
+          }),
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+}
+
+Deno.test('getConfig — expose les poids réglables sous forme de map key -> value', async () => {
+  const db = fakeDbForConfig({
+    weights: [{ key: 'salaire_floor', value: 40000 }, { key: 'tjm_floor', value: 400 }],
+    activeProfile: null,
+    skills: [],
+    staleCount: 0,
+  });
+  const config = await getConfig(db);
+  assertEquals(config.scoringWeights, { salaire_floor: 40000, tjm_floor: 400 });
+});
+
+Deno.test('getConfig — aucun profil actif : activeProfile null, staleProfileOfferCount à 0', async () => {
+  const db = fakeDbForConfig({ weights: [], activeProfile: null, skills: [], staleCount: 999 });
+  const config = await getConfig(db);
+  assertEquals(config.activeProfile, null);
+  assertEquals(config.staleProfileOfferCount, 0);
+});
+
+Deno.test('getConfig — profil actif : profileVersion et compte des offres à profil antérieur', async () => {
+  const db = fakeDbForConfig({
+    weights: [],
+    activeProfile: {
+      id: 2,
+      label: 'CV v2',
+      profile_version: 'cv-2026-09-09',
+      seniority_years: 7,
+      created_at: '2026-09-09T00:00:00Z',
+    },
+    skills: [{ term: 'react' }, { term: 'python' }],
+    staleCount: 42,
+  });
+  const config = await getConfig(db);
+  assertEquals(config.activeProfile?.profileVersion, 'cv-2026-09-09');
+  assertEquals(config.cvSkills, ['react', 'python']);
+  assertEquals(config.staleProfileOfferCount, 42);
+});
+
+// --------------------------------------------------------------------------
+// importCandidateProfile — l'import du CV ne rejuge rien (tâche 10)
+// --------------------------------------------------------------------------
+
+function fakeDbForImport(opts: {
+  currentVersion: string | null;
+  insertedRow: Row;
+  staleCount: number;
+}): { db: DbClient; deactivated: boolean[]; inserted: Row[] } {
+  const deactivated: boolean[] = [];
+  const inserted: Row[] = [];
+  const db = {
+    from(table: string) {
+      if (table === 'candidate_profile') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({
+                  data: opts.currentVersion === null
+                    ? null
+                    : { profile_version: opts.currentVersion },
+                  error: null,
+                }),
+            }),
+          }),
+          update: (patch: Row) => ({
+            eq: () => {
+              deactivated.push(patch.is_active === false);
+              return Promise.resolve({ data: null, error: null });
+            },
+          }),
+          insert: (row: Row) => {
+            inserted.push(row);
+            return {
+              select: () => ({
+                single: () => Promise.resolve({ data: opts.insertedRow, error: null }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === 'offer_ai_scores') {
+        return {
+          select: () => ({
+            neq: () => Promise.resolve({ count: opts.staleCount, error: null }),
+          }),
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+  return { db, deactivated, inserted };
+}
+
+Deno.test('importCandidateProfile — profileVersion identique à la version active : rejeté (400), rien écrit', async () => {
+  const { db, deactivated, inserted } = fakeDbForImport({
+    currentVersion: 'cv-2026-09-08',
+    insertedRow: {},
+    staleCount: 0,
+  });
+  await assertRejects(
+    () =>
+      importCandidateProfile(db, {
+        label: 'CV',
+        cvText: 'texte',
+        seniorityYears: 7,
+        profileVersion: 'cv-2026-09-08',
+      }),
+    ValidationError,
+  );
+  assertEquals(deactivated.length, 0);
+  assertEquals(inserted.length, 0);
+});
+
+Deno.test('importCandidateProfile — version nouvelle : désactive l’ancien profil PUIS insère le nouveau actif', async () => {
+  const { db, deactivated, inserted } = fakeDbForImport({
+    currentVersion: 'cv-2026-09-08',
+    insertedRow: {
+      id: 3,
+      label: 'CV v3',
+      profile_version: 'cv-2026-09-09',
+      seniority_years: 7,
+      created_at: '2026-09-09T10:00:00Z',
+    },
+    staleCount: 1269,
+  });
+  const result = await importCandidateProfile(db, {
+    label: 'CV v3',
+    cvText: 'texte du CV',
+    seniorityYears: 7,
+    profileVersion: 'cv-2026-09-09',
+  });
+  assertEquals(deactivated, [true]);
+  assertEquals(inserted[0]?.is_active, true);
+  assertEquals(inserted[0]?.label, 'CV v3');
+  assertEquals(result.profile.profileVersion, 'cv-2026-09-09');
+  // Le compte reflète la version FRAÎCHEMENT importée, pas l'ancienne — voilà
+  // ce que l'écran doit dire : "1269 offres jugées sous une version antérieure".
+  assertEquals(result.staleProfileOfferCount, 1269);
+});
+
+Deno.test('importCandidateProfile — aucun profil actif au départ : accepté (rien à comparer)', async () => {
+  const { db, deactivated } = fakeDbForImport({
+    currentVersion: null,
+    insertedRow: {
+      id: 1,
+      label: 'Premier CV',
+      profile_version: 'cv-2026-09-09',
+      seniority_years: 7,
+      created_at: '2026-09-09T10:00:00Z',
+    },
+    staleCount: 0,
+  });
+  const result = await importCandidateProfile(db, {
+    label: 'Premier CV',
+    cvText: 'texte',
+    seniorityYears: 7,
+    profileVersion: 'cv-2026-09-09',
+  });
+  assertEquals(result.profile.id, 1);
+  // Rien n'était actif : la désactivation s'exécute quand même (elle ne
+  // touche aucune ligne, `.eq('is_active', true)` sur une table vide de ce
+  // côté), mais rien n'échoue.
+  assertEquals(deactivated, [true]);
+});
+
+// --------------------------------------------------------------------------
+// getOfferDetail — provenance fusionnée (found_by_labels / trusted_query)
+// --------------------------------------------------------------------------
+
+function fakeDbForDetailWithProvenance(): DbClient {
+  const offerRow = { id: 'offer-1', display_key: 'key-1' };
+  return {
+    from(table: string) {
+      if (table === 'offers_dashboard') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: offerRow, error: null }) }),
+          }),
+        };
+      }
+      if (table === 'offer_display_groups') {
+        return {
+          select: () => ({
+            eq: () => Promise.resolve({ data: [{ offer_id: 'offer-1' }], error: null }),
+          }),
+        };
+      }
+      if (table === 'offers_scored') {
+        return {
+          select: () => ({
+            in: () =>
+              Promise.resolve({
+                data: [{ id: 'offer-1', confidence: 'haute', final_score: 80 }],
+                error: null,
+              }),
+          }),
+        };
+      }
+      if (table === 'offers_ranked') {
+        return {
+          select: () => ({
+            in: () =>
+              Promise.resolve({
+                data: [
+                  {
+                    id: 'offer-1',
+                    found_by_labels: ['adzuna:local:react-ts'],
+                    trusted_query: true,
+                  },
+                ],
+                error: null,
+              }),
+          }),
+        };
+      }
+      if (table === 'offer_application_state') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+          }),
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+}
+
+Deno.test('getOfferDetail — found_by_labels/trusted_query lus sur offers_ranked, fusionnés sur offer ET groupJudgements', async () => {
+  const db = fakeDbForDetailWithProvenance();
+  const detail = await getOfferDetail(db, 'offer-1');
+  assertEquals(detail?.offer.found_by_labels, ['adzuna:local:react-ts']);
+  assertEquals(detail?.offer.trusted_query, true);
+  assertEquals(detail?.groupJudgements[0]?.found_by_labels, ['adzuna:local:react-ts']);
+  assertEquals(detail?.groupJudgements[0]?.trusted_query, true);
 });

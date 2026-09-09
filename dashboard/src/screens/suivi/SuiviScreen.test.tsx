@@ -17,7 +17,7 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
   return {
     listBrief: vi.fn(),
     listOffers: vi.fn().mockImplementation((filters?: OffersListFilters) => {
-      const statut = filters?.statut;
+      const statut = filters?.statut?.[0];
       const rows = statut === undefined ? [] : (OFFRES_PAR_STATUT[statut] ?? []);
       return Promise.resolve({ rows, total: rows.length, page: 1, pageSize: 3 });
     }),
@@ -35,10 +35,18 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
       streak: { days: 3, recentDays: [{ date: '2026-09-09', sent: true }] },
       neverOpened: 23,
       responseRate: { responses: 1, sent: 5 },
+      decidedToday: 2,
     }),
     getOfferDetail: vi.fn(),
     openOffer: vi.fn(),
     patchApplication: vi.fn(),
+    getConfig: vi.fn().mockResolvedValue({
+      scoringWeights: { salaire_floor: 40000 },
+      activeProfile: null,
+      cvSkills: [],
+      staleProfileOfferCount: 0,
+    }),
+    importCandidateProfile: vi.fn(),
     ...overrides,
   };
 }

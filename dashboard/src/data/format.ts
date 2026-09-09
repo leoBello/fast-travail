@@ -118,18 +118,6 @@ export function formatLieu(row: OfferDashboardRow): Lieu {
   return { connu: false };
 }
 
-/**
- * Le plancher qui distingue un salaire « sûr » d'un salaire « incertain »
- * (GUIDELINES §3.6). Dupliqué de `scoring_weights.salaire_floor`
- * (migration `20260909040000_remuneration_par_nature_et_plafond_technos.sql`,
- * valeur semée : 40000) : l'API `api-dashboard` n'expose pas cette table,
- * donc ce nombre ne peut pas être lu en direct. **Réserve** : si ce poids
- * est un jour réglé via `UPDATE scoring_weights` (CLAUDE.md le décrit comme
- * gratuit et rétroactif), cette copie divergera silencieusement — signalé
- * dans le rapport de tâche, pas résolu ici faute d'une route qui l'expose.
- */
-export const SALAIRE_FLOOR_DUPLIQUE = 40000;
-
 export type Compensation =
   { kind: 'connu'; texte: string } | { kind: 'incertain'; texte: string } | { kind: 'absent' };
 
@@ -141,11 +129,24 @@ export type Compensation =
  * forme distincte. `formatCompensation` ci-dessous n'est plus qu'un appel à
  * celle-ci : aucun comportement ne change, l'extraction rend seulement la
  * logique réutilisable sans la dupliquer (GUIDELINES §1, « le kit s'étend »).
+ *
+ * `salaireFloor` : le seuil qui distingue un salaire « sûr » d'un salaire
+ * « incertain » (GUIDELINES §3.6) — `scoring_weights.salaire_floor`, lu via
+ * `GET /config` (tâche 10), **jamais recopié en dur**. Avant tâche 10, ce
+ * nombre était dupliqué ici (`SALAIRE_FLOOR_DUPLIQUE = 40000`) parce
+ * qu'aucune route ne l'exposait — un `UPDATE scoring_weights` en base
+ * (CLAUDE.md : gratuit et rétroactif) divergeait donc silencieusement de
+ * cette copie. `null` tant que `/config` n'a pas répondu : dans ce cas, un
+ * montant `salaire` est rendu `connu` SANS le distinguer « incertain » —
+ * jamais l'inverse (un `incertain` affirmé sur un seuil pas encore lu
+ * inventerait un fait) — le badge se complète dès que `/config` répond, un
+ * bref instant après le premier rendu.
  */
 export function formatCompensationValeurs(
   kind: CompensationKind,
   min: number | null,
   max: number | null,
+  salaireFloor: number | null,
 ): Compensation {
   const valeur = max ?? min ?? null;
   if (kind === null || valeur === null) return { kind: 'absent' };
@@ -156,14 +157,20 @@ export function formatCompensationValeurs(
 
   // kind === 'salaire'
   const texte = t('matin.salaire', Math.round(valeur / 1000));
-  return valeur < SALAIRE_FLOOR_DUPLIQUE ? { kind: 'incertain', texte } : { kind: 'connu', texte };
+  return salaireFloor !== null && valeur < salaireFloor
+    ? { kind: 'incertain', texte }
+    : { kind: 'connu', texte };
 }
 
-export function formatCompensation(row: OfferDashboardRow): Compensation {
+export function formatCompensation(
+  row: OfferDashboardRow,
+  salaireFloor: number | null,
+): Compensation {
   return formatCompensationValeurs(
     row.compensation_kind,
     row.compensation_min,
     row.compensation_max,
+    salaireFloor,
   );
 }
 
@@ -247,4 +254,21 @@ export function scoreJetons(row: OfferDashboardRow): ScoreJeton[] {
   }
 
   return jetons;
+}
+
+/**
+ * Vrai si `techno` (un élément de `extraction.stack`) est un terme de
+ * `profile_skills` — tâche 10, `Detail.dc.html` : « En vert, les N
+ * technologies présentes dans votre CV ». Comparaison insensible à la casse
+ * (`profile_skills.term` est semé en minuscules, `stack` ne l'est pas
+ * forcément — ex. « React », « TypeScript »).
+ *
+ * `cvSkills === null` (tant que `GET /config` n'a pas répondu) rend
+ * systématiquement `false` : aucune techno n'est mise en avant plutôt que
+ * de deviner — jamais l'inverse (affirmer une correspondance non confirmée).
+ */
+export function estTechnoDuCv(cvSkills: readonly string[] | null, techno: string): boolean {
+  if (cvSkills === null) return false;
+  const cible = techno.toLowerCase();
+  return cvSkills.some((terme) => terme.toLowerCase() === cible);
 }

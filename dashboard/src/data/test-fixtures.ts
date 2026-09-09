@@ -63,6 +63,8 @@ export function ligneOffre(partiel: Partial<OfferDashboardRow> = {}): OfferDashb
     candidature_relancee_le: null,
     candidature_entretien_le: null,
     candidature_heritee: null,
+    found_by_labels: [],
+    trusted_query: false,
     ...partiel,
   };
 }
@@ -117,6 +119,8 @@ export function jugementOffre(partiel: Partial<OfferScoredRow> = {}): OfferScore
     malus_technos: 0,
     malus_fraicheur: 0,
     final_score: 80,
+    found_by_labels: [],
+    trusted_query: false,
     ...partiel,
   };
 }

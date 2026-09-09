@@ -26,6 +26,13 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
       .fn()
       .mockResolvedValue({ offer_id: 'off-1', status: 'a_traiter', created_at: '' }),
     patchApplication: vi.fn().mockResolvedValue(etatCandidature({ status: 'retenue' })),
+    getConfig: vi.fn().mockResolvedValue({
+      scoringWeights: { salaire_floor: 40000 },
+      activeProfile: null,
+      cvSkills: [],
+      staleProfileOfferCount: 0,
+    }),
+    importCandidateProfile: vi.fn(),
     ...overrides,
   };
 }
@@ -137,6 +144,82 @@ describe('DetailScreen', () => {
     );
     expect(client.openOffer).not.toHaveBeenCalled();
   });
+
+  it(
+    '« Trouvée par » (tâche 10) : affiche les étiquettes de requête et le badge de confiance, ' +
+      'omet la section quand il n’y a ni étiquette ni requête de confiance',
+    async () => {
+      const client = clientFactice({
+        getOfferDetail: vi.fn().mockResolvedValue({
+          offer: ligneOffre({
+            id: 'off-1',
+            found_by_labels: ['adzuna:local:react-ts', 'free-work:react'],
+            trusted_query: true,
+          }),
+          groupJudgements: [],
+          application: null,
+        }),
+      });
+      render(<DetailScreen client={client} offerId="off-1" onRetour={() => {}} />);
+
+      await waitFor(() => expect(screen.getByText('Trouvée par')).toBeDefined());
+      expect(screen.getByText('adzuna:local:react-ts')).toBeDefined();
+      expect(screen.getByText('free-work:react')).toBeDefined();
+      expect(screen.getByText('requête de confiance')).toBeDefined();
+    },
+  );
+
+  it('« Trouvée par » est absente quand l’offre n’a ni étiquette ni requête de confiance', async () => {
+    const client = clientFactice(); // OFFRE par défaut : found_by_labels: [], trusted_query: false
+    render(<DetailScreen client={client} offerId="off-1" onRetour={() => {}} />);
+    await waitFor(() => expect(screen.getByText(OFFRE.title!)).toBeDefined());
+    expect(screen.queryByText('Trouvée par')).toBeNull();
+  });
+
+  it(
+    'colore en vert les technologies de la stack présentes dans profile_skills (tâche 10), ' +
+      'jamais les autres',
+    async () => {
+      const client = clientFactice({
+        getConfig: vi.fn().mockResolvedValue({
+          scoringWeights: { salaire_floor: 40000 },
+          activeProfile: null,
+          cvSkills: ['react', 'typescript'],
+          staleProfileOfferCount: 0,
+        }),
+        getOfferDetail: vi.fn().mockResolvedValue({
+          offer: ligneOffre({
+            id: 'off-1',
+            extraction: {
+              stack: ['React', 'NestJS'],
+              seniority: null,
+              work_mode: null,
+              engagement: null,
+              duration_months: null,
+              compensation_kind: null,
+              compensation_min: null,
+              compensation_max: null,
+              agentic_ai: false,
+              unwanted_tech: [],
+              domain: null,
+              confidence: 'haute',
+            },
+          }),
+          groupJudgements: [],
+          application: null,
+        }),
+      });
+      render(<DetailScreen client={client} offerId="off-1" onRetour={() => {}} />);
+
+      const reactBadge = await waitFor(() => screen.getByText('React'));
+      const nestBadge = screen.getByText('NestJS');
+      await waitFor(() =>
+        expect(screen.getByText(/technologie.*présente.*dans votre CV/)).toBeDefined(),
+      );
+      expect(reactBadge.className).toMatch(/techCv/);
+      expect(nestBadge.className).not.toMatch(/techCv/);
+    },
+  );
 
   it('une action qui échoue laisse un message d’erreur nommé, sans faire planter l’écran', async () => {
     const user = userEvent.setup();

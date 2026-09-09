@@ -6,11 +6,13 @@ import {
   type ApplicationPatchInput,
   type ApplicationStatus,
   BRIEF_THRESHOLD,
+  type CandidateProfileInput,
   DEFAULT_PAGE_SIZE,
-  type Engagement,
   ENGAGEMENTS,
+  getConfig,
   getOfferDetail,
   getStats,
+  importCandidateProfile,
   listBrief,
   listOffers,
   MAX_PAGE,
@@ -19,7 +21,6 @@ import {
   patchApplication,
   SORT_FIELDS,
   type SortField,
-  type Source,
   SOURCES,
   ValidationError,
   WORK_MODE_UNSPECIFIED,
@@ -65,6 +66,32 @@ function requireEnumParam<T extends string>(
     );
   }
   return raw as T;
+}
+
+/**
+ * Version « plusieurs valeurs » de `requireEnumParam` (tâche 10, filtres
+ * multi-valeurs) : chaque occurrence du paramètre (`?statut=a&statut=b`) est
+ * validée individuellement — une seule valeur inconnue rejette tout l'appel
+ * en 400, jamais un tri silencieux qui ignorerait la valeur fautive.
+ * `undefined` quand le paramètre est absent (comportement inchangé : aucune
+ * restriction), `[]` n'est jamais renvoyé — `getAll` sur une clé absente
+ * rend déjà `[]`, distingué ici de « présent » par sa longueur.
+ */
+function requireEnumParamMulti<T extends string>(
+  params: URLSearchParams,
+  key: string,
+  allowed: readonly T[],
+): T[] | undefined {
+  const raw = params.getAll(key);
+  if (raw.length === 0) return undefined;
+  for (const value of raw) {
+    if (!(allowed as readonly string[]).includes(value)) {
+      throw new ValidationError(
+        `paramètre "${key}" invalide : "${value}" — attendu parmi ${allowed.join(', ')}`,
+      );
+    }
+  }
+  return raw as T[];
 }
 
 /** Entier positif ou nul strict : pas de notation scientifique, pas de signe,
@@ -127,27 +154,31 @@ function parsePagination(params: URLSearchParams): { page: number; pageSize: num
   };
 }
 
-function parseWorkModeParam(params: URLSearchParams): WorkModeFilter | undefined {
-  const raw = params.get('workMode');
-  if (raw === null) return undefined;
-  if (raw === WORK_MODE_UNSPECIFIED) return raw;
-  if (!(WORK_MODES as readonly string[]).includes(raw)) {
-    throw new ValidationError(
-      `paramètre "workMode" invalide : "${raw}" — attendu parmi ${
-        WORK_MODES.join(', ')
-      }, ${WORK_MODE_UNSPECIFIED}`,
-    );
+/** Version « plusieurs valeurs » de `workMode` : chaque occurrence peut être
+ * une valeur connue OU `WORK_MODE_UNSPECIFIED` — c'est cette combinaison
+ * qui rend possible « full remote OU non précisé » (tâche 10). */
+function parseWorkModeParamMulti(params: URLSearchParams): WorkModeFilter[] | undefined {
+  const raw = params.getAll('workMode');
+  if (raw.length === 0) return undefined;
+  for (const value of raw) {
+    if (value !== WORK_MODE_UNSPECIFIED && !(WORK_MODES as readonly string[]).includes(value)) {
+      throw new ValidationError(
+        `paramètre "workMode" invalide : "${value}" — attendu parmi ${
+          WORK_MODES.join(', ')
+        }, ${WORK_MODE_UNSPECIFIED}`,
+      );
+    }
   }
-  return raw as WorkModeFilter;
+  return raw as WorkModeFilter[];
 }
 
 function parseOffersListFilters(params: URLSearchParams) {
   const { page, pageSize } = parsePagination(params);
   const sort: SortField = requireEnumParam(params, 'sort', SORT_FIELDS) ?? 'final_score';
-  const statut = requireEnumParam(params, 'statut', APPLICATION_STATUSES);
-  const engagement: Engagement | undefined = requireEnumParam(params, 'engagement', ENGAGEMENTS);
-  const source: Source | undefined = requireEnumParam(params, 'source', SOURCES);
-  const workMode = parseWorkModeParam(params);
+  const statut = requireEnumParamMulti(params, 'statut', APPLICATION_STATUSES);
+  const engagement = requireEnumParamMulti(params, 'engagement', ENGAGEMENTS);
+  const source = requireEnumParamMulti(params, 'source', SOURCES);
+  const workMode = parseWorkModeParamMulti(params);
   const agenticAi = parseBoolParam(params, 'agenticAi');
   const minScore = parseScoreParam(params, 'minScore');
 
@@ -216,6 +247,40 @@ function parseApplicationPatch(body: unknown): ApplicationPatchInput {
   return patch;
 }
 
+/** Parse et valide le corps de `POST /candidate-profile` (tâche 10, l'import
+ * du CV). Les quatre champs sont OBLIGATOIRES — contrairement au `PATCH`
+ * d'application, il n'y a pas de notion de « champ non touché » : un import
+ * pose un profil entier, jamais un correctif partiel. */
+function parseCandidateProfileInput(body: unknown): CandidateProfileInput {
+  if (!isPlainObject(body)) {
+    throw new ValidationError('corps de requête invalide : objet JSON attendu');
+  }
+
+  const label = body.label;
+  if (typeof label !== 'string' || label.trim() === '') {
+    throw new ValidationError('"label" invalide : chaîne non vide attendue');
+  }
+
+  const cvText = body.cvText;
+  if (typeof cvText !== 'string' || cvText.trim() === '') {
+    throw new ValidationError('"cvText" invalide : chaîne non vide attendue');
+  }
+
+  const seniorityYears = body.seniorityYears;
+  if (
+    typeof seniorityYears !== 'number' || !Number.isFinite(seniorityYears) || seniorityYears < 0
+  ) {
+    throw new ValidationError('"seniorityYears" invalide : nombre positif ou nul attendu');
+  }
+
+  const profileVersion = body.profileVersion;
+  if (typeof profileVersion !== 'string' || profileVersion.trim() === '') {
+    throw new ValidationError('"profileVersion" invalide : chaîne non vide attendue');
+  }
+
+  return { label, cvText, seniorityYears, profileVersion };
+}
+
 async function parseJsonBody(req: Request): Promise<unknown> {
   const text = await req.text();
   if (text.trim() === '') return {};
@@ -266,6 +331,15 @@ export async function routeDashboardRequest(
 
     if (req.method === 'GET' && path === '/stats') {
       return Response.json(await getStats(db));
+    }
+
+    if (req.method === 'GET' && path === '/config') {
+      return Response.json(await getConfig(db));
+    }
+
+    if (req.method === 'POST' && path === '/candidate-profile') {
+      const input = parseCandidateProfileInput(await parseJsonBody(req));
+      return Response.json(await importCandidateProfile(db, input), { status: 201 });
     }
 
     const detailMatch = path.match(/^\/offers\/([^/]+)$/);

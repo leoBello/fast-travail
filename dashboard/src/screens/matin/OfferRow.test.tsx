@@ -5,30 +5,37 @@ import { ligneOffre } from '../../data/test-fixtures';
 
 describe('OfferRow', () => {
   it('affiche rang et correspondance, toujours ensemble', () => {
-    render(<OfferRow offer={ligneOffre({ final_score: 94, fit_score: 68 })} />);
+    render(
+      <OfferRow offer={ligneOffre({ final_score: 94, fit_score: 68 })} salaireFloor={40000} />,
+    );
     expect(screen.getByText('94')).toBeDefined();
     expect(screen.getByText('68')).toBeDefined();
   });
 
   it("nomme l'employeur et le lieu absents plutôt que de laisser une case vide", () => {
     const { container } = render(
-      <OfferRow offer={ligneOffre({ company_name: null, city: null, department: null })} />,
+      <OfferRow
+        offer={ligneOffre({ company_name: null, city: null, department: null })}
+        salaireFloor={40000}
+      />,
     );
     expect(container.querySelector('[data-nature="non-publiee"]')).not.toBeNull();
     expect(container.querySelector('[data-nature="non-precisee"]')).not.toBeNull();
   });
 
   it('affiche le badge "N sources" seulement quand le groupe compte plus d’un membre', () => {
-    const { rerender } = render(<OfferRow offer={ligneOffre({ group_size: 1 })} />);
+    const { rerender } = render(
+      <OfferRow offer={ligneOffre({ group_size: 1 })} salaireFloor={40000} />,
+    );
     expect(screen.queryByText(/sources/)).toBeNull();
 
-    rerender(<OfferRow offer={ligneOffre({ group_size: 2 })} />);
+    rerender(<OfferRow offer={ligneOffre({ group_size: 2 })} salaireFloor={40000} />);
     expect(screen.getByText('2 sources')).toBeDefined();
   });
 
   it('affiche les jours écoulés depuis la publication', () => {
     const hier = new Date(Date.now() - 86_400_000).toISOString();
-    render(<OfferRow offer={ligneOffre({ published_at: hier })} />);
+    render(<OfferRow offer={ligneOffre({ published_at: hier })} salaireFloor={40000} />);
     expect(screen.getByText('1 j')).toBeDefined();
   });
 
@@ -36,7 +43,9 @@ describe('OfferRow', () => {
     'une date de publication absente relève de "non publiée" (champ de source manquant), ' +
       'pas de "non précisée" (qui suppose un champ que le modèle aurait dû dégager — GUIDELINES §3.1)',
     () => {
-      const { container } = render(<OfferRow offer={ligneOffre({ published_at: null })} />);
+      const { container } = render(
+        <OfferRow offer={ligneOffre({ published_at: null })} salaireFloor={40000} />,
+      );
       const cellulePubliee = container.querySelector('[class*="publiee"]');
       expect(cellulePubliee).not.toBeNull();
       expect(cellulePubliee?.querySelector('[data-nature="non-publiee"]')).not.toBeNull();
@@ -44,7 +53,9 @@ describe('OfferRow', () => {
   );
 
   it('rend l’absence de titre via `Absence`, pas via un `Absent` nu — uniformité avec les autres cellules', () => {
-    const { container } = render(<OfferRow offer={ligneOffre({ title: null })} />);
+    const { container } = render(
+      <OfferRow offer={ligneOffre({ title: null })} salaireFloor={40000} />,
+    );
     expect(container.querySelector('[data-nature="non-publiee"]')).not.toBeNull();
   });
 });

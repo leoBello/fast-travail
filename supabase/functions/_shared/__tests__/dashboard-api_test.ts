@@ -34,6 +34,8 @@ function chain(result: CannedResult): Record<string, unknown> {
     gte: () => chain(result),
     is: () => chain(result),
     in: () => chain(result),
+    or: () => chain(result),
+    neq: () => chain(result),
     order: () => chain(result),
     range: () => chain(result),
     insert: () => chain(result),
@@ -78,6 +80,16 @@ const invalidQueryCases: { name: string; path: string }[] = [
   { name: 'page non entière', path: '/offers?page=un' },
   { name: 'page à zéro', path: '/offers?page=0' },
   { name: 'pageSize à zéro', path: '/offers?pageSize=0' },
+  // Multi-valeurs (tâche 10) : UNE valeur invalide parmi plusieurs rejette
+  // tout l'appel — jamais un tri silencieux qui ignorerait la fautive.
+  {
+    name: 'statut, deux valeurs dont une inconnue',
+    path: '/offers?statut=retenue&statut=en_cours',
+  },
+  {
+    name: 'workMode, deux valeurs dont une inconnue',
+    path: '/offers?workMode=full_remote&workMode=teletravail',
+  },
 ];
 
 for (const { name, path } of invalidQueryCases) {
@@ -374,4 +386,192 @@ Deno.test('erreur de lecture : 500 avec un message JSON, jamais un plantage muet
   assertEquals(res.status, 500);
   const body = await res.json();
   assertEquals(typeof body.error, 'string');
+});
+
+// --------------------------------------------------------------------------
+// GET /offers — filtres multi-valeurs, plusieurs occurrences acceptées (tâche 10)
+// --------------------------------------------------------------------------
+
+Deno.test('GET /offers — workMode=full_remote&workMode=non_precise : 200, composé sans rejet', async () => {
+  const db = fakeDb(
+    { offers_dashboard: { data: [], error: null, count: 0 } },
+    { data: [], error: null, count: 0 },
+  );
+  const res = await routeDashboardRequest(
+    req('GET', '/offers?workMode=full_remote&workMode=non_precise'),
+    { db },
+  );
+  assertEquals(res.status, 200);
+});
+
+Deno.test('GET /offers — statut=retenue&statut=postulee : 200', async () => {
+  const db = fakeDb(
+    { offers_dashboard: { data: [], error: null, count: 0 } },
+    { data: [], error: null, count: 0 },
+  );
+  const res = await routeDashboardRequest(req('GET', '/offers?statut=retenue&statut=postulee'), {
+    db,
+  });
+  assertEquals(res.status, 200);
+});
+
+// --------------------------------------------------------------------------
+// GET /config (tâche 10)
+// --------------------------------------------------------------------------
+
+Deno.test('GET /config — route vers la configuration : 200, forme attendue', async () => {
+  const db = {
+    from(table: string) {
+      if (table === 'scoring_weights') {
+        return {
+          select: () =>
+            Promise.resolve({ data: [{ key: 'salaire_floor', value: 40000 }], error: null }),
+        };
+      }
+      if (table === 'candidate_profile') {
+        return {
+          select: () => ({
+            eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+          }),
+        };
+      }
+      if (table === 'profile_skills') {
+        return { select: () => Promise.resolve({ data: [{ term: 'react' }], error: null }) };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+  const res = await routeDashboardRequest(req('GET', '/config'), { db });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.scoringWeights, { salaire_floor: 40000 });
+  assertEquals(body.activeProfile, null);
+  assertEquals(body.cvSkills, ['react']);
+  assertEquals(body.staleProfileOfferCount, 0);
+});
+
+// --------------------------------------------------------------------------
+// POST /candidate-profile — l'import du CV (tâche 10)
+// --------------------------------------------------------------------------
+
+const invalidCandidateProfileCases: { name: string; body: unknown }[] = [
+  { name: 'label absent', body: { cvText: 'x', seniorityYears: 7, profileVersion: 'v2' } },
+  {
+    name: 'label vide',
+    body: { label: '  ', cvText: 'x', seniorityYears: 7, profileVersion: 'v2' },
+  },
+  { name: 'cvText absent', body: { label: 'CV', seniorityYears: 7, profileVersion: 'v2' } },
+  {
+    name: 'seniorityYears non numérique',
+    body: { label: 'CV', cvText: 'x', seniorityYears: 'sept', profileVersion: 'v2' },
+  },
+  {
+    name: 'seniorityYears négatif',
+    body: { label: 'CV', cvText: 'x', seniorityYears: -1, profileVersion: 'v2' },
+  },
+  {
+    name: 'profileVersion absente',
+    body: { label: 'CV', cvText: 'x', seniorityYears: 7 },
+  },
+];
+
+for (const { name, body } of invalidCandidateProfileCases) {
+  Deno.test(`POST /candidate-profile — ${name} : 400, base non touchée`, async () => {
+    const res = await routeDashboardRequest(req('POST', '/candidate-profile', body), {
+      db: untouchableDb(),
+    });
+    assertEquals(res.status, 400);
+  });
+}
+
+Deno.test('POST /candidate-profile — entrée valide : 201, désactive puis insère, ne touche jamais offer_ai_scores en ÉCRITURE', async () => {
+  const writes: string[] = [];
+  const db = {
+    from(table: string) {
+      if (table === 'candidate_profile') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({ data: { profile_version: 'cv-2026-09-08' }, error: null }),
+            }),
+          }),
+          update: (_patch: Record<string, unknown>) => ({
+            eq: () => {
+              writes.push('deactivate');
+              return Promise.resolve({ data: null, error: null });
+            },
+          }),
+          insert: (_row: Record<string, unknown>) => {
+            writes.push('insert');
+            return {
+              select: () => ({
+                single: () =>
+                  Promise.resolve({
+                    data: {
+                      id: 2,
+                      label: 'CV v2',
+                      profile_version: 'cv-2026-09-09',
+                      seniority_years: 7,
+                      created_at: '2026-09-09T10:00:00Z',
+                    },
+                    error: null,
+                  }),
+              }),
+            };
+          },
+        };
+      }
+      if (table === 'offer_ai_scores') {
+        return { select: () => ({ neq: () => Promise.resolve({ count: 1269, error: null }) }) };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+
+  const res = await routeDashboardRequest(
+    req('POST', '/candidate-profile', {
+      label: 'CV v2',
+      cvText: 'texte du CV',
+      seniorityYears: 7,
+      profileVersion: 'cv-2026-09-09',
+    }),
+    { db },
+  );
+  assertEquals(res.status, 201);
+  const body = await res.json();
+  assertEquals(body.profile.profileVersion, 'cv-2026-09-09');
+  assertEquals(body.staleProfileOfferCount, 1269);
+  assertEquals(writes, ['deactivate', 'insert']);
+});
+
+Deno.test('POST /candidate-profile — même profileVersion que le profil actif : 400 (CLAUDE.md : jamais sans faire évoluer la version)', async () => {
+  const db = {
+    from(table: string) {
+      if (table === 'candidate_profile') {
+        return {
+          select: () => ({
+            eq: () => ({
+              maybeSingle: () =>
+                Promise.resolve({ data: { profile_version: 'cv-2026-09-08' }, error: null }),
+            }),
+          }),
+          update: () => {
+            throw new Error("n'aurait pas dû écrire : rejeté avant toute écriture");
+          },
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+  const res = await routeDashboardRequest(
+    req('POST', '/candidate-profile', {
+      label: 'CV',
+      cvText: 'texte',
+      seniorityYears: 7,
+      profileVersion: 'cv-2026-09-08',
+    }),
+    { db },
+  );
+  assertEquals(res.status, 400);
 });

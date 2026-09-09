@@ -116,3 +116,19 @@
 .boutonPrimaire:not(:disabled):hover {
   filter: brightness(1.1);
 }
+
+.provenance {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0 4px;
+}
+
+.provenanceTitre {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--color-text-faint);
+  font-weight: 600;
+}

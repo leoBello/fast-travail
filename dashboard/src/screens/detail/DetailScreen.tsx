@@ -12,6 +12,7 @@ import { Absence } from '../../ui/kit/Absence';
 import { Badge } from '../../ui/kit/Badge';
 import { EmptyState } from '../../ui/kit/EmptyState';
 import { t } from '../../i18n/i18n';
+import { useConfig } from '../matin/hooks';
 import { ExtractionSection } from './ExtractionSection';
 import { RankSection } from './RankSection';
 import { SuiviSection } from './SuiviSection';
@@ -45,6 +46,17 @@ export function DetailScreen({ client, offerId, onRetour }: Props) {
   const [detailState, recharger] = useOfferDetail(client, offerId);
   const [enTraitement, setEnTraitement] = useState(false);
   const [erreurAction, setErreurAction] = useState(false);
+
+  // Appel réseau INDÉPENDANT de `useOfferDetail` (même principe que
+  // `MatinScreen`, où `/stats` et `/brief` sont deux appels séparés) : le
+  // plancher de salaire et les compétences du CV (tâche 10, `GET /config`)
+  // n'ont pas besoin d'attendre — ni de bloquer — le détail de l'offre.
+  const [configState] = useConfig(client);
+  const salaireFloor =
+    configState.statut === 'succes'
+      ? (configState.donnees.scoringWeights.salaire_floor ?? null)
+      : null;
+  const cvSkills = configState.statut === 'succes' ? configState.donnees.cvSkills : null;
 
   const applicationConnue =
     detailState.statut === 'succes' && detailState.donnees !== null
@@ -196,10 +208,14 @@ export function DetailScreen({ client, offerId, onRetour }: Props) {
       <RankSection offer={offer} />
 
       {offer.group_size > 1 ? (
-        <TwoSourcesPanel offerId={offer.id} judgements={groupJudgements} />
+        <TwoSourcesPanel
+          offerId={offer.id}
+          judgements={groupJudgements}
+          salaireFloor={salaireFloor}
+        />
       ) : null}
 
-      <ExtractionSection offer={offer} />
+      <ExtractionSection offer={offer} salaireFloor={salaireFloor} cvSkills={cvSkills} />
 
       <SuiviSection
         application={application}
@@ -209,6 +225,34 @@ export function DetailScreen({ client, offerId, onRetour }: Props) {
         onEcarter={ecarter}
         onDefinirIssue={definirIssue}
       />
+
+      <ProvenanceSection labels={offer.found_by_labels} trustedQuery={offer.trusted_query} />
+    </div>
+  );
+}
+
+/**
+ * « Trouvée par » (`Detail.dc.html`) : les étiquettes des requêtes qui ont
+ * ramené cette offre, et si l'une d'elles est `anchored` (tâche 10,
+ * `offers_ranked.found_by_labels`/`trusted_query`). Ne rend rien s'il n'y a
+ * ni étiquette ni requête de confiance : une section vide n'aurait rien à
+ * montrer — mieux vaut l'omettre que l'afficher creuse.
+ */
+function ProvenanceSection({ labels, trustedQuery }: { labels: string[]; trustedQuery: boolean }) {
+  if (labels.length === 0 && !trustedQuery) return null;
+  return (
+    <div className={styles.provenance}>
+      <span className={styles.provenanceTitre}>{t('detail.trouveePar')}</span>
+      {labels.map((label) => (
+        <Badge key={label} ton="neutre" taille="compacte" discontinu>
+          {label}
+        </Badge>
+      ))}
+      {trustedQuery ? (
+        <Badge ton="accent" taille="compacte">
+          {t('detail.requeteConfiance')}
+        </Badge>
+      ) : null}
     </div>
   );
 }

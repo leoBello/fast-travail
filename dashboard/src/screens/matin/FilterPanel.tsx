@@ -4,10 +4,13 @@ import type { WorkModeCounts } from './hooks';
 import { t } from '../../i18n/i18n';
 import styles from './FilterPanel.module.css';
 
+/** Chaque dimension accepte plusieurs valeurs, composées en `OU` par le
+ * serveur (tâche 10) — `undefined` : aucune sélection, ce dashboard ne
+ * construit jamais de tableau vide. */
 export interface FilterState {
-  workMode?: WorkModeFilter;
-  engagement?: Engagement;
-  source?: Source;
+  workMode?: WorkModeFilter[];
+  engagement?: Engagement[];
+  source?: Source[];
   agenticAi?: boolean;
 }
 
@@ -21,11 +24,11 @@ interface Props {
 
 const TOUS_WORK_MODES: WorkModeFilter[] = [...WORK_MODES, WORK_MODE_UNSPECIFIED];
 
-interface GroupeRadioProps<V extends string> {
+interface GroupeCaseProps<V extends string> {
   nom: string;
   valeurs: readonly V[];
-  selection: V | undefined;
-  onChange: (valeur: V | undefined) => void;
+  selection: readonly V[] | undefined;
+  onChange: (valeurs: V[]) => void;
   libelle: (valeur: V) => string;
   /** Le compte à afficher pour chaque valeur — absent si cette dimension
    * n'est pas chiffrée (seul `work_mode` l'est, GUIDELINES §3.2). */
@@ -34,20 +37,17 @@ interface GroupeRadioProps<V extends string> {
 }
 
 /**
- * Un groupe de boutons radio EXCLUSIFS, avec la possibilité de revenir à
- * "aucune sélection" — ce que `<input type="radio">` natif ne permet pas
- * (cliquer un radio déjà coché ne le décoche jamais, aucun `onChange` ne se
- * déclenche). `onClick` se déclenche, lui, à CHAQUE clic y compris sur une
- * option déjà cochée : c'est lui qui porte la logique de désélection,
- * `onChange` ne portant que la sélection d'une valeur différente.
+ * Un groupe de cases à cocher INDÉPENDANTES, une par valeur possible d'une
+ * dimension — plusieurs valeurs composées en `OU` côté serveur (tâche 10).
  *
- * Remplace les cases à cocher de la version précédente (revue de tâche 7) :
- * une case à cocher signifie "sélection indépendante" pour un lecteur
- * d'écran comme pour l'œil, alors que l'API (`GET /offers`) ne retient
- * qu'UNE valeur par dimension — cocher une case en décochait une autre,
- * silencieusement. `type="radio"` rend ce comportement honnête.
+ * **Remplace les boutons radio de la tâche 7** : ceux-ci n'étaient qu'un
+ * pis-aller honnête devant une API qui ne retenait qu'UNE valeur par
+ * dimension — cocher une case en aurait silencieusement décoché une autre.
+ * `GET /offers` compose désormais un `OU` sur plusieurs valeurs, et c'est ce
+ * qui rend possible « full remote OU non précisé », la requête réellement
+ * utile (`work_mode` nul sur 863 offres, 68 % du corpus — GUIDELINES §3.2).
  */
-function GroupeRadio<V extends string>({
+function GroupeCase<V extends string>({
   nom,
   valeurs,
   selection,
@@ -55,19 +55,22 @@ function GroupeRadio<V extends string>({
   libelle,
   compte,
   classeLigne,
-}: GroupeRadioProps<V>) {
+}: GroupeCaseProps<V>) {
+  const selectionnees = new Set(selection ?? []);
   return (
     <>
       {valeurs.map((valeur) => (
         <label key={valeur} className={classeLigne?.(valeur) ?? styles.ligne}>
           <input
-            type="radio"
+            type="checkbox"
             name={nom}
             value={valeur}
-            checked={selection === valeur}
-            onChange={() => onChange(valeur)}
-            onClick={() => {
-              if (selection === valeur) onChange(undefined);
+            checked={selectionnees.has(valeur)}
+            onChange={() => {
+              const suivant = new Set(selectionnees);
+              if (suivant.has(valeur)) suivant.delete(valeur);
+              else suivant.add(valeur);
+              onChange([...suivant]);
             }}
           />
           <span className={styles.libelle}>{libelle(valeur)}</span>
@@ -78,6 +81,12 @@ function GroupeRadio<V extends string>({
   );
 }
 
+/** Un tableau vide vaut `undefined` (aucune restriction) : ce dashboard ne
+ * construit jamais de tableau vide dans l'état de filtre. */
+function versFiltre<V>(valeurs: V[]): V[] | undefined {
+  return valeurs.length === 0 ? undefined : valeurs;
+}
+
 /**
  * Le panneau de filtres (`Etats.dc.html`, « Filtres — aucun coché au
  * démarrage »).
@@ -86,14 +95,14 @@ function GroupeRadio<V extends string>({
  * texte libre — task-7-brief.md) : ce panneau ne facette que les quatre
  * dimensions que l'API borne à un vocabulaire fermé.
  *
- * `work_mode` est le seul filtre exclusif dont la ligne « non précisé » est
- * chiffrée : GUIDELINES §3.2, 863 offres (68 % du corpus) n'ont aucun mode de
- * travail connu — la cocher masquerait silencieusement les deux tiers du
- * corpus sans le dire. Les autres dimensions (engagement, source) sont aussi
- * des choix exclusifs (l'API ne filtre que sur UNE valeur à la fois), mais
- * sans ce piège documenté : rien n'impose de compter leur cas nul.
+ * `work_mode` est le seul filtre dont la ligne « non précisé » est chiffrée :
+ * GUIDELINES §3.2, 863 offres (68 % du corpus) n'ont aucun mode de travail
+ * connu — la cocher masquerait silencieusement les deux tiers du corpus sans
+ * le dire. C'est aussi la case qui rend « full remote OU non précisé »
+ * possible : cocher les deux compose un `OU` côté serveur (tâche 10),
+ * jamais un `ET` qui ne rendrait plus rien.
  *
- * Chaque dimension exclusive vit dans un `<fieldset>` : le titre de section
+ * Chaque dimension vit dans un `<fieldset>` : le titre de section
  * (`<legend>`) est alors relié PROGRAMMATIQUEMENT à ses champs, pas
  * seulement visuellement — un lecteur d'écran annonce « Mode de travail,
  * Full remote, case à cocher » plutôt que « Full remote » nu.
@@ -103,11 +112,11 @@ export function FilterPanel({ valeurs, onChange, comptesModeTravail }: Props) {
     <div className={styles.panneau} role="group" aria-label={t('matin.filtres')}>
       <fieldset className={styles.fieldset}>
         <legend className={styles.titreSection}>{t('matin.filtreModeTravail')}</legend>
-        <GroupeRadio
+        <GroupeCase
           nom="workMode"
           valeurs={TOUS_WORK_MODES}
           selection={valeurs.workMode}
-          onChange={(workMode) => onChange({ ...valeurs, workMode })}
+          onChange={(workMode) => onChange({ ...valeurs, workMode: versFiltre(workMode) })}
           libelle={(v) =>
             v === WORK_MODE_UNSPECIFIED ? t('teletravail.nonPrecise') : t(`teletravail.${v}`)
           }
@@ -120,22 +129,22 @@ export function FilterPanel({ valeurs, onChange, comptesModeTravail }: Props) {
 
       <fieldset className={styles.fieldset}>
         <legend className={styles.titreSection}>{t('matin.filtreEngagement')}</legend>
-        <GroupeRadio
+        <GroupeCase
           nom="engagement"
           valeurs={ENGAGEMENTS}
           selection={valeurs.engagement}
-          onChange={(engagement) => onChange({ ...valeurs, engagement })}
+          onChange={(engagement) => onChange({ ...valeurs, engagement: versFiltre(engagement) })}
           libelle={(v) => t(`engagement.${v}`)}
         />
       </fieldset>
 
       <fieldset className={styles.fieldset}>
         <legend className={styles.titreSection}>{t('matin.filtreSource')}</legend>
-        <GroupeRadio
+        <GroupeCase
           nom="source"
           valeurs={SOURCES}
           selection={valeurs.source}
-          onChange={(source) => onChange({ ...valeurs, source })}
+          onChange={(source) => onChange({ ...valeurs, source: versFiltre(source) })}
           libelle={(v) => t(`sources.${v}`)}
         />
       </fieldset>

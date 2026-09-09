@@ -29,6 +29,9 @@ interface Props {
    * `Écarter`, l'annonce d'origine), et un élément interactif ne peut pas en
    * envelopper un autre sans DOM invalide. */
   onOuvrir?: (id: string) => void;
+  /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
+   * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
+  salaireFloor: number | null;
 }
 
 /**
@@ -41,9 +44,16 @@ interface Props {
  * (titre, badges, verdict) s'intercale entre les deux, comme la maquette le
  * dessine.
  */
-export function OfferCard({ offer, onGarder, onEcarter, enTraitement, onOuvrir }: Props) {
+export function OfferCard({
+  offer,
+  onGarder,
+  onEcarter,
+  enTraitement,
+  onOuvrir,
+  salaireFloor,
+}: Props) {
   const employeur = formatEmployeur(offer);
-  const compensation = formatCompensation(offer);
+  const compensation = formatCompensation(offer, salaireFloor);
   const texteCoupe = badgeTexteCoupe(offer);
   const jetons = scoreJetons(offer);
 

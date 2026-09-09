@@ -6,11 +6,11 @@ import {
   badgesDeFaits,
   badgeTeletravail,
   badgeTexteCoupe,
+  estTechnoDuCv,
   formatCompensation,
   formatEmployeur,
   formatLieu,
   formatPublication,
-  SALAIRE_FLOOR_DUPLIQUE,
   scoreJetons,
 } from './format';
 import { ligneOffre as ligne } from './test-fixtures';
@@ -78,9 +78,12 @@ describe('formatEmployeur / formatLieu — absences nommées, jamais une case vi
 });
 
 describe('formatCompensation — trois rendus, jamais un nombre nu (GUIDELINES §3.6)', () => {
+  const PLANCHER = 40000; // scoring_weights.salaire_floor, valeur semée — lu via GET /config en vrai.
+
   it("rend un TJM connu, quelle que soit sa valeur — jamais 'incertain' côté TJM", () => {
     const c = formatCompensation(
       ligne({ compensation_kind: 'tjm', compensation_min: 450, compensation_max: null }),
+      PLANCHER,
     );
     expect(c).toEqual({ kind: 'connu', texte: '450 €/j' });
   });
@@ -88,18 +91,20 @@ describe('formatCompensation — trois rendus, jamais un nombre nu (GUIDELINES �
   it('rend un salaire au-dessus du plancher comme connu', () => {
     const c = formatCompensation(
       ligne({ compensation_kind: 'salaire', compensation_min: null, compensation_max: 65000 }),
+      PLANCHER,
     );
     expect(c).toEqual({ kind: 'connu', texte: '65 k€/an' });
   });
 
   it('rend un salaire sous le plancher comme incertain — le montant existe, son unité non (P22)', () => {
-    const sousLePlancher = SALAIRE_FLOOR_DUPLIQUE - 1000;
+    const sousLePlancher = PLANCHER - 1000;
     const c = formatCompensation(
       ligne({
         compensation_kind: 'salaire',
         compensation_min: sousLePlancher,
         compensation_max: null,
       }),
+      PLANCHER,
     );
     expect(c.kind).toBe('incertain');
   });
@@ -107,8 +112,32 @@ describe('formatCompensation — trois rendus, jamais un nombre nu (GUIDELINES �
   it("rend 'absent' quand rien n'a été extrait", () => {
     const c = formatCompensation(
       ligne({ compensation_kind: null, compensation_min: null, compensation_max: null }),
+      PLANCHER,
     );
     expect(c).toEqual({ kind: 'absent' });
+  });
+
+  it("salaireFloor encore inconnu (null, /config pas répondu) : rendu 'connu', jamais 'incertain' sans preuve (tâche 10)", () => {
+    const c = formatCompensation(
+      ligne({ compensation_kind: 'salaire', compensation_min: 4000, compensation_max: null }),
+      null,
+    );
+    expect(c.kind).toBe('connu');
+  });
+});
+
+describe('estTechnoDuCv — les technos présentes dans profile_skills (tâche 10)', () => {
+  it('reconnaît une techno du CV, insensible à la casse', () => {
+    expect(estTechnoDuCv(['react', 'typescript'], 'React')).toBe(true);
+    expect(estTechnoDuCv(['react', 'typescript'], 'TypeScript')).toBe(true);
+  });
+
+  it('ne reconnaît pas une techno absente de profile_skills', () => {
+    expect(estTechnoDuCv(['react'], 'NestJS')).toBe(false);
+  });
+
+  it('cvSkills=null (chargement de /config) : jamais de correspondance affirmée', () => {
+    expect(estTechnoDuCv(null, 'React')).toBe(false);
   });
 });
 

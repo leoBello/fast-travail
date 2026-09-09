@@ -58,7 +58,7 @@ describe('createDashboardClient', () => {
     });
     const client = createDashboardClient({ ...CONFIG, fetchImpl });
 
-    await client.listOffers({ workMode: 'non_precise', sort: 'fit_score', page: 2 });
+    await client.listOffers({ workMode: ['non_precise'], sort: 'fit_score', page: 2 });
 
     const url = new URL(capturedUrl);
     expect(url.searchParams.get('workMode')).toBe('non_precise');
@@ -121,6 +121,84 @@ describe('countByWorkMode', () => {
     const total = await countByWorkMode(client, 'non_precise');
 
     expect(total).toBe(863);
-    expect(listOffers).toHaveBeenCalledWith({ workMode: 'non_precise', pageSize: 1 });
+    expect(listOffers).toHaveBeenCalledWith({ workMode: ['non_precise'], pageSize: 1 });
+  });
+});
+
+describe('buildQuery — filtres multi-valeurs (tâche 10)', () => {
+  it('un tableau pose la MÊME clé plusieurs fois, dans l’ordre', async () => {
+    let capturedUrl = '';
+    const fetchImpl = fakeFetch((url) => {
+      capturedUrl = url;
+      return jsonResponse(200, { rows: [], total: 0, page: 1, pageSize: 20 });
+    });
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    await client.listOffers({ workMode: ['full_remote', 'non_precise'] });
+
+    const url = new URL(capturedUrl);
+    expect(url.searchParams.getAll('workMode')).toEqual(['full_remote', 'non_precise']);
+  });
+
+  it('un tableau vide ne pose aucun paramètre — comme absent', async () => {
+    let capturedUrl = '';
+    const fetchImpl = fakeFetch((url) => {
+      capturedUrl = url;
+      return jsonResponse(200, { rows: [], total: 0, page: 1, pageSize: 20 });
+    });
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    await client.listOffers({ statut: [] });
+
+    expect(new URL(capturedUrl).searchParams.has('statut')).toBe(false);
+  });
+});
+
+describe('getConfig / importCandidateProfile (tâche 10)', () => {
+  it('getConfig appelle GET /config', async () => {
+    let capturedUrl = '';
+    const fetchImpl = fakeFetch((url) => {
+      capturedUrl = url;
+      return jsonResponse(200, {
+        scoringWeights: { salaire_floor: 40000 },
+        activeProfile: null,
+        cvSkills: [],
+        staleProfileOfferCount: 0,
+      });
+    });
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    const config = await client.getConfig();
+
+    expect(capturedUrl).toContain('/config');
+    expect(config.scoringWeights.salaire_floor).toBe(40000);
+  });
+
+  it('importCandidateProfile POST /candidate-profile avec le corps JSON de l’import', async () => {
+    let capturedInit: RequestInit | undefined;
+    const fetchImpl = fakeFetch((_url, init) => {
+      capturedInit = init;
+      return jsonResponse(201, {
+        profile: {
+          id: 2,
+          label: 'CV v2',
+          profileVersion: 'cv-2026-09-09',
+          seniorityYears: 7,
+          createdAt: '2026-09-09T10:00:00Z',
+        },
+        staleProfileOfferCount: 1269,
+      });
+    });
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    const result = await client.importCandidateProfile({
+      label: 'CV v2',
+      cvText: 'texte',
+      seniorityYears: 7,
+      profileVersion: 'cv-2026-09-09',
+    });
+
+    expect(capturedInit?.method).toBe('POST');
+    expect(result.staleProfileOfferCount).toBe(1269);
   });
 });

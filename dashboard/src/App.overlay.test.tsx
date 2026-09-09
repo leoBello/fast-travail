@@ -79,6 +79,8 @@ vi.mock('./data/client', async (importOriginal) => {
     candidature_relancee_le: null,
     candidature_entretien_le: null,
     candidature_heritee: null,
+    found_by_labels: [],
+    trusted_query: false,
   };
   return {
     ...reel,
@@ -99,12 +101,20 @@ vi.mock('./data/client', async (importOriginal) => {
         streak: { days: 0, recentDays: [] },
         neverOpened: 0,
         responseRate: { responses: 0, sent: 0 },
+        decidedToday: 0,
       }),
       getOfferDetail: vi
         .fn()
         .mockResolvedValue({ offer: offre, groupJudgements: [], application: null }),
       openOffer: vi.fn(),
       patchApplication: vi.fn(),
+      getConfig: vi.fn().mockResolvedValue({
+        scoringWeights: { salaire_floor: 40000 },
+        activeProfile: null,
+        cvSkills: [],
+        staleProfileOfferCount: 0,
+      }),
+      importCandidateProfile: vi.fn(),
     }),
   };
 });

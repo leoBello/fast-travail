@@ -28,7 +28,13 @@ export function usePipelineColonne(
   statut: ApplicationStatus,
 ): [AsyncState<PageResult<OfferDashboardRow>>, () => void] {
   const fn = useCallback(
-    () => client.listOffers({ statut, sort: 'final_score', page: 1, pageSize: CARTES_PAR_COLONNE }),
+    () =>
+      client.listOffers({
+        statut: [statut],
+        sort: 'final_score',
+        page: 1,
+        pageSize: CARTES_PAR_COLONNE,
+      }),
     [client, statut],
   );
   return useAsync(fn);

@@ -3,6 +3,7 @@ import type { DashboardClient } from '../../data/client';
 import { countByWorkMode } from '../../data/client';
 import { WORK_MODE_UNSPECIFIED, WORK_MODES } from '../../data/types';
 import type {
+  ConfigResult,
   Engagement,
   OfferDashboardRow,
   PageResult,
@@ -32,9 +33,9 @@ export interface OffersListParams {
   sort: SortField;
   page: number;
   pageSize: number;
-  workMode?: WorkModeFilter;
-  engagement?: Engagement;
-  source?: Source;
+  workMode?: WorkModeFilter[];
+  engagement?: Engagement[];
+  source?: Source[];
   agenticAi?: boolean;
 }
 
@@ -70,5 +71,18 @@ export function useWorkModeCounts(
     const comptes = await Promise.all(valeurs.map((v) => countByWorkMode(client, v)));
     return Object.fromEntries(valeurs.map((v, i) => [v, comptes[i]])) as WorkModeCounts;
   }, [client]);
+  return useAsync(fn);
+}
+
+/**
+ * `GET /config` (tâche 10) : poids réglables, profil actif, compétences.
+ * Appelé indépendamment par chaque écran qui en a besoin (`MatinScreen`,
+ * `DetailScreen`, `ProfilScreen`) — même principe que `useStats`, déjà
+ * dupliqué entre `MatinScreen` et `SuiviScreen` : chaque écran reste la
+ * SEULE couche de LUI-MÊME qui appelle le réseau, sans dépendance croisée
+ * sur l'état d'un autre écran superposé.
+ */
+export function useConfig(client: DashboardClient): [AsyncState<ConfigResult>, () => void] {
+  const fn = useCallback(() => client.getConfig(), [client]);
   return useAsync(fn);
 }

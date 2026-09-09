@@ -19,6 +19,9 @@ interface Props {
    * ligne reste alors simplement lisible, sans geste possible — même
    * principe d'extension sans rupture que `Card.extra`. */
   onOuvrir?: (id: string) => void;
+  /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
+   * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
+  salaireFloor: number | null;
 }
 
 /**
@@ -31,11 +34,11 @@ interface Props {
  * marcherait tout aussi bien visuellement, mais casserait le survol déjà
  * posé par CSS sur `.row` sans reprise de styles.
  */
-export function OfferRow({ offer, onOuvrir }: Props) {
+export function OfferRow({ offer, onOuvrir, salaireFloor }: Props) {
   const employeur = formatEmployeur(offer);
   const lieu = formatLieu(offer);
   const publication = formatPublication(offer.published_at);
-  const compensation = formatCompensation(offer);
+  const compensation = formatCompensation(offer, salaireFloor);
 
   function ouvrir() {
     onOuvrir?.(offer.id);

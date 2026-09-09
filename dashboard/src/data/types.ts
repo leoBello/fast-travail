@@ -129,6 +129,13 @@ export interface OfferDashboardRow {
   candidature_relancee_le: string | null;
   candidature_entretien_le: string | null;
   candidature_heritee: boolean | null;
+  /** Tâche 10 : les étiquettes des requêtes qui ont ramené cette offre, et si
+   * l'une d'elles est `anchored` — lus sur `offers_ranked`, jamais sur
+   * `offers_scored`/`offers_dashboard` (voir CLAUDE.md). `[]`/`false` par
+   * défaut plutôt qu'absents : une offre peut n'avoir été trouvée par aucune
+   * requête directement (jugée via une autre voie), ce n'est pas une panne. */
+  found_by_labels: string[];
+  trusted_query: boolean;
 }
 
 export interface PageResult<T> {
@@ -138,14 +145,21 @@ export interface PageResult<T> {
   pageSize: number;
 }
 
+/**
+ * Chaque dimension accepte plusieurs valeurs, composées en `OU` par le
+ * serveur (tâche 10) — c'est ce qui rend possible « full remote OU non
+ * précisé ». Un tableau absent ne restreint rien, comme avant ; un tableau
+ * vide n'est jamais construit par ce dashboard — `FilterPanel` omet la clé
+ * plutôt que d'envoyer un tableau vide (voir `MatinScreen`).
+ */
 export interface OffersListFilters {
   sort?: SortField;
   page?: number;
   pageSize?: number;
-  statut?: ApplicationStatus;
-  workMode?: WorkModeFilter;
-  engagement?: Engagement;
-  source?: Source;
+  statut?: ApplicationStatus[];
+  workMode?: WorkModeFilter[];
+  engagement?: Engagement[];
+  source?: Source[];
   agenticAi?: boolean;
   minScore?: number;
 }
@@ -210,6 +224,9 @@ export interface OfferScoredRow {
   malus_technos: number;
   malus_fraicheur: number;
   final_score: number;
+  /** Tâche 10 — voir `OfferDashboardRow.found_by_labels`. */
+  found_by_labels: string[];
+  trusted_query: boolean;
 }
 
 /**
@@ -269,4 +286,48 @@ export interface StatsResult {
   streak: { days: number; recentDays: { date: string; sent: boolean }[] };
   neverOpened: number;
   responseRate: { responses: number; sent: number };
+  /** Tâche 10 — remplace le compteur `localStorage` de la tâche 7
+   * (`decidedStorage.ts`, retiré) : une vérité serveur, comptée sur
+   * `status_changed_at` en heure de Paris. */
+  decidedToday: number;
+}
+
+/** `GET /config` (tâche 10) : les poids réglables, le profil actif et ses
+ * compétences. Remplace `SALAIRE_FLOOR_DUPLIQUE` (`data/format.ts`, retiré) :
+ * `scoringWeights.salaire_floor` est la SEULE source du seuil « unité
+ * incertaine », lue en direct plutôt que recopiée en dur. */
+export interface ConfigResult {
+  scoringWeights: Record<string, number>;
+  activeProfile: {
+    id: number;
+    label: string;
+    profileVersion: string;
+    seniorityYears: number;
+    createdAt: string;
+  } | null;
+  /** Les termes de `profile_skills`, en minuscules — comparés à
+   * `extraction.stack` pour distinguer les technos présentes dans le CV
+   * (`Detail.dc.html`, « En vert, les N technologies présentes dans votre
+   * CV »). */
+  cvSkills: string[];
+  /** Offres jugées sous un `profile_version` différent de celui du profil
+   * actif — 0 si aucun profil actif. */
+  staleProfileOfferCount: number;
+}
+
+/** `POST /candidate-profile` (tâche 10, l'import du CV). Les quatre champs
+ * sont tous obligatoires — un import pose un profil entier, jamais un
+ * correctif partiel. */
+export interface CandidateProfileInput {
+  label: string;
+  cvText: string;
+  seniorityYears: number;
+  profileVersion: string;
+}
+
+export interface ImportCandidateProfileResult {
+  profile: ConfigResult['activeProfile'];
+  /** Recompté APRÈS l'écriture — voir CLAUDE.md : l'import ne rejuge RIEN,
+   * ce nombre dit seulement ce que l'import laisse inchangé. */
+  staleProfileOfferCount: number;
 }

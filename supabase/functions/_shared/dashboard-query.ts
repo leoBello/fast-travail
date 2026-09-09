@@ -83,14 +83,24 @@ export const MAX_PAGE = 100_000;
 
 export type Row = Record<string, unknown>;
 
+/**
+ * Chaque dimension accepte désormais PLUSIEURS valeurs, composées en `OU` —
+ * tâche 10 : c'est ce qui rend possible « full remote OU non précisé »,
+ * la requête réellement utile puisque `work_mode` est nul sur 863 offres
+ * (68 % du corpus, GUIDELINES §3.2). Un tableau vide n'est jamais construit
+ * par l'appelant (`dashboard-api.ts` rend `undefined` quand le paramètre est
+ * absent) : `listOffers` traite « présent mais vide » et « absent » de la
+ * même façon (aucune restriction), par simplicité, mais ce cas ne se
+ * produit jamais en pratique via l'API HTTP.
+ */
 export interface OffersListFilters {
   sort: SortField;
   page: number;
   pageSize: number;
-  statut?: ApplicationStatus;
-  workMode?: WorkModeFilter;
-  engagement?: Engagement;
-  source?: Source;
+  statut?: ApplicationStatus[];
+  workMode?: WorkModeFilter[];
+  engagement?: Engagement[];
+  source?: Source[];
   agenticAi?: boolean;
   /** `final_score >= minScore`. Borné 0-100 par l'appelant. */
   minScore?: number;
@@ -117,15 +127,32 @@ export async function listOffers(db: DbClient, filters: OffersListFilters): Prom
 
   let query = db.from('offers_dashboard').select('*', { count: 'exact' });
 
-  if (filters.statut !== undefined) query = query.eq('candidature_statut', filters.statut);
-  if (filters.engagement !== undefined) query = query.eq('engagement', filters.engagement);
-  if (filters.source !== undefined) query = query.eq('source', filters.source);
+  if (filters.statut !== undefined && filters.statut.length > 0) {
+    query = query.in('candidature_statut', filters.statut);
+  }
+  if (filters.engagement !== undefined && filters.engagement.length > 0) {
+    query = query.in('engagement', filters.engagement);
+  }
+  if (filters.source !== undefined && filters.source.length > 0) {
+    query = query.in('source', filters.source);
+  }
   if (filters.agenticAi !== undefined) query = query.eq('agentic_ai', filters.agenticAi);
   if (filters.minScore !== undefined) query = query.gte('final_score', filters.minScore);
-  if (filters.workMode === WORK_MODE_UNSPECIFIED) {
-    query = query.is('work_mode', null);
-  } else if (filters.workMode !== undefined) {
-    query = query.eq('work_mode', filters.workMode);
+  if (filters.workMode !== undefined && filters.workMode.length > 0) {
+    const contientNonPrecise = filters.workMode.includes(WORK_MODE_UNSPECIFIED);
+    const valeursConnues = filters.workMode.filter(
+      (v): v is WorkMode => v !== WORK_MODE_UNSPECIFIED,
+    );
+    if (contientNonPrecise && valeursConnues.length > 0) {
+      // `OU` entre « non précisé » (work_mode NULL) et une ou plusieurs
+      // valeurs connues : c'est la requête que la tâche 10 rend possible.
+      // Syntaxe PostgREST du filtre composé — voir `.or()` de supabase-js.
+      query = query.or(`work_mode.is.null,work_mode.in.(${valeursConnues.join(',')})`);
+    } else if (contientNonPrecise) {
+      query = query.is('work_mode', null);
+    } else {
+      query = query.in('work_mode', valeursConnues);
+    }
   }
 
   query = query
@@ -233,6 +260,34 @@ export async function getOfferDetail(db: DbClient, id: string): Promise<OfferDet
     return (Number(b.final_score) || 0) - (Number(a.final_score) || 0);
   });
 
+  // `found_by_labels`/`trusted_query` (tâche 10, section « Trouvée par » du
+  // détail) vivent sur `offers_ranked`, pas sur `offers_scored` — voir
+  // CLAUDE.md. Lues ICI, filtrées sur les quelques ids du GROUPE
+  // (`.in('id', groupIds)`), jamais sur la liste complète : c'est ce filtre
+  // qui garde le coût négligeable — mesuré au rapport de tâche — à la
+  // différence d'une lecture d'`offers_ranked` sans filtre, qui répète le
+  // balayage lexical (`offer_lexical_score`) sur tout le corpus et coûte ce
+  // qu'`offers_shortlist` coûte déjà (~0,76 s, CLAUDE.md).
+  const provenanceIds = groupIds.length > 0 ? groupIds : [id];
+  const { data: provenanceRows, error: provenanceError } = await db
+    .from('offers_ranked')
+    .select('id, found_by_labels, trusted_query')
+    .in('id', provenanceIds);
+  if (provenanceError) {
+    throw new Error(`lecture de la provenance : ${provenanceError.message}`);
+  }
+  const provenanceById = new Map(
+    ((provenanceRows ?? []) as Row[]).map((row) => [row.id as string, row]),
+  );
+  function avecProvenance(row: Row): Row {
+    const provenance = provenanceById.get(row.id as string);
+    return {
+      ...row,
+      found_by_labels: (provenance?.found_by_labels as string[] | undefined) ?? [],
+      trusted_query: (provenance?.trusted_query as boolean | undefined) ?? false,
+    };
+  }
+
   const { data: applicationState, error: applicationError } = await db
     .from('offer_application_state')
     .select('*')
@@ -243,8 +298,8 @@ export async function getOfferDetail(db: DbClient, id: string): Promise<OfferDet
   }
 
   return {
-    offer: offerRow,
-    groupJudgements,
+    offer: avecProvenance(offerRow),
+    groupJudgements: groupJudgements.map(avecProvenance),
     application: (applicationState as Row | null) ?? null,
   };
 }
@@ -438,6 +493,17 @@ export interface StatsResult {
    * requête que `/brief`, comptée plutôt que listée. */
   neverOpened: number;
   responseRate: { responses: number; sent: number };
+  /** Candidatures dont le STATUT a réellement changé aujourd'hui (heure de
+   * PARIS, jamais UTC — même piège que `computeStreak`, corrigé en tâche 6).
+   * Remplace le compteur `localStorage` de la tâche 7 (`decidedStorage.ts`) :
+   * une vérité serveur, partagée entre tous les navigateurs, plutôt qu'un
+   * fait local à CE poste. `status <> 'a_traiter'` exclut l'ouverture seule
+   * (`POST /offers/:id/open` pose `status_changed_at` à l'insertion sans
+   * qu'aucune décision n'ait encore été prise) : chaque appelant du
+   * tableau de bord enchaîne toujours `open` puis un `PATCH` vers un statut
+   * réel dans le même geste (voir `MatinScreen.decider`, `DetailScreen`), ce
+   * compteur ne compte donc que les VRAIES décisions. */
+  decidedToday: number;
 }
 
 async function countExact(db: DbClient, table: string): Promise<number> {
@@ -518,8 +584,12 @@ export function computeStreak(
   return { days, recentDays };
 }
 
-/** `GET /stats` : entonnoir, série, compteur anti-perte. */
-export async function getStats(db: DbClient): Promise<StatsResult> {
+/** `GET /stats` : entonnoir, série, compteur anti-perte.
+ *
+ * `now` est injectable (défaut `new Date()`) — même principe que
+ * `computeStreak` : un test peut fixer « aujourd'hui » sans dépendre de
+ * l'horloge réelle, pour `decidedToday` comme pour la série. */
+export async function getStats(db: DbClient, now: Date = new Date()): Promise<StatsResult> {
   const collected = await countExact(db, 'offers');
   const scored = await countExact(db, 'offers_scored');
 
@@ -540,13 +610,14 @@ export async function getStats(db: DbClient): Promise<StatsResult> {
 
   const { data: appRows, error: appError } = await db
     .from('offer_applications')
-    .select('status, outcome, applied_at');
+    .select('status, outcome, applied_at, status_changed_at');
   if (appError) throw new Error(`lecture des candidatures : ${appError.message}`);
 
   const applications = (appRows ?? []) as {
     status: string;
     outcome: string | null;
     applied_at: string | null;
+    status_changed_at: string;
   }[];
 
   const byStatus = Object.fromEntries(
@@ -554,13 +625,18 @@ export async function getStats(db: DbClient): Promise<StatsResult> {
   ) as Record<ApplicationStatus, number>;
   let responses = 0;
   let sent = 0;
+  let decidedToday = 0;
   const sentDays = new Set<string>();
+  const todayKey = parisDateKey(now);
   for (const app of applications) {
     if (app.status in byStatus) byStatus[app.status as ApplicationStatus] += 1;
     if (app.outcome) responses += 1;
     if (app.applied_at) {
       sent += 1;
       sentDays.add(parisDateKey(new Date(app.applied_at)));
+    }
+    if (app.status !== 'a_traiter' && parisDateKey(new Date(app.status_changed_at)) === todayKey) {
+      decidedToday += 1;
     }
   }
 
@@ -573,8 +649,200 @@ export async function getStats(db: DbClient): Promise<StatsResult> {
       applied: byStatus.postulee,
     },
     byStatus,
-    streak: computeStreak(sentDays),
+    streak: computeStreak(sentDays, now),
     neverOpened: neverOpenedCount ?? 0,
+    decidedToday,
     responseRate: { responses, sent },
   };
+}
+
+// ----------------------------------------------------------------------------
+// GET /config — les poids réglables et le profil actif (tâche 10)
+// ----------------------------------------------------------------------------
+
+export interface ActiveProfile {
+  id: number;
+  label: string;
+  profileVersion: string;
+  seniorityYears: number;
+  createdAt: string;
+}
+
+export interface ConfigResult {
+  /** Toutes les lignes de `scoring_weights` (`key` -> `value`), pas
+   * seulement `salaire_floor` : la route existe pour que PLUS AUCUN poids
+   * réglable n'ait jamais besoin d'être recopié en dur côté navigateur
+   * (CLAUDE.md, « les axes réglables sont des lignes en base »), même si
+   * `salaire_floor` est aujourd'hui le seul que la SPA consomme. */
+  scoringWeights: Record<string, number>;
+  activeProfile: ActiveProfile | null;
+  /** Les termes de `profile_skills`, tels quels (minuscules, comme semés) —
+   * TOUTE la table, pas seulement `stance = 'core'` : chaque ligne provient
+   * d'une lecture littérale du CV (voir la migration `20260908250000`), donc
+   * chacune est bien « présente dans le CV » au sens de la maquette
+   * (`Detail.dc.html`, « les N technologies présentes dans votre CV ») —
+   * qu'elle soit désirée (`core`/`adjacent`) ou non (`unwanted`). Comparée
+   * en minuscules à `extraction.stack` par l'appelant. */
+  cvSkills: string[];
+  /** Offres jugées (`offer_ai_scores`) sous un `profile_version` DIFFÉRENT
+   * de celui du profil actif — 0 si aucun profil actif. Répond à « combien
+   * de jugements datent d'un CV antérieur », sans jamais déclencher un
+   * rejugement (CLAUDE.md : décision tranchée, l'import ne repaie rien). */
+  staleProfileOfferCount: number;
+}
+
+/** Nombre d'offres jugées sous un `profile_version` différent de celui
+ * fourni — partagé entre `getConfig` (l'état courant) et
+ * `importCandidateProfile` (l'état juste après l'import), pour ne jamais
+ * dupliquer la question. */
+async function countStaleProfileOffers(
+  db: DbClient,
+  currentProfileVersion: string,
+): Promise<number> {
+  const { count, error } = await db
+    .from('offer_ai_scores')
+    .select('*', { count: 'exact', head: true })
+    .neq('profile_version', currentProfileVersion);
+  if (error) {
+    throw new Error(`comptage des offres à profil antérieur : ${error.message}`);
+  }
+  return count ?? 0;
+}
+
+function toActiveProfile(row: Row): ActiveProfile {
+  return {
+    id: row.id as number,
+    label: row.label as string,
+    profileVersion: row.profile_version as string,
+    seniorityYears: Number(row.seniority_years),
+    createdAt: row.created_at as string,
+  };
+}
+
+/** `GET /config` : les poids réglables (`scoring_weights`), le profil actif
+ * et ses compétences, le compte d'offres à profil antérieur. Remplace la
+ * copie en dur `SALAIRE_FLOOR_DUPLIQUE` de `dashboard/src/data/format.ts`
+ * (tâche 10) : le seuil « unité incertaine » redevient une lecture de
+ * `scoring_weights.salaire_floor`, réglable par `UPDATE` sans redéploiement,
+ * comme CLAUDE.md le promet pour tous les axes de ce tableau. */
+export async function getConfig(db: DbClient): Promise<ConfigResult> {
+  const { data: weightRows, error: weightError } = await db
+    .from('scoring_weights')
+    .select('key, value');
+  if (weightError) throw new Error(`lecture des poids réglables : ${weightError.message}`);
+  const scoringWeights = Object.fromEntries(
+    ((weightRows ?? []) as { key: string; value: number }[]).map((row) => [
+      row.key,
+      Number(row.value),
+    ]),
+  );
+
+  const { data: profileRow, error: profileError } = await db
+    .from('candidate_profile')
+    .select('id, label, profile_version, seniority_years, created_at')
+    .eq('is_active', true)
+    .maybeSingle();
+  if (profileError) throw new Error(`lecture du profil actif : ${profileError.message}`);
+
+  const { data: skillRows, error: skillError } = await db.from('profile_skills').select('term');
+  if (skillError) {
+    throw new Error(`lecture des compétences du profil : ${skillError.message}`);
+  }
+  const cvSkills = ((skillRows ?? []) as { term: string }[]).map((row) => row.term);
+
+  const activeProfile = profileRow === null ? null : toActiveProfile(profileRow as Row);
+  const staleProfileOfferCount = activeProfile === null
+    ? 0
+    : await countStaleProfileOffers(db, activeProfile.profileVersion);
+
+  return { scoringWeights, activeProfile, cvSkills, staleProfileOfferCount };
+}
+
+// ----------------------------------------------------------------------------
+// POST /candidate-profile — l'import du CV (tâche 10)
+// ----------------------------------------------------------------------------
+
+export interface CandidateProfileInput {
+  label: string;
+  cvText: string;
+  seniorityYears: number;
+  profileVersion: string;
+}
+
+export interface ImportCandidateProfileResult {
+  profile: ActiveProfile;
+  /** Recompté APRÈS l'écriture, par rapport à la version qui vient d'être
+   * importée — c'est le nombre que l'écran doit afficher pour dire « voilà
+   * ce que cet import laisse inchangé », jamais un nombre proposé à recalculer. */
+  staleProfileOfferCount: number;
+}
+
+/**
+ * `POST /candidate-profile` : importe un nouveau CV.
+ *
+ * **Décision tranchée (task-10-brief.md), à respecter à la lettre : ne
+ * rejuge RIEN.** Cette fonction n'écrit que sur `candidate_profile` — jamais
+ * sur `offer_ai_scores`, jamais de file de rejugement posée. Le rejugement
+ * reste une opération délibérée en ligne de commande (~12 € le passage,
+ * CLAUDE.md), jamais un effet de bord de cet import.
+ *
+ * Désactive l'ancien profil actif puis insère le nouveau — deux écritures
+ * séquentielles, pas une transaction : `candidate_profile_one_active`
+ * (index unique partiel sur `is_active`) interdit deux lignes actives à la
+ * fois, donc l'ordre (désactiver, PUIS insérer active) est obligatoire quel
+ * que soit le mécanisme. Application mono-utilisateur, un seul poste : le
+ * risque d'écriture concurrente est nul en pratique.
+ *
+ * Rejette (`ValidationError`, 400) si `profileVersion` égale la version
+ * active : CLAUDE.md prévient explicitement que changer le CV SANS faire
+ * évoluer la version est pire que de payer un rejugement — « le corpus
+ * porterait deux populations jugées sous deux profils différents, sans rien
+ * pour les distinguer ». Ce garde-fou refuse ce cas au lieu de le permettre
+ * en silence.
+ */
+export async function importCandidateProfile(
+  db: DbClient,
+  input: CandidateProfileInput,
+): Promise<ImportCandidateProfileResult> {
+  const { data: currentActive, error: currentError } = await db
+    .from('candidate_profile')
+    .select('profile_version')
+    .eq('is_active', true)
+    .maybeSingle();
+  if (currentError) throw new Error(`lecture du profil actif : ${currentError.message}`);
+
+  const currentVersion = (currentActive as Row | null)?.profile_version as string | undefined;
+  if (currentVersion === input.profileVersion) {
+    throw new ValidationError(
+      `"profileVersion" doit différer de la version active ("${input.profileVersion}") — ` +
+        'un CV changé sans faire évoluer la version mélangerait deux populations de ' +
+        'jugements sans rien pour les distinguer (CLAUDE.md)',
+    );
+  }
+
+  const { error: deactivateError } = await db
+    .from('candidate_profile')
+    .update({ is_active: false })
+    .eq('is_active', true);
+  if (deactivateError) {
+    throw new Error(`désactivation du profil précédent : ${deactivateError.message}`);
+  }
+
+  const { data: inserted, error: insertError } = await db
+    .from('candidate_profile')
+    .insert({
+      label: input.label,
+      cv_text: input.cvText,
+      seniority_years: input.seniorityYears,
+      profile_version: input.profileVersion,
+      is_active: true,
+    })
+    .select('id, label, profile_version, seniority_years, created_at')
+    .single();
+  if (insertError) throw new Error(`écriture du profil : ${insertError.message}`);
+
+  const profile = toActiveProfile(inserted as Row);
+  const staleProfileOfferCount = await countStaleProfileOffers(db, profile.profileVersion);
+
+  return { profile, staleProfileOfferCount };
 }

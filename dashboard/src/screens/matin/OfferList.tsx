@@ -39,6 +39,9 @@ export interface OfferListProps {
   chargement: boolean;
   erreur: boolean;
   onReessayer: () => void;
+  /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
+   * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
+  salaireFloor: number | null;
 }
 
 /**
@@ -73,6 +76,7 @@ export function OfferList({
   chargement,
   erreur,
   onReessayer,
+  salaireFloor,
 }: OfferListProps) {
   const debut = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const fin = Math.min(page * pageSize, total);
@@ -144,7 +148,12 @@ export function OfferList({
               <motion.div layout>
                 <AnimatePresence initial={false}>
                   {offers.map((offer) => (
-                    <OfferRow key={offer.id} offer={offer} onOuvrir={onOuvrirOffre} />
+                    <OfferRow
+                      key={offer.id}
+                      offer={offer}
+                      onOuvrir={onOuvrirOffre}
+                      salaireFloor={salaireFloor}
+                    />
                   ))}
                 </AnimatePresence>
               </motion.div>

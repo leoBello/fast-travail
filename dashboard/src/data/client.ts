@@ -1,6 +1,9 @@
 import type {
   ApplicationPatchInput,
   ApplicationRow,
+  CandidateProfileInput,
+  ConfigResult,
+  ImportCandidateProfileResult,
   OfferDashboardRow,
   OfferDetail,
   OffersListFilters,
@@ -40,10 +43,22 @@ export class DashboardApiError extends Error {
   }
 }
 
-function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
+/** `string[]` pose la MÊME clé plusieurs fois (`?workMode=a&workMode=b`) —
+ * c'est ce que `getAll()` lit côté serveur (`dashboard-api.ts`, tâche 10).
+ * Un tableau vide se comporte comme `undefined` (aucun paramètre posé) : les
+ * appelants de ce dashboard n'en construisent jamais, mais rien ne le
+ * suppose ici. */
+function buildQuery(
+  params: Record<string, string | number | boolean | readonly string[] | undefined>,
+): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined) search.set(key, String(value));
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) search.append(key, v);
+    } else {
+      search.set(key, String(value));
+    }
   }
   const qs = search.toString();
   return qs === '' ? '' : `?${qs}`;
@@ -64,6 +79,11 @@ export interface DashboardClient {
   getOfferDetail(id: string): Promise<OfferDetail | null>;
   openOffer(id: string): Promise<ApplicationRow>;
   patchApplication(id: string, patch: ApplicationPatchInput): Promise<ApplicationRow>;
+  /** `GET /config` (tâche 10) : poids réglables, profil actif, compétences. */
+  getConfig(): Promise<ConfigResult>;
+  /** `POST /candidate-profile` (tâche 10) : importe un nouveau CV. Ne
+   * rejuge RIEN (CLAUDE.md, décision tranchée) — voir `ProfilScreen`. */
+  importCandidateProfile(input: CandidateProfileInput): Promise<ImportCandidateProfileResult>;
 }
 
 /** Compte les offres pour une valeur de `work_mode` donnée, sans rien lister
@@ -73,7 +93,7 @@ export async function countByWorkMode(
   client: DashboardClient,
   workMode: WorkModeFilter,
 ): Promise<number> {
-  const page = await client.listOffers({ workMode, pageSize: 1 });
+  const page = await client.listOffers({ workMode: [workMode], pageSize: 1 });
   return page.total;
 }
 
@@ -152,6 +172,17 @@ export function createDashboardClient(config: DashboardClientConfig): DashboardC
       return request<ApplicationRow>(`/offers/${id}/application`, {
         method: 'PATCH',
         body: JSON.stringify(patch),
+      });
+    },
+
+    getConfig() {
+      return request<ConfigResult>('/config');
+    },
+
+    importCandidateProfile(input) {
+      return request<ImportCandidateProfileResult>('/candidate-profile', {
+        method: 'POST',
+        body: JSON.stringify(input),
       });
     },
   };

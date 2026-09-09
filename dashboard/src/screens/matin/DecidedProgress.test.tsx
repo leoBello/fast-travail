@@ -56,10 +56,15 @@ describe('DecidedProgress', () => {
     },
   );
 
-  it('la légende "N décidées" reste affichée pendant le chargement — c’est un fait LOCAL, pas un fait serveur', () => {
-    render(<DecidedProgress decidees={2} total={2} chargement />);
-    expect(screen.getByText('2 décidées')).toBeDefined();
-  });
+  it(
+    'la légende masque le nombre pendant le chargement (tâche 10) — "decidees" est ' +
+      'désormais un fait SERVEUR (`/stats.decidedToday`) comme `total`, jamais affiché avant confirmation',
+    () => {
+      render(<DecidedProgress decidees={2} total={2} chargement />);
+      expect(screen.queryByText('2 décidées')).toBeNull();
+      expect(screen.getByText('…')).toBeDefined();
+    },
+  );
 
   it('l’aria-label pendant le chargement ne prétend aucune proportion ("X sur Y")', () => {
     render(<DecidedProgress decidees={2} total={2} chargement />);

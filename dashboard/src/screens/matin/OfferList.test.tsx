@@ -23,6 +23,7 @@ function props(partiel: Partial<ComponentProps<typeof OfferList>> = {}) {
     chargement: false,
     erreur: false,
     onReessayer: vi.fn(),
+    salaireFloor: 40000,
     ...partiel,
   };
 }

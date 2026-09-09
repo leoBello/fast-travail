@@ -5,6 +5,7 @@ import { t } from './i18n/i18n';
 import { DetailScreen } from './screens/detail/DetailScreen';
 import { MatinScreen } from './screens/matin/MatinScreen';
 import { MotionRoot } from './screens/matin/MotionRoot';
+import { ProfilScreen } from './screens/profil/ProfilScreen';
 import { SuiviScreen } from './screens/suivi/SuiviScreen';
 import styles from './App.module.css';
 
@@ -65,6 +66,7 @@ export function App() {
   const { client, erreur } = construireClient();
   const [offreOuverte, setOffreOuverte] = useState<string | null>(null);
   const [suiviOuvert, setSuiviOuvert] = useState(false);
+  const [profilOuvert, setProfilOuvert] = useState(false);
 
   if (client === null) {
     return (
@@ -82,6 +84,7 @@ export function App() {
         client={client}
         onOuvrirOffre={setOffreOuverte}
         onVoirSuivi={() => setSuiviOuvert(true)}
+        onImporterCv={() => setProfilOuvert(true)}
       />
       {!suiviOuvert ? null : (
         <div className={styles.overlay}>
@@ -90,6 +93,11 @@ export function App() {
             onRetour={() => setSuiviOuvert(false)}
             onOuvrirOffre={setOffreOuverte}
           />
+        </div>
+      )}
+      {!profilOuvert ? null : (
+        <div className={styles.overlay}>
+          <ProfilScreen client={client} onRetour={() => setProfilOuvert(false)} />
         </div>
       )}
       {offreOuverte === null ? null : (

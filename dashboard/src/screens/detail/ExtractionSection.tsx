@@ -2,34 +2,35 @@ import type { ReactNode } from 'react';
 import { Absence } from '../../ui/kit/Absence';
 import { Badge } from '../../ui/kit/Badge';
 import { Tooltip } from '../../ui/kit/Tooltip';
-import { badgeSeniorite, formatCompensation } from '../../data/format';
+import { badgeSeniorite, estTechnoDuCv, formatCompensation } from '../../data/format';
 import type { OfferDashboardRow } from '../../data/types';
 import { t } from '../../i18n/i18n';
 import styles from './ExtractionSection.module.css';
 
 interface Props {
   offer: OfferDashboardRow;
+  /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
+   * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
+  salaireFloor: number | null;
+  /** Les termes de `profile_skills` (tâche 10, `GET /config`) — `null` tant
+   * qu'ils n'ont pas été lus. Comble l'écart documenté au rapport de tâche 8
+   * (« api-dashboard n'exposait alors AUCUNE route pour cette table ») : la
+   * stack colore désormais en vert les technos présentes dans le CV,
+   * comme la maquette le dessine. */
+  cvSkills: readonly string[] | null;
 }
 
 /**
  * « Ce que l'annonce dit » (`Detail.dc.html`) : la grille de faits extraits,
- * puis la stack détectée.
- *
- * **Écart connu avec la maquette, documenté plutôt que fabriqué** (voir le
- * rapport de tâche 8) : la maquette distingue en vert les technologies
- * présentes au CV. `api-dashboard` (tâche 6) n'expose `profile_skills` sur
- * AUCUNE route — la seule lecture de cette table est
- * `supabase/functions/_shared/run-scoring.ts`, côté Edge Function. Sans
- * cette donnée, colorer une techno « comme si » elle correspondait au CV
- * serait inventer un fait, ce que `GUIDELINES.md` interdit explicitement.
- * La stack s'affiche donc en badges neutres, tous identiques, jusqu'à ce
- * qu'une route l'expose.
+ * puis la stack détectée — en vert, les technologies présentes dans le CV
+ * (`profile_skills`, tâche 10), en badge neutre les autres.
  */
-export function ExtractionSection({ offer }: Props) {
-  const compensation = formatCompensation(offer);
+export function ExtractionSection({ offer, salaireFloor, cvSkills }: Props) {
+  const compensation = formatCompensation(offer, salaireFloor);
   const seniorite = badgeSeniorite(offer.seniority);
   const stack = offer.extraction.stack;
   const unwanted = offer.extraction.unwanted_tech;
+  const techsDuCv = stack.filter((techno) => estTechnoDuCv(cvSkills, techno));
 
   return (
     <section className={styles.section}>
@@ -109,11 +110,21 @@ export function ExtractionSection({ offer }: Props) {
             <span className={styles.stackTitre}>{t('detail.stackDetectee', stack.length)}</span>
             <div className={styles.stackListe}>
               {stack.map((techno) => (
-                <span key={techno} className={styles.tech}>
+                <span
+                  key={techno}
+                  className={
+                    estTechnoDuCv(cvSkills, techno)
+                      ? `${styles.tech} ${styles.techCv}`
+                      : styles.tech
+                  }
+                >
                   {techno}
                 </span>
               ))}
             </div>
+            {cvSkills === null ? null : (
+              <p className={styles.stackNote}>{t('detail.stackTechnosCv', techsDuCv.length)}</p>
+            )}
           </>
         )}
       </div>

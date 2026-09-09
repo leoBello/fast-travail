@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import type { DashboardClient } from '../../data/client';
 import type { OfferDashboardRow, SortField } from '../../data/types';
 import { t } from '../../i18n/i18n';
-import { useBrief, useOffersList, useStats, useWorkModeCounts } from './hooks';
-import { ecrireDecideesDuJour, lireDecideesDuJour } from './decidedStorage';
+import { useBrief, useConfig, useOffersList, useStats, useWorkModeCounts } from './hooks';
 import type { FilterState } from './FilterPanel';
 import { FilterPanel } from './FilterPanel';
 import { MorningBand } from './MorningBand';
@@ -22,6 +21,9 @@ interface Props {
    * isolément n'a pas à le fournir, et le bouton reste alors simplement
    * absent plutôt que de planter sur un callback manquant. */
   onVoirSuivi?: () => void;
+  /** Ouvre l'import du CV (tâche 10, `ProfilScreen`). Même principe
+   * optionnel que `onVoirSuivi`. */
+  onImporterCv?: () => void;
 }
 
 /**
@@ -33,7 +35,7 @@ interface Props {
  * `OfferList`, `OfferCard`, `FilterPanel` restent des composants
  * présentés (props → rendu), testables sans client réel.
  */
-export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
+export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }: Props) {
   // ---- Bande « Ce matin » ----
   const [briefPage, setBriefPage] = useState(1);
   const [briefState, recargerBrief] = useBrief(client, briefPage);
@@ -44,11 +46,6 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
   // déjà plus se dissout de lui-même de `retiresConfirmes`, sans jamais
   // compter deux fois la même décision (voir le commentaire sur `total`).
   const [retiresOptimistes, setRetiresOptimistes] = useState<ReadonlySet<string>>(new Set());
-  // Persisté dans `localStorage`, borné au jour civil de PARIS (voir
-  // `decidedStorage.ts`) — pas remis à zéro à chaque rechargement de page.
-  // Initialisation paresseuse : `lireDecideesDuJour()` n'est appelée qu'au
-  // tout premier rendu, jamais à chaque re-rendu.
-  const [decidesAujourdhui, setDecidesAujourdhui] = useState(() => lireDecideesDuJour());
   const [enTraitement, setEnTraitement] = useState<ReadonlySet<string>>(new Set());
   const [erreurDecision, setErreurDecision] = useState(false);
 
@@ -75,6 +72,22 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
   const [statsState, recargerStats] = useStats(client);
   const streakDays = statsState.statut === 'succes' ? statsState.donnees.streak.days : 0;
   const neverOpened = statsState.statut === 'succes' ? statsState.donnees.neverOpened : 0;
+  // Vérité SERVEUR (tâche 10), comptée sur `status_changed_at` en heure de
+  // Paris — remplace le `localStorage` de la tâche 7 (`decidedStorage.ts`,
+  // retiré) : ce chiffre est désormais partagé entre tous les navigateurs,
+  // pas un fait local à CE poste. `0` tant que `/stats` n'a pas répondu —
+  // `decideesChargement` ci-dessous le distingue d'un zéro confirmé.
+  const decidesAujourdhui = statsState.statut === 'succes' ? statsState.donnees.decidedToday : 0;
+  const decideesChargement = statsState.statut === 'chargement';
+
+  const [configState] = useConfig(client);
+  // `null` tant que `/config` n'a pas répondu — `formatCompensation`
+  // traite ce cas sans jamais affirmer « incertain » sans preuve (voir
+  // `data/format.ts`).
+  const salaireFloor =
+    configState.statut === 'succes'
+      ? (configState.donnees.scoringWeights.salaire_floor ?? null)
+      : null;
 
   async function decider(offer: OfferDashboardRow, decision: 'garder' | 'ecarter') {
     setErreurDecision(false);
@@ -86,11 +99,8 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
       await client.patchApplication(offer.id, {
         status: decision === 'garder' ? 'retenue' : 'ecartee',
       });
-      setDecidesAujourdhui((n) => {
-        const suivant = n + 1;
-        ecrireDecideesDuJour(suivant);
-        return suivant;
-      });
+      // `decidesAujourdhui` est dérivé de `/stats` (tâche 10) : le recharger
+      // suffit à le faire avancer, aucun état local à maintenir en plus.
       recargerBrief();
       recargerStats();
     } catch {
@@ -144,6 +154,11 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
         <span className={styles.nom}>{t('app.nom')}</span>
         <span className={styles.tagline}>{t('app.tagline')}</span>
         <div className={styles.spacer} />
+        {onImporterCv === undefined ? null : (
+          <button type="button" className={styles.suiviBouton} onClick={onImporterCv}>
+            {t('profil.importerCv')}
+          </button>
+        )}
         {onVoirSuivi === undefined ? null : (
           <button type="button" className={styles.suiviBouton} onClick={onVoirSuivi}>
             {t('suivi.titre')}
@@ -163,6 +178,7 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
         page={briefPage}
         onPageChange={setBriefPage}
         decidees={decidesAujourdhui}
+        decideesChargement={decideesChargement}
         streakDays={streakDays}
         streakChargement={statsState.statut === 'chargement'}
         onDecision={decider}
@@ -171,6 +187,7 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
         chargement={briefState.statut === 'chargement'}
         erreur={briefState.statut === 'erreur'}
         onReessayer={recargerBrief}
+        salaireFloor={salaireFloor}
       />
 
       <OfferList
@@ -196,6 +213,7 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi }: Props) {
         chargement={listState.statut === 'chargement'}
         erreur={listState.statut === 'erreur'}
         onReessayer={recargerListe}
+        salaireFloor={salaireFloor}
       />
     </div>
   );

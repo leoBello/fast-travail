@@ -6,7 +6,11 @@ import { jugementOffre } from '../../data/test-fixtures';
 describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
   it("ne rend rien quand il n'y a qu'un seul jugement — rien à comparer", () => {
     const { container } = render(
-      <TwoSourcesPanel offerId="a" judgements={[jugementOffre({ id: 'a' })]} />,
+      <TwoSourcesPanel
+        offerId="a"
+        salaireFloor={40000}
+        judgements={[jugementOffre({ id: 'a' })]}
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -38,7 +42,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
       });
 
       const { container } = render(
-        <TwoSourcesPanel offerId="fw-id" judgements={[adzuna, freeWork]} />,
+        <TwoSourcesPanel offerId="fw-id" salaireFloor={40000} judgements={[adzuna, freeWork]} />,
       );
 
       const carteRetenue = container.querySelector('[data-retenu="true"]');
@@ -54,6 +58,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     const { container } = render(
       <TwoSourcesPanel
         offerId="a"
+        salaireFloor={40000}
         judgements={[
           jugementOffre({ id: 'a', confidence: 'haute' }),
           jugementOffre({ id: 'b', confidence: 'basse' }),
@@ -83,7 +88,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
         compensation_max: 530,
       });
       const { container } = render(
-        <TwoSourcesPanel offerId="retenu" judgements={[retenu, masque]} />,
+        <TwoSourcesPanel offerId="retenu" salaireFloor={40000} judgements={[retenu, masque]} />,
       );
 
       expect(screen.getByText('450 €/j')).toBeDefined();
@@ -97,6 +102,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     const { container } = render(
       <TwoSourcesPanel
         offerId="a"
+        salaireFloor={40000}
         judgements={[
           jugementOffre({ id: 'a' }),
           jugementOffre({
@@ -115,6 +121,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     render(
       <TwoSourcesPanel
         offerId="a"
+        salaireFloor={40000}
         judgements={[
           jugementOffre({ id: 'a', truncated_input: false }),
           jugementOffre({ id: 'b', truncated_input: true }),
@@ -129,6 +136,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     render(
       <TwoSourcesPanel
         offerId="a"
+        salaireFloor={40000}
         judgements={[jugementOffre({ id: 'a' }), jugementOffre({ id: 'b' })]}
       />,
     );
@@ -142,6 +150,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
       const { container } = render(
         <TwoSourcesPanel
           offerId="b"
+          salaireFloor={40000}
           judgements={[
             jugementOffre({ id: 'a', source: 'adzuna' }),
             jugementOffre({ id: 'b', source: 'free_work' }),
@@ -163,6 +172,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     const { rerender, container } = render(
       <TwoSourcesPanel
         offerId="a"
+        salaireFloor={40000}
         judgements={[
           jugementOffre({ id: 'a', compensation_kind: 'tjm', compensation_min: 450 }),
           jugementOffre({ id: 'b', compensation_kind: 'salaire', compensation_min: 45000 }),
@@ -174,6 +184,7 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     rerender(
       <TwoSourcesPanel
         offerId="a"
+        salaireFloor={40000}
         judgements={[
           jugementOffre({ id: 'a', compensation_kind: 'tjm', compensation_min: 450 }),
           jugementOffre({ id: 'b', compensation_kind: 'tjm', compensation_min: 500 }),
