@@ -175,6 +175,23 @@ parallélisme.
 - **RLS activé sur toutes les tables, sans aucune policy.** Seule la clé
   `service_role` accède aux données. Une table sans RLS rendrait la base
   lisible depuis Internet via la clé `anon`, qui est publique par nature.
+- **Le RLS d'une table ne protège PAS une vue posée dessus.** Une vue s'exécute
+  par défaut avec les droits de son propriétaire, donc elle **contourne** le RLS
+  des tables qu'elle lit. Toute vue nouvelle doit porter
+  `security_invoker = on` — sans quoi `anon` lit par la vue ce que le RLS lui
+  refuse par la table.
+
+  Mesuré le 2026-09-09 : `offers_dashboard` rendait **1 245 lignes** à la clé
+  `anon`, là où `offers` en rendait 0. Corrigé par la migration
+  `20260910020000`. Ça n'avait échappé à personne par négligence — le
+  commentaire du code affirmait même le contraire — mais parce que **la
+  protection de la table avait été vérifiée, et pas celle de la vue**.
+
+  Contrôle, qui doit rendre `security_invoker=on` sur chaque vue :
+
+  ```bash
+  npx supabase db query --linked "select c.relname, coalesce(array_to_string(c.reloptions,','),'(aucune)') as options from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='v' order by 1"
+  ```
 - **Pour interroger ou modifier la base distante, utiliser
   `npx supabase db query --linked "<SQL>"`.** C'est le chemin direct : il
   exécute du SQL arbitraire sur le projet distant, sans Docker ni script

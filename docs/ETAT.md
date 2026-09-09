@@ -1602,6 +1602,85 @@ concordent : Marseille est un marché Angular / Java.
 
 ## Problèmes ouverts, par priorité
 
+### Ce que la revue finale de la phase 3 a trouvé — 2026-09-09
+
+**Cinq défauts qu'aucune revue de tâche ne pouvait voir**, parce qu'ils ne se
+lisent qu'en joignant deux ou trois tâches. Tous corrigés avant fusion ; ils
+sont consignés parce que leur *forme* se reproduira.
+
+**C1 — L'import du CV aurait déclenché un rejugement complet, sous un écran qui
+affirmait le contraire.** `run-scoring.ts` sélectionnait ses candidats par
+`scored_profile_version.neq.<version active>` ; l'import écrit une **nouvelle**
+version. Importer un CV rendait donc les ~1 390 offres candidates, et le cron de
+7 h en aurait repayé 100 par jour pendant deux semaines — **~14 €** — en
+**écrasant** les scores affichés par `upsert`. Pendant ce temps l'interface
+disait « Aucune offre n'a été rejugée ».
+
+Il fallait joindre trois choses pour le voir : le chemin d'écriture de la
+tâche 10, la sélection de candidats de la **phase 2**, et le cron de 7 h. Aucune
+revue de tâche n'avait les trois sous les yeux.
+
+**Tranché par Léo** : le cron ignore désormais les changements de CV. Les
+candidats sont les offres *jamais jugées* ou jugées sous un **prompt**
+différent. Le rejugement volontaire reste possible et explicite :
+`npm run score:backfill -- --rejudge-stale-profile`.
+
+**I1 — Les vues étaient lisibles par la clé `anon`, désormais embarquée dans le
+navigateur.** Les tables sont bien protégées (`relrowsecurity = true`), mais
+`offers_dashboard`, `offers_scored`, `offer_display_groups` et
+`offer_application_state` avaient `relrowsecurity = false` et **aucune option
+`security_invoker`** : une vue s'exécute alors avec les droits de son
+propriétaire et **contourne le RLS**. `anon` ayant `SELECT` dessus,
+`/rest/v1/offers_dashboard` rendait **tout le corpus** à qui possédait la clé —
+publique par conception. `offer_application_state` porte les notes et les dates
+d'entretien ; elle ne rendait 0 que parce que la table était vide.
+
+Et le commentaire de `api-dashboard/index.ts` **affirmait le contraire** :
+« RLS actif sans policy — la clé `anon` ne lit rien directement ».
+
+Corrigé par la migration `20260910020000` (`security_invoker = on` sur les
+quatre vues), prouvé par `curl` réel : sans clé **401**, clé `anon` **200 avec
+`[]`**, clé `service_role` **200 avec les lignes**. `rolbypassrls` vérifié
+(`anon` faux, `service_role` vrai), pas supposé.
+
+**La leçon, qui vaut au-delà de cette phase** : *le RLS d'une table ne protège
+pas une vue posée dessus.* Toute vue nouvelle doit porter
+`security_invoker = on`, et c'est à vérifier plutôt qu'à supposer.
+
+**I2 — Le détail affirmait « Aucune » et « Non » sur un texte tronqué.**
+527 offres sur 1 339 affichaient « Technos non désirées : Aucune », 559 « IA /
+agents : Non », sans consulter `truncated_input` — à trois lignes du bloc
+`stack` qui, lui, le faisait correctement. Et 501 des 1 245 lignes affichées
+n'avaient **aucun** signal de troncature, les badges de confiance ne vivant que
+dans le panneau à deux jugements.
+
+**I3 — L'entonnoir comptait le statut courant, pas le cumul.** Passer une
+candidature de `retenue` à `postulee` faisait **retomber « retenues » à 0**. La
+même réponse `/stats` portait déjà les deux définitions : `funnel.applied`
+(courant) et `responseRate.sent` (cumulatif). Un entonnoir compte ce qui est
+**passé par** une étape, jamais ce qui y stationne.
+
+*Réserve subsistante* : faute d'un horodatage `retained_at`, une candidature
+écartée sans être jamais passée par « retenue » ne se distingue pas avec
+certitude. Le pipeline séquentiel de l'interface rend l'approximation fiable en
+pratique, mais ce n'est pas une garantie serveur.
+
+**I4 — Un test dont l'intitulé nommait le cas que son assertion ne couvrait
+pas.** `parisDate.test.ts` promettait de traiter une date **seule**
+(`"2026-09-11"`) et passait en réalité un horodatage déjà converti. Mesuré :
+une date seule arrive à **01 h ou 02 h heure de Paris** selon la saison, et la
+carte d'entretien aurait affirmé une heure jamais saisie.
+
+**C'est la troisième fois de ce chantier qu'un test promet plus que son
+assertion.** Les deux précédentes : un badge « vérifié » qui ne contrôlait
+qu'une classe CSS, et deux tests de `prefers-reduced-motion` qui validaient un
+attribut de diagnostic calculé à côté de la vraie prop. **Le motif est à
+chercher activement en revue** : lire l'intitulé, puis l'assertion, et vérifier
+qu'ils parlent de la même chose.
+
+---
+
+
 ### P1 — Le rayon local ne peut pas être ajusté finement
 
 `distance_marseille_km` est `null` pour une bonne part des offres : l'API ne
