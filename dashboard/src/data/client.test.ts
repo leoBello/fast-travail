@@ -1,5 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
-import { createDashboardClient, DashboardApiError, countByWorkMode } from './client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createDashboardClient,
+  DashboardApiError,
+  countByWorkMode,
+  dashboardClientFromEnv,
+} from './client';
 import type { DashboardClient } from './client';
 
 const CONFIG = {
@@ -200,5 +205,48 @@ describe('getConfig / importCandidateProfile (tâche 10)', () => {
 
     expect(capturedInit?.method).toBe('POST');
     expect(result.staleProfileOfferCount).toBe(1269);
+  });
+});
+
+describe('dashboardClientFromEnv — la lecture des trois variables VITE_*', () => {
+  // `vi.stubEnv` agit sur `import.meta.env` comme sur `process.env` (Vitest
+  // 5) : ces tests SIMULENT explicitement chaque cas plutôt que de compter
+  // sur ce que porte `dashboard/.env` (gitignoré) sur la machine qui les
+  // exécute — revue de tâche 10, le même défaut qu'`App.test.tsx` corrige à
+  // côté. `unstubAllEnvs` après CHAQUE test, qu'il ait réussi ou non.
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('les trois variables présentes : construit un client sans lever', () => {
+    vi.stubEnv('VITE_DASHBOARD_API_URL', 'https://exemple.supabase.co/functions/v1/api-dashboard');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-de-test');
+    vi.stubEnv('VITE_DASHBOARD_TOKEN', 'secret-de-test');
+
+    expect(() => dashboardClientFromEnv()).not.toThrow();
+  });
+
+  it('une variable absente (chaîne vide) : lève une erreur qui la NOMME', () => {
+    vi.stubEnv('VITE_DASHBOARD_API_URL', '');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'anon-de-test');
+    vi.stubEnv('VITE_DASHBOARD_TOKEN', 'secret-de-test');
+
+    expect(() => dashboardClientFromEnv()).toThrow(/VITE_DASHBOARD_API_URL/);
+  });
+
+  it('les trois absentes : l’erreur les nomme toutes les trois', () => {
+    vi.stubEnv('VITE_DASHBOARD_API_URL', '');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
+    vi.stubEnv('VITE_DASHBOARD_TOKEN', '');
+
+    try {
+      dashboardClientFromEnv();
+      expect.fail('devait lever');
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      expect(message).toContain('VITE_DASHBOARD_API_URL');
+      expect(message).toContain('VITE_SUPABASE_ANON_KEY');
+      expect(message).toContain('VITE_DASHBOARD_TOKEN');
+    }
   });
 });
