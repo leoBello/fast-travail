@@ -10,6 +10,7 @@ import styles from './OfferList.module.css';
 
 export interface OfferListProps {
   offers: OfferDashboardRow[];
+  /** Sans signification tant que `chargement` est vrai — voir plus bas. */
   total: number;
   page: number;
   pageSize: number;
@@ -18,13 +19,19 @@ export interface OfferListProps {
   onSortChange: (sort: SortField) => void;
   /** Le compteur anti-perte (`/stats.neverOpened`) : offres au-dessus de 50
    * jamais ouvertes — indépendant des filtres actifs (GUIDELINES §3.3, un
-   * compteur qui se nomme à zéro plutôt qu'un silence). */
+   * compteur qui se nomme à zéro plutôt qu'un silence). Sans signification
+   * tant que `statsChargement` est vrai. */
   neverOpened: number;
+  /** Vrai tant que `/stats` (donc `neverOpened`) n'a jamais répondu — appel
+   * réseau INDÉPENDANT de celui qui charge `offers`/`total` (`chargement`
+   * ci-dessous porte sur `/offers`). */
+  statsChargement: boolean;
   filtresOuverts: boolean;
   onToggleFiltres: () => void;
   /** Le panneau de filtres lui-même — injecté par l'appelant (`MatinScreen`)
    * pour que `OfferList` reste sans dépendance directe sur `FilterPanel`. */
   panneauFiltres: ReactNode;
+  /** Vrai tant que `/offers` n'a JAMAIS répondu — voir la note sur `total`. */
   chargement: boolean;
   erreur: boolean;
   onReessayer: () => void;
@@ -32,6 +39,13 @@ export interface OfferListProps {
 
 /**
  * « Toute la veille » (`Main.dc.html`) : la liste complète, rien de masqué.
+ *
+ * **Trois états, jamais confondus** (revue de tâche 7 — même défaut que
+ * `MorningBand` : afficher « 0 offre jugée, rien de masqué » et un badge
+ * anti-perte à zéro PENDANT le chargement initial serait une AFFIRMATION
+ * fausse, pas une zone blanche). `chargement` (rien d'affirmé) précède
+ * toujours `total === 0` (le serveur a confirmé qu'il n'y a rien) dans
+ * l'ordre des branches ci-dessous.
  *
  * Pagine via l'API plutôt que de virtualiser : voir `Pagination.tsx` — le
  * nombre de nœuds DOM reste borné (`pageSize`) sans qu'aucune mesure de
@@ -47,6 +61,7 @@ export function OfferList({
   sort,
   onSortChange,
   neverOpened,
+  statsChargement,
   filtresOuverts,
   onToggleFiltres,
   panneauFiltres,
@@ -61,8 +76,14 @@ export function OfferList({
     <section className={styles.section}>
       <div className={styles.entete}>
         <span className={styles.sectionTitre}>{t('matin.toutesLaVeille')}</span>
-        <span className={styles.compte}>{t('matin.offresJugeesRienMasque', total)}</span>
-        {neverOpened === 0 ? (
+        <span className={styles.compte}>
+          {chargement ? t('matin.chargement') : t('matin.offresJugeesRienMasque', total)}
+        </span>
+        {statsChargement ? (
+          <Badge ton="neutre" taille="compacte" discontinu>
+            {t('matin.compteEnAttente')}
+          </Badge>
+        ) : neverOpened === 0 ? (
           <Badge ton="neutre" taille="compacte" discontinu>
             {t('matin.antiPerteZero')}
           </Badge>
@@ -100,7 +121,9 @@ export function OfferList({
               titre={t('matin.erreurChargement')}
               detail={t('matin.erreurChargementDetail')}
             />
-          ) : total === 0 && !chargement ? (
+          ) : chargement ? (
+            <EmptyState titre={t('matin.chargement')} detail={t('matin.chargementDetail')} />
+          ) : total === 0 ? (
             <EmptyState titre={t('matin.listeVideTitre')} detail={t('matin.listeVideDetail')} />
           ) : (
             <>

@@ -15,6 +15,7 @@ function props(partiel: Partial<ComponentProps<typeof OfferList>> = {}) {
     sort: 'final_score' as const,
     onSortChange: vi.fn(),
     neverOpened: 23,
+    statsChargement: false,
     filtresOuverts: false,
     onToggleFiltres: vi.fn(),
     panneauFiltres: <div data-testid="panneau-filtres" />,
@@ -66,6 +67,24 @@ describe('OfferList', () => {
   it('état vide (aucun résultat filtré) : un vide nommé, jamais une liste blanche', () => {
     render(<OfferList {...props({ offers: [], total: 0 })} />);
     expect(screen.getByText('Aucune offre ne correspond')).toBeDefined();
+  });
+
+  it(
+    'état de CHARGEMENT (revue de tâche 7) : n’affirme PAS "0 offre jugée, rien de masqué" ni ' +
+      '"Aucune offre ne correspond" tant que le serveur n’a pas répondu',
+    () => {
+      render(<OfferList {...props({ offers: [], total: 0, chargement: true })} />);
+      expect(screen.queryByText(/offres? jugée/)).toBeNull();
+      expect(screen.queryByText('Aucune offre ne correspond')).toBeNull();
+      expect(screen.getAllByText('Chargement…').length).toBeGreaterThan(0);
+    },
+  );
+
+  it('le compteur anti-perte reste à blanc (jamais "0") tant que /stats n’a pas répondu', () => {
+    render(<OfferList {...props({ statsChargement: true, neverOpened: 0 })} />);
+    expect(screen.queryByText('Rien laissé de côté au-dessus de 50')).toBeNull();
+    expect(screen.queryByText(/jamais ouverte/)).toBeNull();
+    expect(screen.getByText('…')).toBeDefined();
   });
 
   it('ne coche/n’active aucun filtre implicite : le bouton Filtres reste neutre au départ', () => {

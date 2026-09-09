@@ -9,6 +9,16 @@
   min-width: 220px;
 }
 
+/* `<fieldset>` porte une bordure et un rembourrage par défaut du
+   navigateur, qui n'ont rien à voir avec le vocabulaire visuel de ce
+   panneau (theme.css) : réinitialisés à zéro, `.titreSection`/`.ligne`
+   portent seuls la mise en forme. */
+.fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
 .titreSection {
   margin: 0 0 var(--space-2);
   font-size: var(--text-xs);

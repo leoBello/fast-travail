@@ -18,4 +18,15 @@ describe('StreakIndicator', () => {
     render(<StreakIndicator jours={3} />);
     expect(screen.getByText('3 jours de suite')).toBeDefined();
   });
+
+  it(
+    'pendant le chargement, ne prétend PAS "série non commencée" même si jours vaut 0 par ' +
+      'défaut — un fait inconnu ne se confond jamais avec un fait confirmé (revue de tâche 7)',
+    () => {
+      render(<StreakIndicator jours={0} chargement />);
+      expect(screen.queryByText('série non commencée')).toBeNull();
+      expect(screen.queryByText(/jour de suite/)).toBeNull();
+      expect(screen.getByText('Chargement…')).toBeDefined();
+    },
+  );
 });

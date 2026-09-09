@@ -2,6 +2,7 @@ import type { DashboardClient } from './data/client';
 import { dashboardClientFromEnv } from './data/client';
 import { t } from './i18n/i18n';
 import { MatinScreen } from './screens/matin/MatinScreen';
+import { MotionRoot } from './screens/matin/MotionRoot';
 import styles from './App.module.css';
 
 /** Construit le client, ou capture l'erreur — jamais de JSX à l'intérieur du
@@ -41,5 +42,9 @@ export function App() {
     );
   }
 
-  return <MatinScreen client={client} />;
+  return (
+    <MotionRoot>
+      <MatinScreen client={client} />
+    </MotionRoot>
+  );
 }

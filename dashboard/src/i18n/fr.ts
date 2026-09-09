@@ -248,6 +248,7 @@ export const fr = {
     malusTechnos: 'technos non désirées',
     malusFraicheur: 'fraîcheur',
     chargement: 'Chargement…',
+    chargementDetail: 'Les données sont en cours de récupération.',
     compteEnAttente: '…',
     erreurChargement: 'Le chargement a échoué',
     erreurChargementDetail: "La connexion à l'API a échoué. Réessayez dans un instant.",

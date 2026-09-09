@@ -31,4 +31,20 @@ describe('OfferRow', () => {
     render(<OfferRow offer={ligneOffre({ published_at: hier })} />);
     expect(screen.getByText('1 j')).toBeDefined();
   });
+
+  it(
+    'une date de publication absente relève de "non publiée" (champ de source manquant), ' +
+      'pas de "non précisée" (qui suppose un champ que le modèle aurait dû dégager — GUIDELINES §3.1)',
+    () => {
+      const { container } = render(<OfferRow offer={ligneOffre({ published_at: null })} />);
+      const cellulePubliee = container.querySelector('[class*="publiee"]');
+      expect(cellulePubliee).not.toBeNull();
+      expect(cellulePubliee?.querySelector('[data-nature="non-publiee"]')).not.toBeNull();
+    },
+  );
+
+  it('rend l’absence de titre via `Absence`, pas via un `Absent` nu — uniformité avec les autres cellules', () => {
+    const { container } = render(<OfferRow offer={ligneOffre({ title: null })} />);
+    expect(container.querySelector('[data-nature="non-publiee"]')).not.toBeNull();
+  });
 });

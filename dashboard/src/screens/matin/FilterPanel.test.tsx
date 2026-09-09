@@ -6,10 +6,35 @@ import { FilterPanel } from './FilterPanel';
 const COMPTES = { full_remote: 175, hybride: 143, sur_site: 88, non_precise: 863 };
 
 describe('FilterPanel', () => {
-  it('aucune case n’est cochée au démarrage — la liste complète ne masque rien', () => {
+  it('aucune case ni aucun bouton radio n’est coché au démarrage — la liste complète ne masque rien', () => {
     render(<FilterPanel valeurs={{}} onChange={() => {}} comptesModeTravail={COMPTES} />);
-    for (const case_ of screen.getAllByRole('checkbox')) {
-      expect(case_).toHaveProperty('checked', false);
+    for (const champ of [...screen.getAllByRole('radio'), ...screen.getAllByRole('checkbox')]) {
+      expect(champ).toHaveProperty('checked', false);
+    }
+  });
+
+  it('les trois dimensions exclusives sont des boutons radio, pas des cases à cocher indépendantes', () => {
+    // Une case à cocher signifie "sélection indépendante" — cocher un mode
+    // de travail en décochait un autre silencieusement (revue de tâche 7).
+    // L'API n'acceptant qu'UNE valeur par dimension, le widget doit le dire.
+    render(<FilterPanel valeurs={{}} onChange={() => {}} comptesModeTravail={COMPTES} />);
+    expect(screen.getAllByRole('radio')).toHaveLength(
+      4 /* work_mode */ + 4 /* engagement */ + 4 /* source */,
+    );
+    // Seul agenticAi reste une case à cocher : un booléen indépendant.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+  });
+
+  it('chaque groupe de radios relie son titre de section via un <fieldset>/<legend>', () => {
+    const { container } = render(
+      <FilterPanel valeurs={{}} onChange={() => {}} comptesModeTravail={COMPTES} />,
+    );
+    const fieldsets = container.querySelectorAll('fieldset');
+    expect(fieldsets.length).toBeGreaterThanOrEqual(3);
+    for (const fs of fieldsets) {
+      if (fs.querySelector('input[type="radio"]')) {
+        expect(fs.querySelector('legend')).not.toBeNull();
+      }
     }
   });
 
@@ -18,9 +43,9 @@ describe('FilterPanel', () => {
     const ligne = screen.getByText('Non précisé').closest('label');
     expect(ligne).not.toBeNull();
     expect(ligne?.textContent).toContain('863');
-    const case_ = ligne?.querySelector('input[type="checkbox"]');
-    expect(case_).not.toBeNull();
-    expect(case_).toHaveProperty('disabled', false);
+    const champ = ligne?.querySelector('input[type="radio"]');
+    expect(champ).not.toBeNull();
+    expect(champ).toHaveProperty('disabled', false);
   });
 
   it('affiche un compte à blanc, jamais un zéro trompeur, tant que les comptes ne sont pas chargés', () => {
@@ -29,7 +54,7 @@ describe('FilterPanel', () => {
     expect(screen.getAllByText('…').length).toBeGreaterThan(0);
   });
 
-  it('ne coche jamais deux modes de travail à la fois — un clic remplace la sélection précédente', async () => {
+  it('sélectionner un mode de travail appelle onChange avec exactement cette valeur', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const { rerender } = render(
@@ -50,7 +75,7 @@ describe('FilterPanel', () => {
     expect(onChange).toHaveBeenLastCalledWith({ workMode: 'non_precise' });
   });
 
-  it('décoche en cliquant une seconde fois sur la même valeur', async () => {
+  it('décoche en cliquant une seconde fois sur la même valeur — le comportement natif du radio ne le permettrait pas seul', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(

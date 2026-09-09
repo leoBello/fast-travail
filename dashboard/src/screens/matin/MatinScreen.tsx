@@ -3,6 +3,7 @@ import type { DashboardClient } from '../../data/client';
 import type { OfferDashboardRow, SortField } from '../../data/types';
 import { t } from '../../i18n/i18n';
 import { useBrief, useOffersList, useStats, useWorkModeCounts } from './hooks';
+import { ecrireDecideesDuJour, lireDecideesDuJour } from './decidedStorage';
 import type { FilterState } from './FilterPanel';
 import { FilterPanel } from './FilterPanel';
 import { MorningBand } from './MorningBand';
@@ -35,7 +36,11 @@ export function MatinScreen({ client }: Props) {
   // déjà plus se dissout de lui-même de `retiresConfirmes`, sans jamais
   // compter deux fois la même décision (voir le commentaire sur `total`).
   const [retiresOptimistes, setRetiresOptimistes] = useState<ReadonlySet<string>>(new Set());
-  const [decidedSession, setDecidedSession] = useState(0);
+  // Persisté dans `localStorage`, borné au jour civil de PARIS (voir
+  // `decidedStorage.ts`) — pas remis à zéro à chaque rechargement de page.
+  // Initialisation paresseuse : `lireDecideesDuJour()` n'est appelée qu'au
+  // tout premier rendu, jamais à chaque re-rendu.
+  const [decidesAujourdhui, setDecidesAujourdhui] = useState(() => lireDecideesDuJour());
   const [enTraitement, setEnTraitement] = useState<ReadonlySet<string>>(new Set());
   const [erreurDecision, setErreurDecision] = useState(false);
 
@@ -73,7 +78,11 @@ export function MatinScreen({ client }: Props) {
       await client.patchApplication(offer.id, {
         status: decision === 'garder' ? 'retenue' : 'ecartee',
       });
-      setDecidedSession((n) => n + 1);
+      setDecidesAujourdhui((n) => {
+        const suivant = n + 1;
+        ecrireDecideesDuJour(suivant);
+        return suivant;
+      });
       recargerBrief();
       recargerStats();
     } catch {
@@ -139,8 +148,9 @@ export function MatinScreen({ client }: Props) {
         total={briefTotal}
         page={briefPage}
         onPageChange={setBriefPage}
-        decidees={decidedSession}
+        decidees={decidesAujourdhui}
         streakDays={streakDays}
+        streakChargement={statsState.statut === 'chargement'}
         onDecision={decider}
         offresEnTraitement={enTraitement}
         chargement={briefState.statut === 'chargement'}
@@ -157,6 +167,7 @@ export function MatinScreen({ client }: Props) {
         sort={sort}
         onSortChange={changerTri}
         neverOpened={neverOpened}
+        statsChargement={statsState.statut === 'chargement'}
         filtresOuverts={filtresOuverts}
         onToggleFiltres={() => setFiltresOuverts((v) => !v)}
         panneauFiltres={

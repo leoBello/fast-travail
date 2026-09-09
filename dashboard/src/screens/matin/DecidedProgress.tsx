@@ -4,13 +4,14 @@ import styles from './DecidedProgress.module.css';
 const SEGMENTS = 10;
 
 interface Props {
-  /** Décidées depuis le chargement de cette page (Garder/Écarter cliqués
-   * dans la bande « Ce matin »). Volontairement PAS une notion "aujourd'hui" :
-   * voir la note du rapport de tâche — `first_seen_at` ne porte que deux
-   * jours d'historique (GUIDELINES §3.3), rien de comparable n'existe pour
-   * une candidature "décidée aujourd'hui". Ce compteur recommence à 0 à
-   * chaque chargement de page, honnêtement, plutôt que de prétendre à un
-   * historique qu'aucune donnée ne porte. */
+  /** Décidées AUJOURD'HUI (Garder/Écarter cliqués dans la bande « Ce matin »),
+   * en jour civil de PARIS — persisté dans `localStorage`
+   * (`decidedStorage.ts`), pas remis à zéro à chaque rechargement de page.
+   * Ce n'est PAS un chiffre serveur : `first_seen_at` ne porte que deux
+   * jours d'historique (GUIDELINES §3.3), rien de comparable n'existe côté
+   * API pour une candidature « décidée aujourd'hui ». Le compte reste donc
+   * strictement ce que CE navigateur a observé — jamais partagé entre
+   * appareils, jamais lu depuis l'API, jamais un chiffre inventé. */
   decidees: number;
   /** La taille de la bande au chargement — le dénominateur réel. */
   total: number;

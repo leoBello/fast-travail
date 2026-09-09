@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { Absent } from '../../ui/kit/Card';
 import { Badge } from '../../ui/kit/Badge';
 import { Absence } from '../../ui/kit/Absence';
 import {
@@ -37,7 +36,7 @@ export function OfferRow({ offer }: Props) {
       <div className={styles.intitule}>
         <span className={styles.trunc}>
           {offer.title === null || offer.title.trim() === '' ? (
-            <Absent>{t('absences.non-publiee')}</Absent>
+            <Absence nature="non-publiee">{t('absences.non-publiee')}</Absence>
           ) : (
             offer.title
           )}
@@ -79,7 +78,17 @@ export function OfferRow({ offer }: Props) {
         )}
       </span>
       <span className={styles.publiee}>
-        {publication.connu ? publication.texte : <Absent>{t('absences.non-precisee')}</Absent>}
+        {publication.connu ? (
+          publication.texte
+        ) : (
+          // `published_at` est un champ de SOURCE (métadonnée de collecte),
+          // jamais extrait par le modèle : son absence relève de « non
+          // publiée par la source », pas de « non précisée » (qui suppose
+          // un champ que le modèle aurait dû dégager d'un texte — GUIDELINES
+          // §3.1). Revue de tâche 7 : uniformisé avec `Absence`, comme
+          // l'employeur et le lieu ci-dessus — jamais `Absent` nu.
+          <Absence nature="non-publiee">{t('absences.non-publiee')}</Absence>
+        )}
       </span>
     </motion.div>
   );

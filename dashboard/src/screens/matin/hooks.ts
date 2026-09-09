@@ -25,7 +25,7 @@ export function useBrief(
     () => client.listBrief({ page, pageSize: BRIEF_PAGE_SIZE }),
     [client, page],
   );
-  return useAsync(fn, [client, page]);
+  return useAsync(fn);
 }
 
 export interface OffersListParams {
@@ -49,12 +49,12 @@ export function useOffersList(
     () => client.listOffers({ sort, page, pageSize, workMode, engagement, source, agenticAi }),
     [client, sort, page, pageSize, workMode, engagement, source, agenticAi],
   );
-  return useAsync(fn, [client, sort, page, pageSize, workMode, engagement, source, agenticAi]);
+  return useAsync(fn);
 }
 
 export function useStats(client: DashboardClient): [AsyncState<StatsResult>, () => void] {
   const fn = useCallback(() => client.getStats(), [client]);
-  return useAsync(fn, [client]);
+  return useAsync(fn);
 }
 
 /** Les quatre valeurs de `work_mode` (les trois connues, plus « non précisé »),
@@ -70,5 +70,5 @@ export function useWorkModeCounts(
     const comptes = await Promise.all(valeurs.map((v) => countByWorkMode(client, v)));
     return Object.fromEntries(valeurs.map((v, i) => [v, comptes[i]])) as WorkModeCounts;
   }, [client]);
-  return useAsync(fn, [client]);
+  return useAsync(fn);
 }

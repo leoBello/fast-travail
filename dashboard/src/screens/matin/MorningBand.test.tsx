@@ -19,6 +19,7 @@ function props(partiel: Partial<ComponentProps<typeof MorningBand>> = {}) {
     onPageChange: vi.fn(),
     decidees: 0,
     streakDays: 0,
+    streakChargement: false,
     onDecision: vi.fn(),
     offresEnTraitement: new Set<string>(),
     chargement: false,
@@ -29,10 +30,42 @@ function props(partiel: Partial<ComponentProps<typeof MorningBand>> = {}) {
 }
 
 describe('MorningBand', () => {
-  it('état à zéro (total === 0) : un vide nommé, jamais une zone blanche', () => {
-    render(<MorningBand {...props({ offers: [], total: 0 })} />);
+  it('état à zéro CONFIRMÉ (chargement terminé, total === 0) : un vide nommé, jamais une zone blanche', () => {
+    render(<MorningBand {...props({ offers: [], total: 0, chargement: false })} />);
     expect(screen.getByText('Rien à décider ce matin')).toBeDefined();
     expect(screen.queryByRole('article')).toBeNull();
+  });
+
+  it(
+    'état de CHARGEMENT (revue de tâche 7) : n’affirme PAS "0 offre au-dessus de 50", n’affiche ' +
+      'pas "Rien à décider" tant que le serveur n’a pas répondu — trois états, jamais confondus',
+    () => {
+      render(<MorningBand {...props({ offers: [], total: 0, chargement: true })} />);
+      // Le défaut exact relevé en revue : `total === 0 && !chargement` était
+      // FAUX pendant le chargement (chargement === true), donc le composant
+      // tombait dans la branche "chargée" et affichait un total à 0 comme un
+      // fait. Aucun de ces deux messages ne doit apparaître ici.
+      expect(screen.queryByText('Rien à décider ce matin')).toBeNull();
+      expect(screen.queryByText(/0 offre.*sans décision/)).toBeNull();
+      expect(screen.queryByText('1–3 sur 6')).toBeNull();
+      expect(screen.queryByText('0–0 sur 0')).toBeNull();
+      expect(screen.getAllByText('Chargement…').length).toBeGreaterThan(0);
+    },
+  );
+
+  it('le chargement de la bande et celui de la série sont deux appels indépendants — une série déjà connue s’affiche même si /brief charge encore', () => {
+    render(
+      <MorningBand
+        {...props({
+          chargement: true,
+          offers: [],
+          total: 0,
+          streakDays: 5,
+          streakChargement: false,
+        })}
+      />,
+    );
+    expect(screen.getByText('5 jours de suite')).toBeDefined();
   });
 
   it("n'affiche jamais plus de trois cartes — la direction A tranchée par la maquette", () => {
@@ -76,6 +109,11 @@ describe('MorningBand', () => {
     expect(screen.getByText('Le chargement a échoué')).toBeDefined();
     await user.click(screen.getByRole('button', { name: 'Réessayer' }));
     expect(onReessayer).toHaveBeenCalledTimes(1);
+  });
+
+  it('n’affirme pas "série non commencée" tant que /stats n’a pas répondu (streakChargement)', () => {
+    render(<MorningBand {...props({ streakChargement: true, streakDays: 0 })} />);
+    expect(screen.queryByText('série non commencée')).toBeNull();
   });
 
   it('la barre "décidées" démarre à zéro sans confondre avec un état non-zéro', () => {

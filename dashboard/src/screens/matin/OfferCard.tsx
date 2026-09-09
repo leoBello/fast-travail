@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { Absent } from '../../ui/kit/Card';
 import { Badge } from '../../ui/kit/Badge';
 import { Absence } from '../../ui/kit/Absence';
 import { ScoreJetons, ScorePaire } from '../../ui/kit/Score';
@@ -80,7 +79,7 @@ export function OfferCard({ offer, onGarder, onEcarter, enTraitement }: Props) {
       <div>
         <div className={styles.titre}>
           {offer.title === null || offer.title.trim() === '' ? (
-            <Absent>{t('absences.non-publiee')}</Absent>
+            <Absence nature="non-publiee">{t('absences.non-publiee')}</Absence>
           ) : (
             offer.title
           )}

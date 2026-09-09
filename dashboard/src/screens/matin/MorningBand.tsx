@@ -15,14 +15,20 @@ export interface MorningBandProps {
    * plan, tranchée par `Main.dc.html`). */
   offers: OfferDashboardRow[];
   /** Le total du brief (offres au-dessus de 50 sans décision), pas la
-   * longueur de `offers`. */
+   * longueur de `offers`. Sans signification tant que `chargement` est vrai
+   * (voir plus bas). */
   total: number;
   page: number;
   onPageChange: (page: number) => void;
   decidees: number;
   streakDays: number;
+  /** Vrai tant que `/stats` (donc `streakDays`) n'a jamais répondu — distinct
+   * de `chargement` ci-dessous, qui porte sur `/brief`. Les deux appels
+   * réseau sont indépendants et peuvent résoudre à des moments différents. */
+  streakChargement: boolean;
   onDecision: (offer: OfferDashboardRow, decision: 'garder' | 'ecarter') => void;
   offresEnTraitement: ReadonlySet<string>;
+  /** Vrai tant que `/brief` n'a JAMAIS répondu — voir la note sur `total`. */
   chargement: boolean;
   erreur: boolean;
   onReessayer: () => void;
@@ -32,10 +38,16 @@ export interface MorningBandProps {
  * La bande « Ce matin » (`Main.dc.html`) : les offres au-dessus de 50 sans
  * décision, en trois cartes, avec la pagination `1–3 sur N`.
  *
- * **L'état à zéro** (`total === 0`) est celui qui est vrai le jour de la
- * livraison — `EmptyState` avec `vides.rienADeciderTitre`/`Detail`, jamais
- * une zone blanche (GUIDELINES §3.3, `Etats.dc.html` « Trois vides, trois
- * causes »).
+ * **Trois états, jamais confondus** (revue de tâche 7 — le défaut le plus
+ * grave relevé : la version précédente affichait « 0 offre au-dessus de 50
+ * sans décision » PENDANT le chargement initial, une AFFIRMATION fausse,
+ * pas une zone blanche) :
+ * - `chargement` (aucune donnée n'est encore arrivée) → un état neutre, qui
+ *   n'affirme RIEN sur le nombre d'offres ;
+ * - `!chargement && total === 0` (le serveur a confirmé qu'il n'y a rien) →
+ *   `EmptyState` avec `vides.rienADeciderTitre`/`Detail`, l'état à zéro
+ *   VRAI (GUIDELINES §3.3, `Etats.dc.html` « Trois vides, trois causes ») ;
+ * - `!chargement && total > 0` → la grille de cartes.
  */
 export function MorningBand({
   offers,
@@ -44,6 +56,7 @@ export function MorningBand({
   onPageChange,
   decidees,
   streakDays,
+  streakChargement,
   onDecision,
   offresEnTraitement,
   chargement,
@@ -58,13 +71,15 @@ export function MorningBand({
       <div className={styles.entete}>
         <div>
           <h2 className={styles.titre}>{t('jourZero.titre')}</h2>
-          <p className={styles.resume}>{t('matin.resume', total)}</p>
+          <p className={styles.resume}>
+            {chargement ? t('matin.chargement') : t('matin.resume', total)}
+          </p>
         </div>
         <div className={styles.spacer} />
         <div className={styles.indicateurs}>
           <DecidedProgress decidees={decidees} total={total + decidees} />
           <span className={styles.separateur} aria-hidden="true" />
-          <StreakIndicator jours={streakDays} />
+          <StreakIndicator jours={streakDays} chargement={streakChargement} />
         </div>
       </div>
 
@@ -73,7 +88,9 @@ export function MorningBand({
           titre={t('matin.erreurChargement')}
           detail={t('matin.erreurChargementDetail')}
         />
-      ) : total === 0 && !chargement ? (
+      ) : chargement ? (
+        <EmptyState titre={t('matin.chargement')} detail={t('matin.chargementDetail')} />
+      ) : total === 0 ? (
         <EmptyState
           titre={t('vides.rienADeciderTitre')}
           detail={t('vides.rienADeciderDetail', decidees)}
