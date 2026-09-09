@@ -4,6 +4,7 @@ import {
   getConfig,
   getOfferDetail,
   getStats,
+  getWorkModeCounts,
   importCandidateProfile,
   listOffers,
   openOffer,
@@ -1042,4 +1043,73 @@ Deno.test('getOfferDetail — found_by_labels/trusted_query lus sur offers_ranke
   assertEquals(detail?.offer.trusted_query, true);
   assertEquals(detail?.groupJudgements[0]?.found_by_labels, ['adzuna:local:react-ts']);
   assertEquals(detail?.groupJudgements[0]?.trusted_query, true);
+});
+
+// --------------------------------------------------------------------------
+// getWorkModeCounts
+// --------------------------------------------------------------------------
+
+function fakeDbForWorkModeCounts(
+  rows: { work_mode: string; total: number | string }[] | null,
+  error?: { message: string },
+): { db: DbClient; tablesLues: string[] } {
+  const tablesLues: string[] = [];
+  const db = {
+    from(table: string) {
+      tablesLues.push(table);
+      return {
+        select: (_cols: string) => Promise.resolve({ data: rows, error: error ?? null }),
+      };
+    },
+  } as unknown as DbClient;
+  return { db, tablesLues };
+}
+
+Deno.test('getWorkModeCounts lit la vue de comptage, en UNE seule requête', async () => {
+  const { db, tablesLues } = fakeDbForWorkModeCounts([
+    { work_mode: 'non_precise', total: 861 },
+    { work_mode: 'full_remote', total: 173 },
+    { work_mode: 'hybride', total: 150 },
+    { work_mode: 'sur_site', total: 88 },
+  ]);
+
+  const counts = await getWorkModeCounts(db);
+
+  assertEquals(tablesLues, ['offers_dashboard_work_mode_counts']);
+  assertEquals(counts, { non_precise: 861, full_remote: 173, hybride: 150, sur_site: 88 });
+});
+
+Deno.test('getWorkModeCounts complète à ZÉRO une valeur que la vue ne rend pas', async () => {
+  // La vue est un `group by` : elle n'a aucune ligne pour un mode dont aucune
+  // offre ne relève. Le panneau doit tout de même afficher les quatre lignes.
+  const { db } = fakeDbForWorkModeCounts([{ work_mode: 'hybride', total: 3 }]);
+
+  const counts = await getWorkModeCounts(db);
+
+  assertEquals(counts, { non_precise: 0, full_remote: 0, hybride: 3, sur_site: 0 });
+});
+
+Deno.test('getWorkModeCounts ignore une valeur inconnue plutôt que de l’ajouter', async () => {
+  const { db } = fakeDbForWorkModeCounts([
+    { work_mode: 'hybride', total: 3 },
+    { work_mode: 'teletravail_lunaire', total: 99 },
+  ]);
+
+  const counts = await getWorkModeCounts(db);
+
+  assertEquals(counts, { non_precise: 0, full_remote: 0, hybride: 3, sur_site: 0 });
+});
+
+Deno.test('getWorkModeCounts accepte un total rendu en chaîne (bigint PostgREST)', async () => {
+  const { db } = fakeDbForWorkModeCounts([{ work_mode: 'full_remote', total: '173' }]);
+
+  const counts = await getWorkModeCounts(db);
+
+  assertEquals(counts.full_remote, 173);
+});
+
+Deno.test('getWorkModeCounts remonte une erreur de base plutôt que des zéros', async () => {
+  const { db } = fakeDbForWorkModeCounts(null, { message: 'base indisponible' });
+
+  await assertRejects(() => getWorkModeCounts(db), Error, 'comptage par mode de travail');
 });

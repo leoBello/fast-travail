@@ -115,6 +115,9 @@ vi.mock('./data/client', async (importOriginal) => {
         staleProfileOfferCount: 0,
       }),
       importCandidateProfile: vi.fn(),
+      getWorkModeCounts: vi
+        .fn()
+        .mockResolvedValue({ full_remote: 173, hybride: 150, sur_site: 88, non_precise: 861 }),
     }),
   };
 });

@@ -12,6 +12,7 @@ import {
   getConfig,
   getOfferDetail,
   getStats,
+  getWorkModeCounts,
   importCandidateProfile,
   listBrief,
   listOffers,
@@ -331,6 +332,10 @@ export async function routeDashboardRequest(
 
     if (req.method === 'GET' && path === '/stats') {
       return Response.json(await getStats(db));
+    }
+
+    if (req.method === 'GET' && path === '/work-mode-counts') {
+      return Response.json(await getWorkModeCounts(db));
     }
 
     if (req.method === 'GET' && path === '/config') {

@@ -1,7 +1,5 @@
 import { useCallback } from 'react';
 import type { DashboardClient } from '../../data/client';
-import { countByWorkMode } from '../../data/client';
-import { WORK_MODE_UNSPECIFIED, WORK_MODES } from '../../data/types';
 import type {
   ConfigResult,
   Engagement,
@@ -10,6 +8,7 @@ import type {
   SortField,
   Source,
   StatsResult,
+  WorkModeCounts,
   WorkModeFilter,
 } from '../../data/types';
 import type { AsyncState } from './useAsync';
@@ -60,17 +59,20 @@ export function useStats(client: DashboardClient): [AsyncState<StatsResult>, () 
 
 /** Les quatre valeurs de `work_mode` (les trois connues, plus « non précisé »),
  * chacune chiffrée — jamais un filtre qui masquerait silencieusement les
- * 68 % d'offres sans mode de travail connu (GUIDELINES §3.2). */
-export type WorkModeCounts = Record<WorkModeFilter, number>;
-
+ * 68 % d'offres sans mode de travail connu (GUIDELINES §3.2).
+ *
+ * **UN appel, pas quatre.** La version précédente lançait quatre
+ * `listOffers({ workMode: [v], pageSize: 1 })` en parallèle pour n'en lire
+ * que le `total`. Le coût d'une lecture d'`offers_dashboard` ne dépendant pas
+ * de `pageSize` (ni le `distinct on` ni les fonctions de fenêtrage ne
+ * laissent descendre un filtre), c'étaient quatre balayages du corpus pour
+ * quatre nombres — la moitié des requêtes du chargement. Le comptage se fait
+ * désormais en base, par un `group by` : `GET /work-mode-counts`, migration
+ * `20260910050000`. */
 export function useWorkModeCounts(
   client: DashboardClient,
 ): [AsyncState<WorkModeCounts>, () => void] {
-  const fn = useCallback(async () => {
-    const valeurs: WorkModeFilter[] = [...WORK_MODES, WORK_MODE_UNSPECIFIED];
-    const comptes = await Promise.all(valeurs.map((v) => countByWorkMode(client, v)));
-    return Object.fromEntries(valeurs.map((v, i) => [v, comptes[i]])) as WorkModeCounts;
-  }, [client]);
+  const fn = useCallback(() => client.getWorkModeCounts(), [client]);
   return useAsync(fn);
 }
 

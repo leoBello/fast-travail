@@ -41,6 +41,13 @@ export type WorkMode = (typeof WORK_MODES)[number];
 export const WORK_MODE_UNSPECIFIED = 'non_precise' as const;
 export type WorkModeFilter = WorkMode | typeof WORK_MODE_UNSPECIFIED;
 
+/** Ce que rend `GET /work-mode-counts` : TOUJOURS les quatre clés, y compris
+ * à zéro. La vue de comptage ne rend que les valeurs présentes ; le serveur
+ * complète (voir `getWorkModeCounts`, dashboard-query.ts), pour qu'un mode
+ * dont aucune offre ne relève s'affiche « 0 » plutôt que de disparaître du
+ * panneau. */
+export type WorkModeCounts = Record<WorkModeFilter, number>;
+
 // Mêmes valeurs que `ENGAGEMENTS` (dashboard-query.ts).
 export const ENGAGEMENTS = ['freelance', 'cdi', 'cdd', 'autre'] as const;
 export type Engagement = (typeof ENGAGEMENTS)[number];

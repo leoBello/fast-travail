@@ -1602,6 +1602,103 @@ concordent : Marseille est un marché Angular / Java.
 
 ## Problèmes ouverts, par priorité
 
+### ~~P-perf-1 — Sept vues restaient lisibles par la clé `anon`~~ *(résolu le 2026-09-09)*
+
+Trouvé le 2026-09-09 en passe de performance, en jouant la sonde
+`security_invoker` que CLAUDE.md prescrit. Le correctif I1 de la revue finale
+(migration `20260910020000`) n'a couvert que les **quatre** vues du tableau de
+bord. Sept autres n'ont aucune option, et `has_table_privilege('anon', …,
+'select')` rend **vrai** sur chacune :
+
+`offer_dedup_keys`, `offer_duplicate_groups`, `offer_lexical_score`,
+`offers_ai_candidates`, `offers_hidden_duplicates`, `offers_ranked`,
+`offers_shortlist`.
+
+C'est le même trou que I1, à la même gravité : `offers_ranked` et
+`offers_shortlist` projettent tout le corpus — titre, entreprise, description,
+URL, score. La clé `anon` est publique par conception ; RLS actif sans policy
+ne protège pas une vue qui s'exécute avec les droits de son propriétaire.
+
+**Chiffré avant de corriger**, par PostgREST avec la clé `anon` et
+`Prefer: count=exact` — des lignes réellement servies sur Internet, pas une
+lecture de catalogue : `offers_ranked` **4 511**, `offer_dedup_keys` **4 341**,
+`offer_duplicate_groups` **4 341**, `offer_lexical_score` **3 367**,
+`offers_ai_candidates` **1 392**, `offers_hidden_duplicates` **233**,
+`offers_shortlist` **103**. `offers_dashboard`, déjà corrigée par I1, rendait
+**0** — la preuve que le correctif fonctionne et que seul son périmètre était
+en cause.
+
+**Corrigé** par la migration `20260910040000`. Après : les **onze** vues
+rendent 0 à `anon`. Vérifié dans l'autre sens aussi — `service_role`
+(`GET /stats`, `/brief`, `/offers`) et le rôle d'administration
+(`db query --linked`) lisent toujours tout, ce qui était attendu : `service_role`
+contourne le RLS de toute façon, donc ni les scrapers, ni les trois crons, ni
+`api-dashboard` n'ont rien senti.
+
+**Ce que cet épisode enseigne, et qui vaut plus que le correctif** : I1 avait
+cherché le trou *là où le tableau de bord regardait*, pas là où il était. Une
+vue nouvelle doit porter `security_invoker = on` **dès sa création**, jamais
+ajouté après coup par une migration de rattrapage.
+
+### ~~P-perf-2 — Le tableau de bord relançait tous ses appels à chaque rendu~~ *(résolu le 2026-09-09)*
+
+**Symptôme** : les quatre colonnes du suivi affichaient « Le chargement a
+échoué », et l'écran mettait plus de dix secondes quand il aboutissait.
+Revenir à la veille rechargeait tout une seconde fois.
+
+**Cause, mesurée au navigateur** : `App.tsx` appelait `construireClient()` dans
+le corps du composant. Le client changeait donc d'identité à chaque rendu, et
+comme il est la dépendance de tous les `useCallback` de `screens/*/hooks.ts`,
+chaque `setState` d'`App` — donc chaque ouverture ou fermeture d'overlay —
+relançait l'intégralité des appels réseau de **tous** les écrans montés,
+l'écran du matin compris alors qu'il est caché sous l'overlay. `React.
+StrictMode` doublait le tout en développement.
+
+| | Avant | Après |
+|---|---:|---:|
+| Requêtes au chargement | 16 | **8** |
+| Requêtes à l'ouverture du suivi | 18 | **5** |
+| Requêtes au retour à la veille | 8 | **0** |
+| La plus lente, sous contention | ~16 s | **~1,3 s** |
+
+**Correctifs** : `useMemo(() => construireClient(), [])` dans `App.tsx` ; et,
+dans `createDashboardClient`, le partage des lectures **en vol** — deux
+appelants qui demandent la même chose au même moment font un seul aller-retour.
+Ce n'est pas un cache (l'entrée disparaît dès la réponse) et toute écriture
+fait avancer une époque, pour qu'un rechargement d'après-décision ne se greffe
+jamais sur une lecture partie avant l'écriture. Cinq tests couvrent ces cinq
+propriétés (`data/client.test.ts`).
+
+**Second poste, en base** : migration `20260910030000`. `display_key` devient
+une colonne générée stockée sur `offers`, indexée, et `offer_display_groups`
+une simple projection. La regexp était évaluée sur les 4 511 offres **trois
+fois** par requête du tableau de bord. Empreinte des regroupements identique de
+part et d'autre (`1f5a5eac2529377e1b23c411d033e280`, 4 511 lignes, 4 104
+groupes). Mesures avant/après : tableau de CLAUDE.md.
+
+**Troisième poste** : le panneau de filtres chiffrait les quatre valeurs de
+`work_mode` par quatre `GET /offers?workMode=…&pageSize=1` dont seul le
+`total` était lu — quatre balayages du corpus pour quatre nombres, la moitié
+des requêtes restantes. Le coût d'une lecture ne dépendant pas de `pageSize`
+(voir CLAUDE.md), un `pageSize=1` y coûtait le prix fort. Remplacé par une vue
+de comptage groupée (`offers_dashboard_work_mode_counts`, migration
+`20260910050000`) et une route `GET /work-mode-counts` — `api-dashboard`
+redéployée en version 8. Contrôle : la somme des quatre nombres vaut le total
+d'`offers_dashboard` (861 + 173 + 150 + 88 = 1 272), et l'écran affiche les
+mêmes quatre chiffres qu'avant.
+
+**Bilan de bout en bout, mesuré au navigateur** : le chargement passe de 16 à
+**5** requêtes et de ~15 s à **~1,5 s** ; l'ouverture du suivi de 18 à 5 et de
+~16 s à **~1,3 s** ; le retour à la veille de 8 à **0**.
+
+**Ce qui reste, et n'a pas été fait** : `/stats` enchaîne quatre comptages
+séquentiels, dont un balayage complet d'`offers_dashboard` pour le compteur
+anti-perte — c'est la requête la plus lente qui subsiste (~0,80 s). Une vue
+d'agrégat unique la ramènerait probablement sous 0,2 s. Pas entrepris : le
+gain absolu est faible depuis que la contention a disparu, et `getStats`
+mélange des comptages SQL et un calcul de série en TypeScript qu'il faudrait
+démêler d'abord.
+
 ### Ce que la revue finale de la phase 3 a trouvé — 2026-09-09
 
 **Cinq défauts qu'aucune revue de tâche ne pouvait voir**, parce qu'ils ne se
