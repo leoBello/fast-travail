@@ -1,0 +1,211 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --accent: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .badge.sm { height: 19px; padding: 0 7px; font-size: 10px; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-accent { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-dash { background: transparent; border-style: dashed; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; font-weight: 500; }
+    .btn-p { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+    .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-family: var(--mono); border: 1px solid var(--border2); color: var(--muted); white-space: nowrap; }
+    .chip-pos { color: #86e3c1; border-color: rgba(79,209,165,0.28); background: rgba(79,209,165,0.08); }
+    .chip-nil { color: var(--faint); border-style: dashed; }
+    .row { display: grid; grid-template-columns: 52px 40px minmax(0, 1fr) 190px 122px 58px; align-items: center; gap: 14px; height: 46px; padding: 0 14px; border-radius: 10px; }
+    .rowSep { height: 1px; background: var(--border); }
+    .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .absent { color: var(--faint); font-size: 12px; font-style: italic; }
+
+    /* --- Ajouts de cette maquette : la barre d'onglets et la pagination --- */
+    .tabs { display: flex; align-items: stretch; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .tab .pt { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+    .tab .ring { width: 5px; height: 5px; border-radius: 999px; border: 1px dashed currentColor; flex: none; }
+    .tab .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--faint); }
+    .tab-on { color: var(--text); font-weight: 600; background: var(--surface2); border-bottom-color: var(--accent); }
+    .tab-on .n { color: var(--text); }
+    .tab-zero .n { color: var(--faint); }
+    .pgBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 27px; height: 27px; padding: 0 7px; border-radius: 7px; border: 1px solid transparent; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .pgBtn-on { color: var(--text); background: var(--surface3); border-color: var(--border2); font-weight: 700; }
+    .pgBtn-nav { border-color: var(--border2); padding: 0 9px; font-family: var(--ui); font-size: 12px; gap: 5px; }
+    .pgBtn-off { color: var(--faint); border-color: var(--border); }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 760px; background: var(--bg); overflow: hidden; padding: 26px 28px; display: flex; flex-direction: column; gap: 20px">
+
+  <div>
+    <h2 style="font-size: 19px">Les deux arbitrages, tranchés le 2026-09-09</h2>
+    <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted)">
+      Gardés pour la trace&nbsp;: ce qui a été retenu, et ce que les deux autres options auraient coûté. Un troisième choix est acquis sans dessin concurrent&nbsp;: le repli de la bande «&nbsp;Ce matin&nbsp;» est <strong style="color: var(--text); font-weight: 600">mémorisé</strong> d'une visite à l'autre.
+    </p>
+  </div>
+
+  <!-- ============ ARBITRAGE 1 : LE DECOUPAGE DES ONGLETS ============ -->
+  <div>
+    <span class="sectT">1 &mdash; Le découpage des onglets</span>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 10px">
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px; border-color: var(--accent)">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">A &mdash; Un onglet par statut</span>
+          <span class="badge sm b-mint"><span class="dot"></span>Retenue</span>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 3px; padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border)">
+          <span class="tab tab-on" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--muted)"></span>À traiter <span class="n">1 258</span></span>
+          <span class="tab tab-zero" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--accent)"></span>Retenues <span class="n">0</span></span>
+          <span class="tab" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--violet)"></span>Postulées <span class="n">6</span></span>
+          <span class="tab" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--amber)"></span>Relancées <span class="n">1</span></span>
+          <span class="tab tab-zero" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--mint)"></span>Entretien <span class="n">0</span></span>
+          <span class="tab tab-zero" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--muted)"></span>Terminées <span class="n">0</span></span>
+          <span class="tab" style="height: 26px; font-size: 11px; color: #ffa8b0"><span class="ring"></span>Écartées <span class="n">7</span></span>
+          <span class="tab" style="height: 26px; font-size: 11px">Toutes <span class="n">1 272</span></span>
+        </div>
+
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Reprend telles quelles les six étapes du suivi et la sortie&nbsp;: aucun vocabulaire nouveau, et la même pastille qu'ailleurs dans l'application.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span>&nbsp;: huit onglets prennent toute la largeur, et cinq d'entre eux sont à zéro aujourd'hui.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">B &mdash; Quatre onglets groupés</span>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 3px; padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border)">
+          <span class="tab tab-on" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--muted)"></span>À traiter <span class="n">1 258</span></span>
+          <span class="tab" style="height: 26px; font-size: 11px"><span class="pt" style="background: var(--violet)"></span>En cours <span class="n">7</span></span>
+          <span class="tab" style="height: 26px; font-size: 11px"><span class="ring"></span>Classées <span class="n">7</span></span>
+          <span class="tab" style="height: 26px; font-size: 11px">Toutes <span class="n">1 272</span></span>
+        </div>
+
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Tient sur un tiers de la largeur et ne montre jamais cinq onglets vides.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span>&nbsp;: «&nbsp;postulée&nbsp;», «&nbsp;relancée&nbsp;» et «&nbsp;entretien&nbsp;» se confondent dans «&nbsp;En cours&nbsp;» &mdash; exactement la distinction demandée. Il faut un second geste pour la retrouver, et un vocabulaire de plus (<span class="num">En cours</span>, <span class="num">Classées</span>) que rien d'autre n'emploie.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">C &mdash; Pas d'onglets, une ligne de filtre</span>
+
+        <div style="padding: 8px 10px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 5px">
+          <span class="sectT">Statut de candidature</span>
+          <label style="display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted)"><input type="checkbox" checked>&nbsp;Sans décision</label>
+          <label style="display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted)"><input type="checkbox">&nbsp;Postulée</label>
+          <label style="display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted)"><input type="checkbox">&nbsp;Relancée</label>
+        </div>
+
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Aucun composant neuf&nbsp;: une dimension de plus dans le panneau de filtres, qui compose déjà en «&nbsp;ou&nbsp;».
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span>&nbsp;: le panneau est replié par défaut&nbsp;: l'état courant devient invisible, et le compte par statut aussi. C'est ce qui manque aujourd'hui, pas un filtre de plus.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ARBITRAGE 2 : CE QU'UNE PAGE CONTIENT ============ -->
+  <div>
+    <span class="sectT">2 &mdash; Ce qu'une page contient</span>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 10px">
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px; border-color: var(--accent)">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 13px; font-weight: 600">1 &mdash; La page vaut ce qui tient</span>
+          <span class="badge sm b-mint"><span class="dot"></span>Retenue</span>
+        </div>
+
+        <div style="padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 11px; color: var(--faint)"><span class="num">1</span>&ndash;<span class="num">8</span> sur <span class="num">1 258</span></span>
+          <div style="flex-grow: 1"></div>
+          <span class="pgBtn pgBtn-on">1</span>
+          <span class="pgBtn">2</span>
+          <span class="pgBtn">3</span>
+          <span class="pgBtn" style="color: var(--faint)">&hellip;</span>
+          <span class="pgBtn">158</span>
+        </div>
+
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          La hauteur disponible est mesurée, la taille de page en découle&nbsp;: <span class="num">8</span> lignes bande dépliée, <span class="num">15</span> repliée, davantage sur un grand écran. Jamais de défilement, jamais de vide.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span>&nbsp;: la taille de page devient un état mesuré au montage et au redimensionnement, à amortir pour ne pas relancer une requête à chaque pixel.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">2 &mdash; Taille fixe, zone qui défile</span>
+
+        <div style="padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 11px; color: var(--faint)"><span class="num">1</span>&ndash;<span class="num">25</span> sur <span class="num">1 258</span></span>
+          <span class="badge sm b-mute b-dash">25 par page</span>
+          <div style="flex-grow: 1"></div>
+          <span class="pgBtn pgBtn-on">1</span>
+          <span class="pgBtn">2</span>
+          <span class="pgBtn" style="color: var(--faint)">&hellip;</span>
+        </div>
+
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Un nombre par page constant, donc des rangs stables d'une session à l'autre et rien à mesurer.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span>&nbsp;: le défilement revient &mdash; à l'intérieur de la liste au lieu de la page, mais il revient. C'est précisément ce qu'on cherche à faire disparaître.
+        </p>
+      </div>
+
+      <div class="card" style="padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <span style="font-size: 13px; font-weight: 600">3 &mdash; «&nbsp;Charger plus&nbsp;»</span>
+
+        <div style="padding: 8px; background: #090b0f; border-radius: 9px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center">
+          <span class="btn" style="height: 28px; font-size: 11.5px">Charger 25 offres de plus</span>
+        </div>
+
+        <p style="margin: 0; font-size: 11.5px; color: var(--muted); line-height: 1.5">
+          Un seul bouton, aucune notion de page à tenir.
+        </p>
+        <p style="margin: 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          <span style="color: #ffa8b0">Coût</span>&nbsp;: la liste ne cesse de s'allonger &mdash; c'est le défaut signalé, aggravé. Et on ne revient jamais en arrière sans tout recharger.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

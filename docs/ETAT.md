@@ -1571,6 +1571,62 @@ périmé — est corrigé dans ce commit même, pas laissé en l'état ; P24 res
 seul point d'attention hérité de la phase 3, déjà visible dans
 « Problèmes ouverts, par priorité » ci-dessous.
 
+### La veille par onglets — maquette validée le 2026-09-09
+
+**Le défaut constaté à l'usage** : « Toute la veille » rend 1 272 lignes par
+pages de 50, donc la page défile ; et les offres décidées — postulées,
+relancées — restent mêlées aux 1 258 sans décision, sans qu'aucune colonne ne
+le dise.
+
+**Maquette** : `Main.dc.html` **mis à jour**, plus `VeilleRepliee.dc.html`,
+`OngletsSuivi.dc.html` et `ArbitragesOnglets.dc.html` dans
+[`design/maquettes/`](design/maquettes/) — republiés au **même** canvas que la
+phase 3, qui reste le seul. Chiffres comptés en base le 2026-09-09
+(1 258 sans décision, 6 postulées, 1 relancée, 7 écartées, 1 272 jugées).
+
+Deux ajouts à la maquette qui ne relèvent pas des onglets : le bouton
+**« Mes candidatures »** dans la barre d'application (il manquait — la maquette
+n'offrait aucun chemin vers l'écran de suivi, que le code avait donc inventé de
+son côté : c'est la maquette qui avait tort, §5.3 de `GUIDELINES.md`), et le
+bouton **« Replier »** sur la bande « Ce matin ».
+
+**Trois arbitrages tranchés**, options écartées gardées sur la seconde page du
+canvas :
+
+| Tranché | Retenu | Écarté, et ce qu'il coûtait |
+|---|---|---|
+| Découpage des onglets | **Un onglet par statut** — les six étapes, la sortie, et « Toutes » | Quatre onglets groupés : « postulée », « relancée » et « entretien » se confondraient dans « En cours », soit exactement la distinction demandée, et deux mots de vocabulaire que rien d'autre n'emploie. Une ligne dans le panneau de filtres : le panneau est replié par défaut, donc l'état courant et les comptes resteraient invisibles |
+| Ce qu'une page contient | **La page vaut ce qui tient** — hauteur mesurée, taille de page déduite | Taille fixe à 25 : le défilement revient à l'intérieur de la liste. « Charger plus » : la liste s'allonge sans fin, le défaut signalé en pire |
+| Bande « Ce matin » | **Repliable, état mémorisé** — repliée, elle rend ~330 px à la liste (8 lignes → 15) | Ne rien faire : 158 pages sur l'onglet « À traiter » |
+
+**Trois règles que le dessin a imposées**, et qui gouvernent l'implémentation :
+
+- **« rien de masqué » ne se dit plus que sur l'onglet « Toutes ».** Sur « À
+  traiter », la ligne de compte devient « 1 258 sans décision, sur 1 272
+  jugées — les 14 décidées sont dans les autres onglets ». Un onglet qui filtre
+  et une phrase qui affirme le contraire, c'est le genre de mensonge que
+  GUIDELINES §3.3 interdit.
+- **Aucune colonne « relance due ».** Rien en base ne la calcule (voir le
+  statut des données des maquettes de phase 3) : la construire serait une
+  affordance qui annonce un fait qu'aucun code ne rend vrai. Même raison pour
+  la relance Katchme, dont `last_followup_at` est nul : elle s'affiche
+  « non datée », jamais une date inventée.
+- **Les comptes d'onglets viennent d'une vue de comptage**, jamais de sept
+  `GET /offers?statut=…&pageSize=1` dont seul le `total` serait lu. C'est
+  exactement le réflexe que CLAUDE.md proscrit sur ce schéma : `offers_dashboard`
+  est intégralement matérialisée avant qu'un filtre ne retienne quoi que ce
+  soit, donc un `pageSize=1` coûte le prix de la page complète.
+
+**Deux points d'implémentation identifiés en dessinant** :
+
+- L'onglet « À traiter » ne peut pas passer par le filtre `statut` existant :
+  `listOffers` compose un `.in('candidature_statut', …)`, qui ne matche jamais
+  `null`. Il faut une valeur explicite (`aucune`) que le serveur traduit en
+  `.is(null)` — le même prédicat que `listBrief` utilise déjà.
+- `final_score` s'affiche `69.5` et `93.5` : `ScorePaire` rend le nombre brut,
+  donc avec un point décimal anglais. Hors périmètre de ce chantier, mais
+  visible sur la maquette.
+
 ---
 
 ## Ce que la mesure a établi sur Adzuna
@@ -1601,6 +1657,58 @@ concordent : Marseille est un marché Angular / Java.
 ---
 
 ## Problèmes ouverts, par priorité
+
+### P25 — L'écran livré ne suit pas la maquette, et rien ne le voyait
+
+**Signalé le 2026-09-09**, capture d'écran à l'appui, sur le tableau de bord en
+service. La phase 3 est passée avec `verify` vert, sept revues, et un écran qui
+ne ressemble pas à `Main.dc.html`. Ce n'est pas une négligence isolée : c'est
+exactement le domaine que le §4 de `GUIDELINES.md` annonce comme invisible aux
+tests — `jsdom` ne calcule aucune mise en page —, et que rien ne relisait.
+
+La règle qui manquait est désormais écrite : `GUIDELINES.md` §5, avec le point
+qui change tout — **un élément dessiné mais pas encore branché s'implémente
+désactivé**, jamais retiré. Retiré, l'écart cesse d'être visible ; désactivé, il
+se voit et se rebranche en une ligne.
+
+Les écarts constatés, à traiter en passe dédiée **après** le chantier des
+onglets :
+
+| # | Écart | Où |
+|---|---|---|
+| a | Le bouton de **réglages** de la barre d'application n'existe pas | `MatinScreen`, barre d'application |
+| b | L'**icône de document** de « Mon CV » manque | idem |
+| c | Le libellé est « Importer mon CV » là où la maquette écrit « Mon CV » | idem |
+| d | L'état des **deux crons** — « Collecte 6 h 30 · Jugement 7 h 00 · N lues » — n'est pas affiché | idem ; demande un point d'API sur `collection_runs` |
+| e | « Mes candidatures » n'a **pas d'icône** | idem |
+| f | Le bouton **« Suivantes »** est collé à la carte du dessus | `MorningBand` / `Pagination` |
+| g | Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas | `theme.css` — voir la cause ci-dessous |
+| h | Le couple de scores ne porte pas les couleurs de la maquette (`77`/`68` en ambre là où la maquette met encre et gris) | `Score` / `OfferCard` |
+| i | Le badge « Texte coupé à 500 car. » paraît plein là où la maquette le veut **discontinu** | `OfferCard` |
+
+**Deux causes déjà trouvées dans le code**, et la première explique bien plus
+que la ligne qu'elle occupe :
+
+- **(g) le fond gris du titre est le fond de bouton du navigateur.** La remise
+  à zéro globale de `dashboard/src/ui/theme.css:142` pose `font`, `color` et
+  `cursor` sur `button` — **mais pas `background`**. Tout `<button>` qui ne
+  déclare pas le sien hérite donc du `buttonface` de Chromium, et
+  `OfferCard.module.css` `.titreLien` n'en déclare pas. La maquette, elle,
+  écrit `background: none` dans sa remise à zéro. **Un seul mot manque, et il
+  touche tous les boutons non stylés de l'application** — c'est le premier
+  endroit à corriger, avant de compter les occurrences.
+- **(f) `Pagination.module.css` `.pagination` n'a aucune marge haute**, là où la
+  maquette pose `margin-top: 11px` entre la grille de cartes et la ligne de
+  pagination. `MorningBand` rend la grille puis `<Pagination>` sans rien entre
+  les deux.
+
+Les points **d** et **h** restent à **remesurer sur le code** avant correction :
+ils sont lus sur une capture, et une capture ne dit pas si la couleur vient
+d'une règle délibérée. Les autres sont directement constatables.
+
+**Ce qui empêchera la récidive** : la relecture du §5.4 — l'écran réel à côté
+de l'artboard, à la même largeur — à la fin de chaque chantier d'interface. Pas
+un test : `jsdom` ne verra jamais un chevauchement.
 
 ### ~~P-perf-1 — Sept vues restaient lisibles par la clé `anon`~~ *(résolu le 2026-09-09)*
 

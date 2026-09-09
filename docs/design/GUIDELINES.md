@@ -260,3 +260,80 @@ raison pour laquelle elle n'est pas une formalité. Sur la phase 2, sept revues
 successives ont laissé passer un client d'API sans horloge parce qu'il était
 hors du périmètre de chaque tâche prise isolément ; une mise en page cassée
 passe de la même façon à travers une suite verte.
+
+---
+
+## 5. La maquette se suit à la lettre, et un manque se comble par un bouton désactivé
+
+Le §2 dit que la maquette gouverne. Ce paragraphe dit **jusqu'où**, parce que
+la phase 3 a été livrée avec une suite verte et un écran qui ne ressemblait
+pas au dessin.
+
+### 5.1 Ce qui est repris tel quel, sans arbitrage silencieux
+
+**Chaque valeur de la maquette est une valeur à reprendre**, pas une
+suggestion : espacements, marges, hauteurs de contrôle, rayons, épaisseurs de
+trait, tailles d'icône, fonds, et **chaque icône dessinée**. Un composant qui
+« ressemble » à la maquette sans en porter les valeurs est un composant à
+reprendre.
+
+Une seule sorte d'exception existe, et elle est déjà écrite au §2 : une valeur
+de maquette **hors de l'échelle de tokens** s'aligne sur l'échelle, et l'écart
+se documente ici. Tout le reste se suit.
+
+**Le fond d'un élément n'est jamais laissé au hasard.** Un titre que la
+maquette dessine sur le fond de la carte ne doit pas hériter d'un fond de
+surface au passage : c'est l'écart le plus facile à ne pas voir en relisant du
+CSS, et le plus visible à l'écran.
+
+### 5.2 Un élément dessiné mais pas encore branché s'implémente **désactivé**
+
+**On ne retire jamais de l'écran un élément que la maquette porte** au motif
+que sa fonction n'existe pas encore. On le construit — bonne place, bonnes
+dimensions, bonne icône — et on le pose `disabled`, avec un `title` ou un
+`aria-label` qui dit pourquoi.
+
+Ce que ça évite, et qui est arrivé : le bouton de réglages de la barre
+d'application a disparu de l'écran, donc l'écart entre le dessin et le rendu
+n'était plus visible nulle part — ni à l'œil, ni dans un test. Un bouton
+désactivé, lui, se voit, se compte, et se rebranche en une ligne.
+
+Ça ne contredit pas le §3.3 : un bouton désactivé n'**annonce aucun fait**. Ce
+qui reste interdit, c'est un **chiffre** ou un **état** inventé pour remplir un
+emplacement — un compteur à un nombre plausible, une date de relance calculée
+de rien. Une commande sans effet se rend visible et inerte ; une donnée qu'on
+n'a pas se nomme.
+
+### 5.3 La maquette est mise à jour AVANT le code, jamais après
+
+Une maquette qui décrit l'écran d'avant ne gouverne plus rien : elle induit en
+erreur, et elle rend indécidable la question « qui a raison, le dessin ou le
+rendu ». Donc, dans cet ordre :
+
+1. la maquette change (`docs/design/maquettes/*.dc.html`) ;
+2. le canvas est réassemblé et republié **au même lien** — il n'y en a qu'un ;
+3. le code suit.
+
+Le corollaire vaut aussi dans l'autre sens : quand le code a raison et la
+maquette tort — le chemin vers l'écran de suivi manquait dans la barre
+d'application, et le code l'avait inventé —, c'est **la maquette qu'on
+corrige**, pas le code qu'on ampute.
+
+### 5.4 La relecture qui manquait
+
+`jsdom` ne calcule aucune mise en page (§4) : aucune suite verte ne dira jamais
+qu'un bouton est collé à la carte du dessus. La seule relecture qui le voit est
+**l'écran réel à côté de l'artboard**, à la même largeur. Elle se fait à la fin
+de chaque chantier d'interface, et elle passe sur :
+
+| Ce qu'on regarde | L'écart déjà payé |
+|---|---|
+| Chaque icône de la maquette est-elle là ? | Barre d'application : icône de document sur « Mon CV », bouton de réglages — les deux absents |
+| Chaque élément de la maquette est-il là, même inerte ? | Le bouton de réglages, retiré au lieu d'être désactivé |
+| Les espacements verticaux entre blocs | « Suivantes » collé à la carte du dessus, là où la maquette pose une marge |
+| Les fonds, un par un | Le titre des cartes « Ce matin » portait un fond que la maquette ne dessine pas |
+| Les libellés, mot pour mot | « Importer mon CV » là où la maquette écrit « Mon CV » |
+| Ce que le code affiche en plus | « Mes candidatures », absent de la maquette — corrigé **dans la maquette** |
+
+Cette liste n'est pas un exemple : ce sont les écarts constatés sur la phase 3
+livrée, et ils sont suivis dans `ETAT.md`.

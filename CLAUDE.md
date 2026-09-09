@@ -15,6 +15,7 @@ React / TypeScript, zone Marseille / Aix-en-Provence et full-remote national.
 | [`docs/design/GUIDELINES.md`](docs/design/GUIDELINES.md) | **Règles de conception de l'interface — contraignantes.** À lire avant d'écrire un composant |
 | [`docs/design/maquettes/README.md`](docs/design/maquettes/README.md) | Les maquettes de la phase 3, et ce que leurs données valent |
 | [`docs/superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](docs/superpowers/plans/2026-09-09-tableau-de-bord-phase3.md) | Plan de la phase 3, tâche par tâche |
+| [`docs/superpowers/plans/2026-09-09-veille-par-onglets.md`](docs/superpowers/plans/2026-09-09-veille-par-onglets.md) | Plan de la veille par onglets : onglets par statut, page bornée à la fenêtre |
 
 **Tenir `ETAT.md` à jour** fait partie du travail : chaque tâche terminée, chaque
 problème découvert et chaque décision prise y sont consignés. C'est le document
