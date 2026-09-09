@@ -48,6 +48,18 @@ export type WorkModeFilter = WorkMode | typeof WORK_MODE_UNSPECIFIED;
  * panneau. */
 export type WorkModeCounts = Record<WorkModeFilter, number>;
 
+// Même valeur que `STATUT_UNDECIDED` (dashboard-query.ts) : une offre sans
+// ligne `offer_applications`, donc `candidature_statut` nul. `in` ne matche
+// jamais `null` — c'est ce qui rend l'onglet « À traiter » possible.
+export const STATUT_UNDECIDED = 'aucune' as const;
+export type StatutFilter = ApplicationStatus | typeof STATUT_UNDECIDED;
+
+/** Ce que rend `GET /statut-counts` : TOUJOURS les huit clefs, y compris à
+ * zéro. La vue de comptage ne rend que les valeurs présentes ; le serveur
+ * complète (voir `getStatutCounts`, dashboard-query.ts), pour qu'un onglet
+ * dont aucune offre ne relève affiche « 0 » plutôt que de disparaître. */
+export type StatutCounts = Record<StatutFilter, number>;
+
 // Mêmes valeurs que `ENGAGEMENTS` (dashboard-query.ts).
 export const ENGAGEMENTS = ['freelance', 'cdi', 'cdd', 'autre'] as const;
 export type Engagement = (typeof ENGAGEMENTS)[number];
@@ -163,7 +175,7 @@ export interface OffersListFilters {
   sort?: SortField;
   page?: number;
   pageSize?: number;
-  statut?: ApplicationStatus[];
+  statut?: StatutFilter[];
   workMode?: WorkModeFilter[];
   engagement?: Engagement[];
   source?: Source[];

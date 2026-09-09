@@ -3,10 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardClient } from '../../data/client';
 import { ligneOffre } from '../../data/test-fixtures';
-import type { ApplicationStatus, OffersListFilters, StatsResult } from '../../data/types';
+import type { OffersListFilters, StatsResult, StatutFilter } from '../../data/types';
 import { SuiviScreen } from './SuiviScreen';
 
-const OFFRES_PAR_STATUT: Partial<Record<ApplicationStatus, ReturnType<typeof ligneOffre>[]>> = {
+const OFFRES_PAR_STATUT: Partial<Record<StatutFilter, ReturnType<typeof ligneOffre>[]>> = {
   retenue: [ligneOffre({ id: 'r1', title: 'Offre retenue', candidature_statut: 'retenue' })],
   postulee: [ligneOffre({ id: 'p1', title: 'Offre postulée', candidature_statut: 'postulee' })],
   relancee: [],
@@ -50,6 +50,16 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
     getWorkModeCounts: vi
       .fn()
       .mockResolvedValue({ full_remote: 173, hybride: 150, sur_site: 88, non_precise: 861 }),
+    getStatutCounts: vi.fn().mockResolvedValue({
+      aucune: 1258,
+      a_traiter: 0,
+      retenue: 0,
+      postulee: 6,
+      relancee: 1,
+      entretien: 0,
+      terminee: 0,
+      ecartee: 7,
+    }),
     ...overrides,
   };
 }
