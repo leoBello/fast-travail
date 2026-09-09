@@ -600,3 +600,40 @@ Deno.test('POST /candidate-profile — même profileVersion que le profil actif 
   );
   assertEquals(res.status, 400);
 });
+
+// --------------------------------------------------------------------------
+// GET /statut-counts, et statut=aucune sur /offers (tâche 3)
+// --------------------------------------------------------------------------
+
+Deno.test('GET /statut-counts — répond 200 et rend les huit clefs', async () => {
+  const db = fakeDb(
+    {
+      offers_dashboard_status_counts: {
+        data: [{ statut: 'aucune', total: 1258 }],
+        error: null,
+      },
+    },
+    { data: [], error: null, count: 0 },
+  );
+  const res = await routeDashboardRequest(req('GET', '/statut-counts'), { db });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.aucune, 1258);
+  assertEquals(body.postulee, 0);
+  assertEquals(Object.keys(body).length, 8);
+});
+
+Deno.test('GET /offers?statut=aucune — accepté (la valeur « sans décision »)', async () => {
+  const db = fakeDb({}, { data: [], error: null, count: 0 });
+  const res = await routeDashboardRequest(req('GET', '/offers?statut=aucune'), { db });
+  assertEquals(res.status, 200);
+});
+
+Deno.test('GET /offers?statut=inventee — rejeté en 400, jamais un repli silencieux', async () => {
+  const res = await routeDashboardRequest(req('GET', '/offers?statut=inventee'), {
+    db: untouchableDb(),
+  });
+  assertEquals(res.status, 400);
+  const body = await res.json();
+  assertEquals(String(body.error).includes('statut'), true);
+});
