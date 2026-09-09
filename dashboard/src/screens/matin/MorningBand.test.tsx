@@ -120,4 +120,25 @@ describe('MorningBand', () => {
     const { container } = render(<MorningBand {...props({ decidees: 0 })} />);
     expect(container.querySelectorAll('[data-rempli="true"]')).toHaveLength(0);
   });
+
+  it(
+    'CHARGEMENT avec decidees > 0 (compteur persisté — revue de tâche 7, deuxième passe, la ' +
+      'combinaison que la fixture par défaut, decidees: 0, ne produisait jamais) : la jauge ' +
+      '"décidées" reste à blanc, elle n’affirme PAS "tout est décidé" avant que /brief n’ait ' +
+      'répondu',
+    () => {
+      // Le scénario exact démontré en revue : un utilisateur qui a déjà
+      // décidé deux offres plus tôt dans la journée recharge la page —
+      // `decidees` vaut 2 dès le montage (lu depuis `localStorage`), mais
+      // `total` vaut encore 0 (valeur initiale, avant la réponse de
+      // `/brief`). Sans garde, `MorningBand` calcule le dénominateur
+      // `total + decidees = 2`, et la jauge affiche 10 segments sur 10 —
+      // "toutes les offres du jour sont décidées" avant même d'avoir
+      // demandé au serveur combien il y en a.
+      const { container } = render(
+        <MorningBand {...props({ chargement: true, decidees: 2, offers: [], total: 0 })} />,
+      );
+      expect(container.querySelectorAll('[data-rempli="true"]')).toHaveLength(0);
+    },
+  );
 });

@@ -77,7 +77,7 @@ export function MorningBand({
         </div>
         <div className={styles.spacer} />
         <div className={styles.indicateurs}>
-          <DecidedProgress decidees={decidees} total={total + decidees} />
+          <DecidedProgress decidees={decidees} total={total + decidees} chargement={chargement} />
           <span className={styles.separateur} aria-hidden="true" />
           <StreakIndicator jours={streakDays} chargement={streakChargement} />
         </div>

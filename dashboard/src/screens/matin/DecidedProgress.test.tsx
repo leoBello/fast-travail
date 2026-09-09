@@ -32,4 +32,37 @@ describe('DecidedProgress', () => {
     const { container } = render(<DecidedProgress decidees={0} total={0} />);
     expect(container.querySelectorAll('[data-rempli="true"]')).toHaveLength(0);
   });
+
+  it(
+    'PENDANT le chargement, avec decidees > 0 (compteur persisté, revue de tâche 7, ' +
+      'deuxième passe) : la jauge reste à blanc — ne prétend PAS "tout est décidé" avant ' +
+      "que le serveur n'ait confirmé le total",
+    () => {
+      // Le scénario exact démontré en revue, à la valeur EXACTE que
+      // `MorningBand` calcule et transmet : `decidees=2` (lu depuis
+      // `localStorage` au montage, avant toute réponse réseau), et
+      // `total` reçu ICI vaut `total + decidees` où le `total` brut (le
+      // brief) est encore 0 (valeur initiale, avant que `/brief` ne
+      // réponde) — donc `total=2`, PAS `total=0`. Passer `total={0}` ici
+      // rendrait ce test aveugle : `total > 0` serait déjà faux tout seul,
+      // sans le garde `chargement`, et la mutation qui a rouvert ce défaut
+      // (retrait du garde) passerait à tort — vérifié par mutation
+      // ci-dessous, voir le rapport de tâche. Sans `chargement`, ce
+      // scénario calculait `round(2/2*10) = 10 segments sur 10` —
+      // "toutes les offres du jour sont décidées" affirmé à tort.
+      const { container } = render(<DecidedProgress decidees={2} total={2} chargement />);
+      expect(container.querySelectorAll('[data-rempli="true"]')).toHaveLength(0);
+      expect(container.querySelectorAll('[data-rempli="false"]')).toHaveLength(10);
+    },
+  );
+
+  it('la légende "N décidées" reste affichée pendant le chargement — c’est un fait LOCAL, pas un fait serveur', () => {
+    render(<DecidedProgress decidees={2} total={2} chargement />);
+    expect(screen.getByText('2 décidées')).toBeDefined();
+  });
+
+  it('l’aria-label pendant le chargement ne prétend aucune proportion ("X sur Y")', () => {
+    render(<DecidedProgress decidees={2} total={2} chargement />);
+    expect(screen.queryByRole('img', { name: /sur/ })).toBeNull();
+  });
 });
