@@ -432,6 +432,9 @@ Deno.test('GET /config — route vers la configuration : 200, forme attendue', a
         return {
           select: () => ({
             eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+            // Aucune ligne active : `getActiveOrLatestProfileRow` retombe sur
+            // ce repli (tâche 10) — vide ici, table sans aucune ligne.
+            order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
           }),
         };
       }

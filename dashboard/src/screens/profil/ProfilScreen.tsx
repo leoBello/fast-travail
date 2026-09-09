@@ -65,7 +65,9 @@ export function ProfilScreen({ client, onRetour }: Props) {
         profileVersion: formulaire.profileVersion,
       });
       setResultat({
-        profileVersion: reponse.profile?.profileVersion ?? formulaire.profileVersion,
+        // `reponse.profile` est NON nul par contrat (`ImportCandidateProfileResult`,
+        // tâche 10) : un `201` porte toujours le profil fraîchement écrit.
+        profileVersion: reponse.profile.profileVersion,
         staleCount: reponse.staleProfileOfferCount,
       });
       setFormulaire(FORMULAIRE_VIDE);

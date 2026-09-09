@@ -98,6 +98,30 @@ describe('TwoSourcesPanel — la pièce maîtresse (GUIDELINES §3.5)', () => {
     },
   );
 
+  it(
+    'salaireFloor pas encore chargé (null) : le montant reste neutre — jamais « connu » ' +
+      '(succès) ni « incertain » (alerte, barré) — correctif de revue, tâche 10',
+    () => {
+      const retenu = jugementOffre({
+        id: 'retenu',
+        confidence: 'moyenne', // évite le ton 'succes' du badge de confiance par défaut
+        compensation_kind: 'salaire',
+        compensation_min: 12000, // sous le vrai plancher (40000) — le cas signalé en revue
+        compensation_max: null,
+      });
+      const masque = jugementOffre({ id: 'masque', confidence: 'moyenne' });
+      render(
+        <TwoSourcesPanel offerId="retenu" salaireFloor={null} judgements={[retenu, masque]} />,
+      );
+
+      const montant = screen.getByText('12 k€/an');
+      expect(montant.className).not.toMatch(/montantBarre/);
+      const badge = montant.closest('[data-ton]');
+      expect(badge?.getAttribute('data-ton')).toBe('neutre');
+      expect(badge?.getAttribute('data-discontinu')).toBe('true');
+    },
+  );
+
   it("rend l'absence « salaire non publié » quand un jugement n'a rien extrait", () => {
     const { container } = render(
       <TwoSourcesPanel

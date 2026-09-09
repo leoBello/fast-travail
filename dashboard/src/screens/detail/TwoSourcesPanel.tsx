@@ -146,6 +146,12 @@ function JudgementCard({
             </Badge>
           </span>
         </Tooltip>
+      ) : compensation.kind === 'attente' ? (
+        // Le plancher n'est pas encore lu (GET /config) : ni « connu » ni
+        // « incertain » ne peuvent être affirmés — voir data/format.ts.
+        <Badge ton="neutre" taille="compacte" discontinu>
+          {compensation.texte}
+        </Badge>
       ) : (
         <Absence nature="salaire-non-publie">{t('absences.salaire-non-publie')}</Absence>
       )}

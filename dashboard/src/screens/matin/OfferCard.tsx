@@ -138,6 +138,15 @@ export function OfferCard({
             </span>
           </Tooltip>
         ) : null}
+        {compensation.kind === 'attente' ? (
+          // Ni « connu » (succès) ni « incertain » (alerte) : le plancher
+          // n'est pas encore lu (GET /config), donc rien n'affirme la
+          // certitude du montant — voir data/format.ts. Ton neutre,
+          // discontinu comme les autres compteurs « en attente » du kit.
+          <Badge ton="neutre" taille="compacte" discontinu>
+            {compensation.texte}
+          </Badge>
+        ) : null}
         {texteCoupe === null ? null : (
           <Badge ton={texteCoupe.ton} taille="compacte" discontinu>
             {texteCoupe.label}

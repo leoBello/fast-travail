@@ -292,19 +292,27 @@ export interface StatsResult {
   decidedToday: number;
 }
 
+/** Un profil candidat (`candidate_profile`), tel que `getConfig`/
+ * `importCandidateProfile` le projettent côté serveur — miroir de
+ * `ActiveProfile` (`dashboard-query.ts`). Toujours NON nul là où le serveur
+ * le renvoie réellement ainsi (`ImportCandidateProfileResult.profile`,
+ * ci-dessous) : `ConfigResult.activeProfile` est le SEUL endroit où
+ * l'absence est un cas réel (aucun profil en base). */
+export interface ActiveProfile {
+  id: number;
+  label: string;
+  profileVersion: string;
+  seniorityYears: number;
+  createdAt: string;
+}
+
 /** `GET /config` (tâche 10) : les poids réglables, le profil actif et ses
  * compétences. Remplace `SALAIRE_FLOOR_DUPLIQUE` (`data/format.ts`, retiré) :
  * `scoringWeights.salaire_floor` est la SEULE source du seuil « unité
  * incertaine », lue en direct plutôt que recopiée en dur. */
 export interface ConfigResult {
   scoringWeights: Record<string, number>;
-  activeProfile: {
-    id: number;
-    label: string;
-    profileVersion: string;
-    seniorityYears: number;
-    createdAt: string;
-  } | null;
+  activeProfile: ActiveProfile | null;
   /** Les termes de `profile_skills`, en minuscules — comparés à
    * `extraction.stack` pour distinguer les technos présentes dans le CV
    * (`Detail.dc.html`, « En vert, les N technologies présentes dans votre
@@ -326,7 +334,12 @@ export interface CandidateProfileInput {
 }
 
 export interface ImportCandidateProfileResult {
-  profile: ConfigResult['activeProfile'];
+  /** NON nul : `POST /candidate-profile` répond soit `201` avec un profil
+   * fraîchement écrit, soit une erreur (4xx/5xx) — jamais un 2xx sans
+   * profil (revue de tâche 10 : hérité de `ConfigResult['activeProfile']`
+   * avant ce correctif, ça forçait un `??` défensif côté écran pour un cas
+   * qui n'arrive pas). */
+  profile: ActiveProfile;
   /** Recompté APRÈS l'écriture — voir CLAUDE.md : l'import ne rejuge RIEN,
    * ce nombre dit seulement ce que l'import laisse inchangé. */
   staleProfileOfferCount: number;

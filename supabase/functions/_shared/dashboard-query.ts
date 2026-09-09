@@ -719,6 +719,46 @@ function toActiveProfile(row: Row): ActiveProfile {
   };
 }
 
+const CANDIDATE_PROFILE_COLUMNS = 'id, label, profile_version, seniority_years, created_at';
+
+/**
+ * Le profil actif — ou, si AUCUNE ligne ne porte `is_active = true`, le plus
+ * récemment créé.
+ *
+ * **Lecture robuste plutôt qu'écriture atomique** (revue de tâche 10) :
+ * `importCandidateProfile` désactive l'ancien profil puis insère le nouveau
+ * en deux écritures séquentielles (voir sa doc) — une panne entre les deux
+ * (coupure réseau, par exemple) laisserait alors TOUTES les lignes à
+ * `is_active = false`. Sans ce repli, `getConfig` rendrait
+ * `activeProfile: null` **et** `staleProfileOfferCount: 0` : l'écran
+ * afficherait « aucune offre périmée » alors que TOUTES le seraient — un
+ * mensonge silencieux, pire que l'incohérence qu'il masquerait. Ce repli
+ * referme le trou de lui-même au prochain appel, sans intervention
+ * manuelle, et protège aussi contre toute autre incohérence de même forme
+ * (une ligne insérée à la main, par exemple). Retenu plutôt qu'une fonction
+ * SQL transactionnelle : plus simple, et couvre des origines de trou que
+ * l'atomicité de CET appel ne couvrirait pas.
+ */
+async function getActiveOrLatestProfileRow(db: DbClient): Promise<Row | null> {
+  const { data: activeRow, error: activeError } = await db
+    .from('candidate_profile')
+    .select(CANDIDATE_PROFILE_COLUMNS)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (activeError) throw new Error(`lecture du profil actif : ${activeError.message}`);
+  if (activeRow !== null) return activeRow as Row;
+
+  const { data: latestRows, error: latestError } = await db
+    .from('candidate_profile')
+    .select(CANDIDATE_PROFILE_COLUMNS)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (latestError) {
+    throw new Error(`lecture du profil le plus récent : ${latestError.message}`);
+  }
+  return ((latestRows ?? []) as Row[])[0] ?? null;
+}
+
 /** `GET /config` : les poids réglables (`scoring_weights`), le profil actif
  * et ses compétences, le compte d'offres à profil antérieur. Remplace la
  * copie en dur `SALAIRE_FLOOR_DUPLIQUE` de `dashboard/src/data/format.ts`
@@ -737,12 +777,7 @@ export async function getConfig(db: DbClient): Promise<ConfigResult> {
     ]),
   );
 
-  const { data: profileRow, error: profileError } = await db
-    .from('candidate_profile')
-    .select('id, label, profile_version, seniority_years, created_at')
-    .eq('is_active', true)
-    .maybeSingle();
-  if (profileError) throw new Error(`lecture du profil actif : ${profileError.message}`);
+  const profileRow = await getActiveOrLatestProfileRow(db);
 
   const { data: skillRows, error: skillError } = await db.from('profile_skills').select('term');
   if (skillError) {
@@ -750,7 +785,7 @@ export async function getConfig(db: DbClient): Promise<ConfigResult> {
   }
   const cvSkills = ((skillRows ?? []) as { term: string }[]).map((row) => row.term);
 
-  const activeProfile = profileRow === null ? null : toActiveProfile(profileRow as Row);
+  const activeProfile = profileRow === null ? null : toActiveProfile(profileRow);
   const staleProfileOfferCount = activeProfile === null
     ? 0
     : await countStaleProfileOffers(db, activeProfile.profileVersion);
@@ -787,11 +822,22 @@ export interface ImportCandidateProfileResult {
  * CLAUDE.md), jamais un effet de bord de cet import.
  *
  * Désactive l'ancien profil actif puis insère le nouveau — deux écritures
- * séquentielles, pas une transaction : `candidate_profile_one_active`
+ * séquentielles, **pas** une transaction : `candidate_profile_one_active`
  * (index unique partiel sur `is_active`) interdit deux lignes actives à la
  * fois, donc l'ordre (désactiver, PUIS insérer active) est obligatoire quel
- * que soit le mécanisme. Application mono-utilisateur, un seul poste : le
- * risque d'écriture concurrente est nul en pratique.
+ * que soit le mécanisme.
+ *
+ * **Réserve assumée, couverte en lecture plutôt qu'en écriture** (revue de
+ * tâche 10) : une panne entre les deux écritures (coupure réseau, par
+ * exemple) laisserait toutes les lignes à `is_active = false`. Plutôt que de
+ * rendre CETTE fonction atomique (une fonction SQL dédiée), c'est
+ * `getActiveOrLatestProfileRow` — utilisée ici ET par `getConfig` — qui
+ * répare : retombe sur le profil le plus récent quand aucun n'est marqué
+ * actif. Choix délibéré : plus simple qu'une fonction SQL, et couvre aussi
+ * les incohérences nées autrement (une ligne modifiée à la main). Le point
+ * qui aurait pu mentir — `getConfig` rendant `activeProfile: null` **et**
+ * `staleProfileOfferCount: 0` alors que des offres restent bel et bien
+ * périmées — est donc fermé côté lecture, là où il se manifesterait.
  *
  * Rejette (`ValidationError`, 400) si `profileVersion` égale la version
  * active : CLAUDE.md prévient explicitement que changer le CV SANS faire
@@ -804,14 +850,8 @@ export async function importCandidateProfile(
   db: DbClient,
   input: CandidateProfileInput,
 ): Promise<ImportCandidateProfileResult> {
-  const { data: currentActive, error: currentError } = await db
-    .from('candidate_profile')
-    .select('profile_version')
-    .eq('is_active', true)
-    .maybeSingle();
-  if (currentError) throw new Error(`lecture du profil actif : ${currentError.message}`);
-
-  const currentVersion = (currentActive as Row | null)?.profile_version as string | undefined;
+  const currentActiveRow = await getActiveOrLatestProfileRow(db);
+  const currentVersion = currentActiveRow?.profile_version as string | undefined;
   if (currentVersion === input.profileVersion) {
     throw new ValidationError(
       `"profileVersion" doit différer de la version active ("${input.profileVersion}") — ` +

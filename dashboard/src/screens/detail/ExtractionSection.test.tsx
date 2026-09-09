@@ -66,6 +66,30 @@ describe('ExtractionSection', () => {
     },
   );
 
+  it(
+    'salaireFloor pas encore chargé (null) : ni « connu » ni « incertain » ne sont affirmés — ' +
+      'un badge neutre, jamais l’absence « salaire non publié » (le montant EXISTE, seule sa ' +
+      'certitude est inconnue) — correctif de revue, tâche 10',
+    () => {
+      const { container } = render(
+        <ExtractionSection
+          offer={ligneOffre({
+            compensation_kind: 'salaire',
+            compensation_min: 12000, // sous le vrai plancher (40000) — le cas signalé en revue
+            compensation_max: null,
+          })}
+          salaireFloor={null}
+          cvSkills={[]}
+        />,
+      );
+      expect(screen.getByText('12 k€/an')).toBeDefined();
+      expect(container.querySelector('[data-nature="salaire-non-publie"]')).toBeNull();
+      expect(container.querySelector('[data-ton="alerte"]')).toBeNull();
+      expect(container.querySelector('.montantBarre, [class*="montantBarre"]')).toBeNull();
+      expect(container.querySelector('[data-ton="neutre"][data-discontinu="true"]')).not.toBeNull();
+    },
+  );
+
   it('distingue « texte coupé » (Adzuna tronqué) d’« aucune techno reconnue » (texte complet)', () => {
     const { rerender } = render(
       <ExtractionSection

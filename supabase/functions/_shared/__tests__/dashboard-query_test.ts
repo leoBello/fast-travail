@@ -580,6 +580,12 @@ function fakeDbForConfig(opts: {
   activeProfile: Row | null;
   skills: { term: string }[];
   staleCount: number;
+  /** Ce que rend le repli `order('created_at', desc).limit(1)` quand AUCUNE
+   * ligne n'est marquée `is_active` — le scénario de la revue de tâche 10
+   * (panne entre les deux écritures séquentielles de `importCandidateProfile`).
+   * `undefined` par défaut : la table est vide de ce côté, comme dans la
+   * plupart des tests qui n'éprouvent pas ce repli. */
+  latestFallback?: Row | null;
 }): DbClient {
   return {
     from(table: string) {
@@ -591,6 +597,13 @@ function fakeDbForConfig(opts: {
           select: () => ({
             eq: () => ({
               maybeSingle: () => Promise.resolve({ data: opts.activeProfile, error: null }),
+            }),
+            order: () => ({
+              limit: () =>
+                Promise.resolve({
+                  data: opts.latestFallback ? [opts.latestFallback] : [],
+                  error: null,
+                }),
             }),
           }),
         };
@@ -621,12 +634,40 @@ Deno.test('getConfig — expose les poids réglables sous forme de map key -> va
   assertEquals(config.scoringWeights, { salaire_floor: 40000, tjm_floor: 400 });
 });
 
-Deno.test('getConfig — aucun profil actif : activeProfile null, staleProfileOfferCount à 0', async () => {
+Deno.test('getConfig — aucun profil actif ET aucune ligne du tout : activeProfile null, staleProfileOfferCount à 0', async () => {
   const db = fakeDbForConfig({ weights: [], activeProfile: null, skills: [], staleCount: 999 });
   const config = await getConfig(db);
   assertEquals(config.activeProfile, null);
   assertEquals(config.staleProfileOfferCount, 0);
 });
+
+Deno.test(
+  'getConfig — AUCUNE ligne marquée is_active (panne entre désactivation et insertion, revue ' +
+    'de tâche 10) : retombe sur la plus récente, ne dit JAMAIS "0 offre périmée" à tort',
+  async () => {
+    const db = fakeDbForConfig({
+      weights: [],
+      activeProfile: null,
+      latestFallback: {
+        id: 3,
+        label: 'CV orphelin',
+        profile_version: 'cv-2026-09-09',
+        seniority_years: 7,
+        created_at: '2026-09-09T10:00:00Z',
+      },
+      skills: [],
+      // Le piège exact que la revue nomme : si ce repli n'existait pas,
+      // staleProfileOfferCount tomberait à 0 (branche `activeProfile === null`)
+      // alors que ce nombre d'offres reste bel et bien jugé sous une version
+      // antérieure — un silence trompeur, pas une absence honnête.
+      staleCount: 1344,
+    });
+    const config = await getConfig(db);
+    assertEquals(config.activeProfile?.id, 3);
+    assertEquals(config.activeProfile?.profileVersion, 'cv-2026-09-09');
+    assertEquals(config.staleProfileOfferCount, 1344);
+  },
+);
 
 Deno.test('getConfig — profil actif : profileVersion et compte des offres à profil antérieur', async () => {
   const db = fakeDbForConfig({
@@ -655,6 +696,9 @@ function fakeDbForImport(opts: {
   currentVersion: string | null;
   insertedRow: Row;
   staleCount: number;
+  /** Simule l'échec de l'écriture d'insertion (ex. coupure réseau APRÈS la
+   * désactivation de l'ancien profil) — le scénario de la revue de tâche 10. */
+  insertFails?: boolean;
 }): { db: DbClient; deactivated: boolean[]; inserted: Row[] } {
   const deactivated: boolean[] = [];
   const inserted: Row[] = [];
@@ -672,6 +716,9 @@ function fakeDbForImport(opts: {
                   error: null,
                 }),
             }),
+            // Aucun repli à éprouver ici (`fakeDbForConfig` s'en charge côté
+            // lecture) : la table est déjà vide de ce côté dans ces tests.
+            order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
           }),
           update: (patch: Row) => ({
             eq: () => {
@@ -683,7 +730,12 @@ function fakeDbForImport(opts: {
             inserted.push(row);
             return {
               select: () => ({
-                single: () => Promise.resolve({ data: opts.insertedRow, error: null }),
+                single: () =>
+                  Promise.resolve(
+                    opts.insertFails
+                      ? { data: null, error: { message: 'connexion perdue' } }
+                      : { data: opts.insertedRow, error: null },
+                  ),
               }),
             };
           },
@@ -773,6 +825,55 @@ Deno.test('importCandidateProfile — aucun profil actif au départ : accepté (
   // côté), mais rien n'échoue.
   assertEquals(deactivated, [true]);
 });
+
+Deno.test(
+  'importCandidateProfile — désactivation réussie PUIS insertion en échec : l’erreur remonte, ' +
+    'RIEN n’est avalé (revue de tâche 10, le trou que la lecture referme ensuite)',
+  async () => {
+    const { db, deactivated, inserted } = fakeDbForImport({
+      currentVersion: 'cv-2026-09-08',
+      insertedRow: {},
+      staleCount: 0,
+      insertFails: true,
+    });
+    await assertRejects(
+      () =>
+        importCandidateProfile(db, {
+          label: 'CV v3',
+          cvText: 'texte',
+          seniorityYears: 7,
+          profileVersion: 'cv-2026-09-09',
+        }),
+      Error,
+      'connexion perdue',
+    );
+    // La désactivation, elle, a bien eu lieu — c'est EXACTEMENT le scénario
+    // qui laisserait la base sans profil actif si rien ne le couvrait.
+    assertEquals(deactivated, [true]);
+    assertEquals(inserted.length, 1); // la tentative a eu lieu, seule l'écriture a échoué
+
+    // La lecture qui suit (une requête distincte, comme le ferait un
+    // rechargement de l'écran) ne doit JAMAIS annoncer "aucune offre
+    // périmée" : `getConfig` retombe sur le profil désactivé — le plus
+    // récent qui existe encore — et rend le VRAI compte, pas 0.
+    const dbAfterFailure = fakeDbForConfig({
+      weights: [],
+      activeProfile: null, // plus aucune ligne active : la panne a laissé ce trou
+      latestFallback: {
+        id: 2,
+        label: 'CV v2 (celui que la panne a laissé désactivé)',
+        profile_version: 'cv-2026-09-08',
+        seniority_years: 7,
+        created_at: '2026-09-08T00:00:00Z',
+      },
+      skills: [],
+      staleCount: 1344,
+    });
+    const config = await getConfig(dbAfterFailure);
+    assertEquals(config.activeProfile?.profileVersion, 'cv-2026-09-08');
+    assertEquals(config.staleProfileOfferCount, 1344); // jamais 0 : le mensonge que la revue signale
+  },
+);
 
 // --------------------------------------------------------------------------
 // getOfferDetail — provenance fusionnée (found_by_labels / trusted_query)

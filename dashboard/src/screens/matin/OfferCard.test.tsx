@@ -70,6 +70,35 @@ describe('OfferCard', () => {
     expect(container.querySelector('[data-ton="alerte"][data-discontinu="true"]')).not.toBeNull();
   });
 
+  it(
+    "salaireFloor pas encore chargé (null) : le montant s'affiche en ton neutre — JAMAIS en " +
+      'succès (fausse certitude) ni en alerte (accusation sans preuve), même sous ce qui EST ' +
+      'le vrai plancher (correctif de revue, tâche 10)',
+    () => {
+      const { container } = render(
+        <OfferCard
+          offer={ligneOffre({
+            // confiance 'moyenne' : évite que le badge de confiance (ton
+            // 'succes' pour 'haute', la valeur par défaut de `ligneOffre`)
+            // ne fausse l'assertion « aucun ton succès sur cette carte ».
+            confidence: 'moyenne',
+            compensation_kind: 'salaire',
+            compensation_min: 12000, // sous le vrai plancher (40000) — le cas signalé en revue
+            compensation_max: null,
+          })}
+          onGarder={() => {}}
+          onEcarter={() => {}}
+          enTraitement={false}
+          salaireFloor={null}
+        />,
+      );
+      expect(screen.getByText('12 k€/an')).toBeDefined();
+      expect(container.querySelector('[data-ton="succes"]')).toBeNull();
+      expect(container.querySelector('[data-ton="alerte"]')).toBeNull();
+      expect(container.querySelector('[data-ton="neutre"][data-discontinu="true"]')).not.toBeNull();
+    },
+  );
+
   it('marque la confiance basse en ambre et porte une infobulle expliquant le pourquoi', () => {
     const { container } = render(
       <OfferCard

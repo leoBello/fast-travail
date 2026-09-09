@@ -117,12 +117,30 @@ describe('formatCompensation — trois rendus, jamais un nombre nu (GUIDELINES �
     expect(c).toEqual({ kind: 'absent' });
   });
 
-  it("salaireFloor encore inconnu (null, /config pas répondu) : rendu 'connu', jamais 'incertain' sans preuve (tâche 10)", () => {
+  it(
+    "salaireFloor encore inconnu (null, /config pas répondu) : rendu 'attente', jamais " +
+      "'connu' (fausse certitude) ni 'incertain' (accusation sans preuve) — correctif de revue, " +
+      'tâche 10',
+    () => {
+      // Le cas exact que la revue a signalé : 4000 est BIEN sous le vrai
+      // plancher (40000). Un premier jet rendait `connu` par défaut ici — une
+      // fausse certitude affichée pendant le chargement, pas une absence
+      // d'information (GUIDELINES §3.3/§3.6).
+      const c = formatCompensation(
+        ligne({ compensation_kind: 'salaire', compensation_min: 4000, compensation_max: null }),
+        null,
+      );
+      expect(c.kind).toBe('attente');
+      expect(c).toMatchObject({ texte: '4 k€/an' }); // le chiffre reste affiché, lui n'est pas en cause
+    },
+  );
+
+  it("salaireFloor connu (non null) : jamais 'attente', même à la limite exacte du plancher", () => {
     const c = formatCompensation(
-      ligne({ compensation_kind: 'salaire', compensation_min: 4000, compensation_max: null }),
-      null,
+      ligne({ compensation_kind: 'salaire', compensation_min: 40000, compensation_max: null }),
+      40000,
     );
-    expect(c.kind).toBe('connu');
+    expect(c.kind).not.toBe('attente');
   });
 });
 

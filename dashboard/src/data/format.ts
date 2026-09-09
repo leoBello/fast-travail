@@ -119,7 +119,13 @@ export function formatLieu(row: OfferDashboardRow): Lieu {
 }
 
 export type Compensation =
-  { kind: 'connu'; texte: string } | { kind: 'incertain'; texte: string } | { kind: 'absent' };
+  | { kind: 'connu'; texte: string }
+  | { kind: 'incertain'; texte: string }
+  | { kind: 'absent' }
+  /** Un montant `salaire` existe, mais `salaireFloor` n'est pas encore connu
+   * (`/config` n'a pas répondu) : ni `connu` ni `incertain` ne peuvent être
+   * affirmés sans mentir — voir la doc de `formatCompensationValeurs`. */
+  | { kind: 'attente'; texte: string };
 
 /**
  * Le cœur des trois rendus (GUIDELINES §3.6), sur les trois valeurs brutes
@@ -136,11 +142,19 @@ export type Compensation =
  * nombre était dupliqué ici (`SALAIRE_FLOOR_DUPLIQUE = 40000`) parce
  * qu'aucune route ne l'exposait — un `UPDATE scoring_weights` en base
  * (CLAUDE.md : gratuit et rétroactif) divergeait donc silencieusement de
- * cette copie. `null` tant que `/config` n'a pas répondu : dans ce cas, un
- * montant `salaire` est rendu `connu` SANS le distinguer « incertain » —
- * jamais l'inverse (un `incertain` affirmé sur un seuil pas encore lu
- * inventerait un fait) — le badge se complète dès que `/config` répond, un
- * bref instant après le premier rendu.
+ * cette copie.
+ *
+ * **`null` tant que `/config` n'a pas répondu — corrigé en revue de tâche
+ * 10.** Un premier jet retombait alors sur `connu` par défaut : un salaire
+ * SOUS le plancher réel s'affichait comme sûr, une fausse certitude, pas une
+ * absence d'information (exactement ce que GUIDELINES §3.3/§3.6 interdisent
+ * ensemble — « ne jamais afficher une affirmation qu'on ne peut pas
+ * prouver »). Le montant `salaire` rend désormais `attente` tant que le
+ * seuil est inconnu : le chiffre existe (il n'y a aucune raison de le
+ * cacher), mais rien n'affirme qu'il est sûr NI qu'il est douteux. Les
+ * appelants doivent rendre `attente` dans un style neutre, jamais dans le
+ * style `connu` (succès) ni `incertain` (alerte barrée) — voir `OfferCard`,
+ * `OfferRow`, `ExtractionSection`, `TwoSourcesPanel`.
  */
 export function formatCompensationValeurs(
   kind: CompensationKind,
@@ -157,9 +171,8 @@ export function formatCompensationValeurs(
 
   // kind === 'salaire'
   const texte = t('matin.salaire', Math.round(valeur / 1000));
-  return salaireFloor !== null && valeur < salaireFloor
-    ? { kind: 'incertain', texte }
-    : { kind: 'connu', texte };
+  if (salaireFloor === null) return { kind: 'attente', texte };
+  return valeur < salaireFloor ? { kind: 'incertain', texte } : { kind: 'connu', texte };
 }
 
 export function formatCompensation(
