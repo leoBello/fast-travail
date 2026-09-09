@@ -44,11 +44,9 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
   const [replie, setReplie] = useState(lireRepli);
 
   function basculerRepli() {
-    setReplie((precedent) => {
-      const suivant = !precedent;
-      ecrireRepli(suivant);
-      return suivant;
-    });
+    const suivant = !replie;
+    ecrireRepli(suivant);
+    setReplie(suivant);
   }
 
   const [briefPage, setBriefPage] = useState(1);

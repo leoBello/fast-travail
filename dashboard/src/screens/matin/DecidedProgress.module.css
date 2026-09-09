@@ -28,3 +28,9 @@
 .segmentRempli {
   background: var(--color-success);
 }
+
+/* Bande « Ce matin » repliée (`VeilleRepliee.dc.html`) : segments resserrés
+   à 14px au lieu de 20px pour tenir sur la ligne unique du repli. */
+.segmentCompact {
+  width: 14px;
+}

@@ -87,6 +87,56 @@ export function MorningBand({
   const debut = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const fin = Math.min(page * PAGE_SIZE, total);
 
+  if (replie) {
+    // La bande REPLIÉE (`VeilleRepliee.dc.html`, bloc « CE MATIN, REPLIEE ») :
+    // une seule ligne de hauteur fixe, tout en ligne — titre, compte, jauge
+    // des décidées, série — pour rendre sa hauteur à la liste (15 lignes au
+    // lieu de 8) sans qu'aucun chiffre ne disparaisse. Structure DÉLIBÉRÉMENT
+    // distincte de l'en-tête déplié ci-dessous (titre empilé sur la phrase
+    // complète) : un repli qui garderait cette structure ne compacterait
+    // rien et raterait l'objet même du repli (revue de tâche 8, défaut 1).
+    return (
+      <section className={styles.bandeRepliee} aria-label={t('jourZero.titre')}>
+        <h2 className={styles.titreReplie}>{t('jourZero.titre')}</h2>
+        <span className={styles.compteReplie}>
+          {chargement ? t('matin.chargement') : t('matin.resumeReplie', total)}
+        </span>
+        <span className={`${styles.separateur} ${styles.separateurReplie}`} aria-hidden="true" />
+        <DecidedProgress
+          decidees={decidees}
+          total={total + decidees}
+          chargement={chargement || decideesChargement}
+          compact
+        />
+        <span className={`${styles.separateur} ${styles.separateurReplie}`} aria-hidden="true" />
+        <StreakIndicator jours={streakDays} chargement={streakChargement} />
+        <div className={styles.spacer} />
+        <button
+          type="button"
+          className={`${styles.repli} ${styles.repliReplie}`}
+          aria-expanded={false}
+          aria-controls="ce-matin-cartes"
+          onClick={onToggleRepli}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+          {t('matin.deplier', total)}
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section className={styles.bande} aria-label={t('jourZero.titre')}>
       <div className={styles.entete}>
@@ -109,7 +159,8 @@ export function MorningBand({
           <button
             type="button"
             className={styles.repli}
-            aria-expanded={!replie}
+            aria-expanded={true}
+            aria-controls="ce-matin-cartes"
             onClick={onToggleRepli}
           >
             <svg
@@ -123,69 +174,65 @@ export function MorningBand({
               strokeLinejoin="round"
               aria-hidden="true"
             >
-              <path d={replie ? 'm6 9 6 6 6-6' : 'm18 15-6-6-6 6'} />
+              <path d="m18 15-6-6-6 6" />
             </svg>
-            {replie ? t('matin.deplier', total) : t('matin.replier')}
+            {t('matin.replier')}
           </button>
         </div>
       </div>
 
-      {replie ? null : (
+      {erreur ? (
+        <EmptyState
+          titre={t('matin.erreurChargement')}
+          detail={t('matin.erreurChargementDetail')}
+        />
+      ) : chargement || (total === 0 && decideesChargement) ? (
+        // `decideesChargement` entre dans cette garde UNIQUEMENT quand elle
+        // empêcherait le texte du zéro confirmé ci-dessous d'afficher un
+        // `decidees` pas encore confirmé par `/stats` (tâche 10) — un
+        // chargement qui traînerait sur `decidees` seul, `total` déjà connu
+        // et non nul, n'a pas besoin de bloquer l'affichage des cartes.
+        <EmptyState titre={t('matin.chargement')} detail={t('matin.chargementDetail')} />
+      ) : total === 0 ? (
+        <EmptyState
+          titre={t('vides.rienADeciderTitre')}
+          detail={t('vides.rienADeciderDetail', decidees)}
+        />
+      ) : (
         <>
-          {erreur ? (
-            <EmptyState
-              titre={t('matin.erreurChargement')}
-              detail={t('matin.erreurChargementDetail')}
-            />
-          ) : chargement || (total === 0 && decideesChargement) ? (
-            // `decideesChargement` entre dans cette garde UNIQUEMENT quand elle
-            // empêcherait le texte du zéro confirmé ci-dessous d'afficher un
-            // `decidees` pas encore confirmé par `/stats` (tâche 10) — un
-            // chargement qui traînerait sur `decidees` seul, `total` déjà connu
-            // et non nul, n'a pas besoin de bloquer l'affichage des cartes.
-            <EmptyState titre={t('matin.chargement')} detail={t('matin.chargementDetail')} />
-          ) : total === 0 ? (
-            <EmptyState
-              titre={t('vides.rienADeciderTitre')}
-              detail={t('vides.rienADeciderDetail', decidees)}
-            />
-          ) : (
-            <>
-              <div className={styles.grille}>
-                <AnimatePresence initial={false}>
-                  {offers.map((offer) => (
-                    <OfferCard
-                      key={offer.id}
-                      offer={offer}
-                      enTraitement={offresEnTraitement.has(offer.id)}
-                      onGarder={() => onDecision(offer, 'garder')}
-                      onEcarter={() => onDecision(offer, 'ecarter')}
-                      onOuvrir={onOuvrirOffre}
-                      salaireFloor={salaireFloor}
-                    />
-                  ))}
-                </AnimatePresence>
-              </div>
+          <div className={styles.grille} id="ce-matin-cartes">
+            <AnimatePresence initial={false}>
+              {offers.map((offer) => (
+                <OfferCard
+                  key={offer.id}
+                  offer={offer}
+                  enTraitement={offresEnTraitement.has(offer.id)}
+                  onGarder={() => onDecision(offer, 'garder')}
+                  onEcarter={() => onDecision(offer, 'ecarter')}
+                  onOuvrir={onOuvrirOffre}
+                  salaireFloor={salaireFloor}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
 
-              <Pagination
-                debut={debut}
-                fin={fin}
-                total={total}
-                onSuivant={() => onPageChange(page + 1)}
-                onPrecedent={() => onPageChange(page - 1)}
-                suivantDisponible={fin < total}
-                precedentDisponible={page > 1}
-              />
-            </>
-          )}
-
-          {erreur ? (
-            <button type="button" className={styles.reessayer} onClick={onReessayer}>
-              {t('matin.reessayer')}
-            </button>
-          ) : null}
+          <Pagination
+            debut={debut}
+            fin={fin}
+            total={total}
+            onSuivant={() => onPageChange(page + 1)}
+            onPrecedent={() => onPageChange(page - 1)}
+            suivantDisponible={fin < total}
+            precedentDisponible={page > 1}
+          />
         </>
       )}
+
+      {erreur ? (
+        <button type="button" className={styles.reessayer} onClick={onReessayer}>
+          {t('matin.reessayer')}
+        </button>
+      ) : null}
     </section>
   );
 }

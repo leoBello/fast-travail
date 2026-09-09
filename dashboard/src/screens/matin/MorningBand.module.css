@@ -59,6 +59,48 @@
   background: var(--color-surface-2);
 }
 
+/*
+ * La bande REPLIÉE (`VeilleRepliee.dc.html`) : une ligne unique de hauteur
+ * fixe, tout en ligne, avec une bordure basse — c'est elle qui rend sa
+ * hauteur à la liste (15 lignes au lieu de 8, revue de tâche 8, défaut 1).
+ * Remplace `.bande` (padding vertical 20px/22px) plutôt que de s'y
+ * imbriquer : additionner les deux aurait gardé une bonne partie de la
+ * hauteur que le repli est censé rendre à la liste.
+ */
+.bandeRepliee {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 52px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.titreReplie {
+  flex: none;
+  font-family: var(--font-display);
+  /* 15px dans la maquette : correspond exactement à --text-lg, aucun écart
+     à consigner. */
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.compteReplie {
+  /* 12px dans la maquette : correspond exactement à --text-sm. */
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* La maquette repliée dessine ce séparateur à 16px de haut, pas 18 — plus
+   court que celui de l'en-tête déplié (`.separateur` ci-dessous). Modificateur
+   posé EN PLUS de `.separateur`, qui garde la largeur et la couleur communes
+   aux deux états. */
+.separateurReplie {
+  height: 16px;
+}
+
 .repli {
   display: inline-flex;
   align-items: center;
@@ -74,4 +116,12 @@
 
 .repli:hover {
   background: var(--color-surface-2);
+}
+
+/* Le bouton de la bande repliée est un peu plus grand dans la maquette
+   (28px/12px, contre 26px/11.5px déplié) — modificateur posé EN PLUS de
+   `.repli`, qui garde le reste (fond, bordure, rayon, couleur) commun. */
+.repliReplie {
+  height: 28px;
+  font-size: var(--text-sm);
 }

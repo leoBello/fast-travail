@@ -147,17 +147,35 @@ describe('MorningBand', () => {
     },
   );
 
-  it('repliée : garde ses chiffres, mais ne rend plus aucune carte', () => {
-    render(<MorningBand {...props({ replie: true })} />);
+  it('repliée : garde ses chiffres (compte, décidées + jauge, série), mais ne rend plus aucune carte', () => {
+    const { container } = render(
+      <MorningBand {...props({ replie: true, total: 6, decidees: 4, streakDays: 3 })} />,
+    );
     expect(screen.queryByRole('button', { name: 'Garder' })).toBeNull();
     expect(screen.getByRole('button', { name: /Déplier/ })).not.toBeNull();
+
+    // le compte d'offres au-dessus de 50 sans décision
+    expect(screen.getByText('6 offres au-dessus de 50 sans décision')).toBeDefined();
+    // les décidées du jour, avec leur jauge proportionnelle (4 sur 6 + 4 = 10)
+    expect(screen.getByText('4 décidées')).toBeDefined();
+    expect(container.querySelectorAll('[data-rempli="true"]')).toHaveLength(4);
+    // la série
+    expect(screen.getByText('3 jours de suite')).toBeDefined();
   });
 
-  it('dépliée : le bouton propose de replier', () => {
-    render(<MorningBand {...props({ replie: false })} />);
-    expect(screen.getByRole('button', { name: 'Replier' }).getAttribute('aria-expanded')).toBe(
-      'true',
+  it('repliée : le bouton porte aria-controls vers le conteneur des cartes (même sans carte affichée)', () => {
+    render(<MorningBand {...props({ replie: true })} />);
+    expect(screen.getByRole('button', { name: /Déplier/ }).getAttribute('aria-controls')).toBe(
+      'ce-matin-cartes',
     );
+  });
+
+  it('dépliée : le bouton propose de replier, et pointe vers le conteneur des cartes', () => {
+    const { container } = render(<MorningBand {...props({ replie: false })} />);
+    const bouton = screen.getByRole('button', { name: 'Replier' });
+    expect(bouton.getAttribute('aria-expanded')).toBe('true');
+    expect(bouton.getAttribute('aria-controls')).toBe('ce-matin-cartes');
+    expect(container.querySelector('#ce-matin-cartes')).not.toBeNull();
   });
 
   it('le bouton remonte le basculement', async () => {

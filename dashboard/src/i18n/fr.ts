@@ -224,6 +224,12 @@ export const fr = {
     // vaut donc que le tout premier jour, jamais recopié ici.
     resume: (n: number) =>
       `${n} offre${n === 1 ? '' : 's'} au-dessus de 50 sans décision. Les autres attendent dans la liste.`,
+    // Le résumé REPLIÉ (`VeilleRepliee.dc.html`, bande d'une seule ligne) :
+    // la même mesure que `resume` ci-dessus, mais sans « Les autres
+    // attendent dans la liste » — cette phrase n'a plus sa place quand le
+    // repli l'a déjà rendue à la liste. Clé distincte plutôt qu'une chaîne
+    // tronquée : les deux textes disent des choses différentes.
+    resumeReplie: (n: number) => `${n} offre${n === 1 ? '' : 's'} au-dessus de 50 sans décision`,
     replier: 'Replier',
     deplier: (n: number) => `Déplier les ${n} carte${n === 1 ? '' : 's'}`,
     suivantes: 'Suivantes',
