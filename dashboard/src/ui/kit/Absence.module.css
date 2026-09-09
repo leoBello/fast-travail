@@ -1,0 +1,28 @@
+/*
+ * « non publiée par la source » et « non précisée » : un texte discret, pas
+ * un badge — la maquette (Composants.dc.html, classe `.absent`) les rend
+ * comme une valeur manquante ordinaire, pas comme un fait à signaler.
+ */
+.texte {
+  font-style: italic;
+  color: var(--color-text-faint);
+  font-size: var(--text-sm);
+}
+
+/*
+ * « salaire non publié » : un jeton discontinu, pas un badge — la maquette
+ * (classe `.chip.chip-nil`) le rend au même gabarit que les jetons de score,
+ * en chasse fixe : un montant qui manque reste dans la colonne des montants.
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  border: 1px dashed var(--color-border-strong);
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}

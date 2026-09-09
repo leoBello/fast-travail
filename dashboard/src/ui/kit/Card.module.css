@@ -1,0 +1,83 @@
+.card {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+/*
+ * `flex-wrap` : titre + `.extra` (un ou plusieurs badges) doivent pouvoir se
+ * replier sur une carte étroite plutôt que de déborder du cadre.
+ */
+.entete {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.titre {
+  margin: 0;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  /* Sans ce plancher explicite à 0, le titre — un enfant flex — refuse de
+     céder la moindre place avant que `.extra` ne soit poussé hors cadre :
+     c'est lui qui doit rendre la main en premier pour que le repli ci-dessus
+     ait un effet. */
+  min-width: 0;
+}
+
+.extra {
+  margin-left: auto;
+}
+
+.field {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  padding: 3px 0;
+}
+
+.fieldLabel {
+  color: var(--color-text-muted);
+  flex: none;
+}
+
+.fieldValue {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * L'absence est en italique et non en gris pâle : elle doit se lire, pas
+ * s'effacer.
+ */
+.absent {
+  font-style: italic;
+  color: var(--color-text-faint);
+}
+
+.vide {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+}
+
+.videTitre {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin: 0 0 3px;
+}
+
+.videDetail {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: 1.55;
+}

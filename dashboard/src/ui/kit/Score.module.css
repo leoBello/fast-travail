@@ -1,0 +1,96 @@
+.couple {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.paire {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.chiffre {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+/*
+ * `final_score` : le nombre sur lequel on trie. Maquette (Composants.dc.html,
+ * « Le couple de scores ») : police d'affichage, pas la chasse fixe — c'est
+ * le nombre-titre de la carte, pas une colonne à aligner avec d'autres
+ * lignes. `font-variant-numeric` reste posé malgré tout : un chiffre qui
+ * change (recalcul de `scoring_weights`) ne doit pas faire vibrer la largeur.
+ */
+.final {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * `fit_score` : chasse fixe, comme tout chiffre comparable d'une ligne à
+ * l'autre (GUIDELINES §1). Couleur ambre : c'est un jugement du modèle, pas
+ * un fait réglable — la même distinction visuelle qui isole la confiance
+ * basse (§3.7) marque ici la nature « payée » de ce nombre.
+ */
+.fit {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-warning);
+  font-variant-numeric: tabular-nums;
+}
+
+.libelle {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.separateur {
+  width: 1px;
+  height: 26px;
+  background: var(--color-border);
+}
+
+.jetons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.jeton {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.jeton[data-signe='positif'] {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
+  background: color-mix(in srgb, var(--color-success) 8%, transparent);
+}
+
+.jeton[data-signe='negatif'] {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
+.jeton[data-signe='nul'] {
+  color: var(--color-text-faint);
+  border-style: dashed;
+}

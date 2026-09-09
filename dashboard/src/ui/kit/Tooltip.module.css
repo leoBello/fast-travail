@@ -1,0 +1,26 @@
+.popup {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-strong);
+  color: var(--color-text);
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  max-width: 250px;
+  box-shadow: var(--shadow-popup);
+  z-index: var(--z-tooltip);
+}
+
+/*
+ * L'intitulé nomme la nature de l'explication — « Confiance basse »,
+ * « Unité incertaine ». Sans lui, l'infobulle est une phrase qui surgit sans
+ * dire de quoi elle parle.
+ */
+.intitule {
+  display: block;
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}

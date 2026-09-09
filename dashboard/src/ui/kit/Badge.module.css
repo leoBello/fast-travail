@@ -1,0 +1,71 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/*
+ * Le point ne remplace jamais le mot : il le double.
+ * Une pastille réduite à sa couleur est illisible pour huit pour cent des
+ * hommes, et pour tout le monde en impression noir et blanc (GUIDELINES §3.7).
+ */
+.point {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  flex: none;
+}
+
+/* Le trait discontinu distingue une sortie ou une obligation d'une étape. */
+.discontinu {
+  border-style: dashed;
+}
+
+/*
+ * Taille compacte (maquette Composants.dc.html, badges `sm`) : une ligne de
+ * liste tolère des dizaines d'occurrences à l'écran, la carte une seule.
+ */
+.badge[data-taille='compacte'] {
+  height: 19px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+.badge[data-ton='neutre'] {
+  color: var(--color-text-muted);
+  background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+  border-color: var(--color-border-strong);
+}
+.badge[data-ton='accent'] {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+.badge[data-ton='succes'] {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 13%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
+}
+.badge[data-ton='alerte'] {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 13%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 28%, transparent);
+}
+.badge[data-ton='danger'] {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 13%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
+}
+.badge[data-ton='info'] {
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 13%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 30%, transparent);
+}
