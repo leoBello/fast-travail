@@ -1122,9 +1122,15 @@ Canvas : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
 | 6 | Edge Function `api-dashboard` | ✅ `ed190e5..36e6a08` |
 | 7 | L'écran du matin | ✅ `36e6a08..0f2d14a` |
 | 8 | Le détail d'une offre | ✅ `0f2d14a..193f37b` |
-| 9 | Le suivi et la gamification | ⬜ |
-| 10 | **Combler la dette d'API** *(ajoutée le 2026-09-09)* | ⬜ |
-| 11 | Déploiement, mesure, documentation | ⬜ |
+| 9 | Le suivi et la gamification | ✅ `193f37b..2024a68` |
+| 10 | **Combler la dette d'API** *(ajoutée le 2026-09-09)* | ✅ `2024a68..714fe42` |
+| 11 | Déploiement, mesure, documentation | ✅ `714fe42..` *(ce commit)* |
+
+**Les onze tâches sont livrées.** `npm run verify` sort en 0 des deux côtés
+(339 tests Deno, 269 dashboard). Détail de la tâche 11 — l'épreuve de bout en
+bout, les mesures et les corrections de documentation — dans « Ce que la
+tâche 11 a mesuré et vérifié » plus bas, et sorties brutes dans
+`.superpowers/sdd/task-11-report.md`.
 
 **Une onzième tâche a été ajoutée en cours de route, et c'est une erreur du
 plan qui l'impose.** Ma spécification de l'API en tâche 6 était trop courte :
@@ -1484,6 +1490,86 @@ une mesure représentative de l'usage réel), et **79,088 / 80,053 /
 79,485 ms** avec une ligne réelle en base — cohérent avec le double scan
 d'`offers` qu'implique la définition de la vue, et toujours sous 200 ms.
 Aucun index d'expression nécessaire.
+
+### Tâche 11 livrée le 2026-09-09 — déploiement, mesure, documentation
+
+**`api-dashboard` était en retard sur le dépôt, et ce n'est pas anodin.** La
+fonction déployée (version 6, `updated_at` 11:48:24 UTC) datait d'**avant**
+le dernier correctif de revue de la tâche 10 (`714fe42`, commité 11:49:55
+UTC) : le correctif de `dashboard-query.ts` (le repli robuste sur le profil
+actif, voir tâche 10) n'était donc **pas** en production. Redéployé
+(`npm run fn:deploy:api-dashboard` → version 7, `updated_at` 11:55:24 UTC,
+postérieur au commit). **Aucun test ni aucune alerte du dépôt ne signale un
+déploiement périmé** : `npm run verify` teste le code local, jamais la
+fonction en production. Le réflexe à garder pour toute tâche future qui
+touche `_shared/dashboard-*.ts` : comparer `updated_at` de
+`npx supabase functions list` à l'heure du dernier commit qui la touche,
+avant de considérer une tâche terminée.
+
+**Épreuve de bout en bout, jouée en réel contre la fonction redéployée** — la
+paire ALLEGIS GROUP citée par P23/le brief de tâche 1 (Adzuna
+`e770bf00-77ac-401e-a9d8-58daedfb8ba8`, Free-Work
+`f309a8f1-286e-471c-bc11-d4d9f45428a4`, même `display_key`) : SPA lancée
+(`vite preview` sur le bundle de production), offre ouverte depuis la liste,
+« Retenir cette offre » puis « Marquer comme postulée » cliqués. Relu en
+base immédiatement après (sortie brute, `.superpowers/sdd/task-11-report.md`) :
+
+```
+offer_applications (1 ligne) : offer_id = f309a8f1-… (Free-Work, la ligne cliquée)
+  status = postulee, applied_at = 2026-09-09 12:02:35+00
+
+offer_application_state (2 lignes, tout le groupe) :
+  e770bf00-… (adzuna)    | postulee | heritee = true
+  f309a8f1-… (free_work) | postulee | heritee = false
+```
+
+**Une seule ligne écrite, deux `offer_id` qui portent l'état** — la
+propagation group-aware posée en tâche 1 fonctionne en conditions réelles,
+pas seulement sur une sonde synthétique. Le compteur de l'écran du matin est
+passé de « 0 décidées » à « 1 décidée » et la liste de 59 à 58 offres sans
+recharger la page, preuve que la SPA relit bien l'état serveur. Sonde
+supprimée aussitôt après (`delete from offer_applications where offer_id =
+'f309a8f1-…'`), table revérifiée à 0 ligne.
+
+**Mesures, écrites et non estimées** (base à 4 511 offres / 1 339 jugées ce
+jour-là — ces deux nombres bougent chaque matin) :
+
+| Mesure | Valeur |
+|---|---:|
+| `offer_display_groups` (`explain analyze`, 1er appel à froid exclu) | 75,5 / 76,0 / 76,5 ms |
+| `offer_application_state`, table vide | 0,31 / 0,32 / 0,36 ms |
+| `offer_application_state`, une ligne réelle | 86,3 / 86,7 / 87,6 ms |
+| `offers_dashboard` (`order by final_score desc limit 20`) | 103,3 / 108,7 / 127,2 ms |
+| Bundle de production (`dashboard/dist`, non gzippé) | 452 KiB — 420 931 o JS + 35 475 o CSS + 1 028 o HTML |
+| Bundle gzippé | 135,53 kB JS + 6,06 kB CSS ≈ **142 kB** |
+| `first-paint`, 3 navigations à froid (Chromium headless, bundle de prod) | 184 / 124 / 120 ms |
+| `first-contentful-paint` | 236 / 172 / 168 ms |
+| Groupes repliés dans `offers_dashboard` (sur le périmètre jugé du jour) | 76 groupes, 94 lignes, **0 offre perdue** |
+
+Le premier appel à `db query --linked` d'une série paie un coût de connexion
+à froid isolé (~630 ms observé une fois en tâche 1, confirmé non reproduit en
+tâche 11) : toujours écarter le premier relevé et garder les trois suivants,
+comme documenté plus haut. Les trois vues restent largement sous le seuil de
+200 ms fixé par le brief de tâche 1 ; le bundle et les temps de peinture sont
+mesurés ici pour la première fois sur ce chantier.
+
+**`DASHBOARD_TOKEN` était déjà posé** (`npx supabase secrets set`, fait en
+tâche 10 en remplissant `dashboard/.env`) — rien à reposer, sa valeur n'a pas
+été relue ni recopiée.
+
+**Documentation mise à jour par cette tâche** : ce tableau (tâches 9 à 11),
+`ROADMAP.md` (phase 3 livrée, Vite et non Next.js avec la raison, phase 5
+partiellement absorbée avec le détail de ce qui reste),
+`.vscode/settings.json` (ne mentionne plus de « futur dashboard Next.js »),
+`CLAUDE.md` (recette de consultation du tableau de bord, et les deux pièges
+d'outillage `deno fmt`/Prettier et `.eslintignore` décoratif depuis
+ESLint 9 — découverts en écrivant l'outillage de la phase 3 mais jamais
+consignés jusqu'ici).
+
+**Aucun problème nouveau ouvert.** Le seul constat notable — le déploiement
+périmé — est corrigé dans ce commit même, pas laissé en l'état ; P24 reste le
+seul point d'attention hérité de la phase 3, déjà visible dans
+« Problèmes ouverts, par priorité » ci-dessous.
 
 ---
 
