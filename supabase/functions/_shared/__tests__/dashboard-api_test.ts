@@ -205,6 +205,28 @@ Deno.test('GET /brief — route vers le brief', async () => {
   assertEquals(body.total, 0);
 });
 
+Deno.test('GET /work-mode-counts — route vers le comptage, les QUATRE clés rendues', async () => {
+  const db = fakeDb(
+    {
+      offers_dashboard_work_mode_counts: {
+        data: [{ work_mode: 'full_remote', total: 173 }],
+        error: null,
+      },
+    },
+    { data: [], error: null, count: 0 },
+  );
+  const res = await routeDashboardRequest(req('GET', '/work-mode-counts'), { db });
+  assertEquals(res.status, 200);
+  // Les trois valeurs absentes de la vue sont rendues à zéro, jamais omises :
+  // le panneau de filtres doit pouvoir afficher les quatre lignes.
+  assertEquals(await res.json(), {
+    full_remote: 173,
+    hybride: 0,
+    sur_site: 0,
+    non_precise: 0,
+  });
+});
+
 Deno.test('GET /stats — route vers les statistiques', async () => {
   const db = fakeDb(
     {

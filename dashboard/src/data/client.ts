@@ -10,7 +10,7 @@ import type {
   PageResult,
   Pagination,
   StatsResult,
-  WorkModeFilter,
+  WorkModeCounts,
 } from './types';
 
 /**
@@ -84,24 +84,41 @@ export interface DashboardClient {
   /** `POST /candidate-profile` (tâche 10) : importe un nouveau CV. Ne
    * rejuge RIEN (CLAUDE.md, décision tranchée) — voir `ProfilScreen`. */
   importCandidateProfile(input: CandidateProfileInput): Promise<ImportCandidateProfileResult>;
-}
-
-/** Compte les offres pour une valeur de `work_mode` donnée, sans rien lister
- * (`pageSize: 1`, seul `total` est lu) — sert au panneau de filtres, qui
- * doit chiffrer la ligne « non précisé » (GUIDELINES §3.2) sans la masquer. */
-export async function countByWorkMode(
-  client: DashboardClient,
-  workMode: WorkModeFilter,
-): Promise<number> {
-  const page = await client.listOffers({ workMode: [workMode], pageSize: 1 });
-  return page.total;
+  /** `GET /work-mode-counts` : les quatre valeurs de `work_mode` chiffrées,
+   * en un seul appel. */
+  getWorkModeCounts(): Promise<WorkModeCounts>;
 }
 
 export function createDashboardClient(config: DashboardClientConfig): DashboardClient {
   const fetchImpl = config.fetchImpl ?? fetch;
   const base = config.baseUrl.replace(/\/+$/, '');
 
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  /**
+   * Lectures EN VOL, indexées par époque et chemin. Deux appelants qui
+   * demandent la même chose au même moment partagent une seule requête réseau
+   * au lieu d'en émettre deux.
+   *
+   * Ce n'est pas un cache : l'entrée disparaît dès que la requête retombe
+   * (succès comme échec), donc rien n'est jamais servi depuis une réponse
+   * passée, et un `recharger()` postérieur refait bien un aller-retour. Ça ne
+   * couvre que la fenêtre pendant laquelle la même lecture est demandée
+   * plusieurs fois en parallèle — ce qui arrive systématiquement ici : les
+   * effets doublés par `React.StrictMode` en développement, et `/stats`
+   * demandé à la fois par `MatinScreen` et par `SuiviScreen` superposé.
+   */
+  const enVol = new Map<string, Promise<unknown>>();
+
+  /**
+   * Toute ÉCRITURE fait avancer l'époque, et une lecture partie sous une
+   * époque antérieure ne peut plus être rejointe. Sans ça, le
+   * `recargerBrief()` qui suit une décision (`MatinScreen.decider`) pourrait
+   * se greffer sur un `/brief` parti AVANT l'écriture et rendre l'état
+   * d'avant — un rechargement qui ne recharge rien, précisément le bug que ce
+   * partage risquerait d'introduire.
+   */
+  let epoque = 0;
+
+  async function envoyer<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetchImpl(`${base}${path}`, {
       ...init,
       headers: {
@@ -128,6 +145,27 @@ export function createDashboardClient(config: DashboardClientConfig): DashboardC
     }
 
     return body as T;
+  }
+
+  function request<T>(path: string, init?: RequestInit): Promise<T> {
+    const methode = init?.method ?? 'GET';
+    if (methode !== 'GET') {
+      epoque += 1;
+      return envoyer<T>(path, init);
+    }
+
+    const cle = `${epoque} ${path}`;
+    const dejaEnVol = enVol.get(cle);
+    if (dejaEnVol !== undefined) return dejaEnVol as Promise<T>;
+
+    const promesse = envoyer<T>(path, init).finally(() => {
+      // Comparaison d'identité plutôt qu'un `delete` sec : une entrée périmée
+      // se retire elle-même sans jamais effacer celle, plus fraîche, qu'une
+      // écriture concurrente aurait posée entre-temps sous la même clé.
+      if (enVol.get(cle) === promesse) enVol.delete(cle);
+    });
+    enVol.set(cle, promesse);
+    return promesse;
   }
 
   return {
@@ -184,6 +222,16 @@ export function createDashboardClient(config: DashboardClientConfig): DashboardC
         method: 'POST',
         body: JSON.stringify(input),
       });
+    },
+
+    // UN appel, là où le panneau de filtres en faisait quatre
+    // (`GET /offers?workMode=…&pageSize=1`, dont seul le `total` était lu).
+    // Le coût d'une lecture d'`offers_dashboard` ne dépendant pas de
+    // `pageSize`, ces quatre nombres coûtaient quatre balayages du corpus —
+    // la moitié des requêtes du chargement. Voir la migration
+    // `20260910050000`.
+    getWorkModeCounts() {
+      return request<WorkModeCounts>('/work-mode-counts');
     },
   };
 }

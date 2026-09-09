@@ -170,6 +170,46 @@ export async function listOffers(db: DbClient, filters: OffersListFilters): Prom
   };
 }
 
+/** Les quatre valeurs de `work_mode` chiffrées : les trois connues, plus
+ * « non précisé » que GUIDELINES §3.2 interdit de masquer. Toujours les
+ * QUATRE clés, y compris à zéro. */
+export type WorkModeCounts = Record<WorkModeFilter, number>;
+
+/**
+ * `GET /work-mode-counts` : un seul balayage pour les quatre nombres.
+ *
+ * Remplace quatre appels `GET /offers?workMode=…&pageSize=1` dont seul le
+ * `total` était lu. Le gain n'est pas de trois requêtes HTTP mais de trois
+ * balayages du corpus : le coût d'une lecture d'`offers_dashboard` ne dépend
+ * PAS de `pageSize` — ni le `distinct on` ni les fonctions de fenêtrage ne
+ * laissent descendre un filtre, donc la vue est intégralement matérialisée
+ * avant que `work_mode` ne retienne quoi que ce soit (mesuré : `pageSize=1`
+ * coûtait autant que la page complète).
+ *
+ * La vue ne rend que les valeurs PRÉSENTES ; les absentes sont complétées à
+ * zéro ici, jamais laissées manquantes. Un mode de travail dont aucune offre
+ * ne relève doit s'afficher « 0 » dans le panneau, pas disparaître — c'est la
+ * même règle qu'ailleurs dans ce tableau : un vide se nomme.
+ */
+export async function getWorkModeCounts(db: DbClient): Promise<WorkModeCounts> {
+  const { data, error } = await db
+    .from('offers_dashboard_work_mode_counts')
+    .select('work_mode, total');
+  if (error) throw new Error(`comptage par mode de travail : ${error.message}`);
+
+  const counts = Object.fromEntries(
+    [...WORK_MODES, WORK_MODE_UNSPECIFIED].map((mode) => [mode, 0]),
+  ) as WorkModeCounts;
+  for (const row of (data ?? []) as { work_mode: string; total: number | string }[]) {
+    // Une valeur que la vue rendrait sans que le code la connaisse est
+    // ignorée plutôt qu'ajoutée : le contrat de sortie est fermé sur les
+    // quatre clés, et une cinquième ferait mentir le type sans que rien ne le
+    // signale.
+    if (row.work_mode in counts) counts[row.work_mode as WorkModeFilter] = Number(row.total);
+  }
+  return counts;
+}
+
 export interface Pagination {
   page: number;
   pageSize: number;

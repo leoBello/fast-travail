@@ -1,6 +1,5 @@
 import { ENGAGEMENTS, SOURCES, WORK_MODES, WORK_MODE_UNSPECIFIED } from '../../data/types';
-import type { Engagement, Source, WorkModeFilter } from '../../data/types';
-import type { WorkModeCounts } from './hooks';
+import type { Engagement, Source, WorkModeCounts, WorkModeFilter } from '../../data/types';
 import { t } from '../../i18n/i18n';
 import styles from './FilterPanel.module.css';
 
