@@ -62,7 +62,7 @@
     .pgBtn-off { color: var(--faint); border-color: var(--border); }
   </style>
 </helmet>
-<div style="width: 1440px; height: 980px; background: var(--bg); overflow: hidden; display: flex; flex-direction: column">
+<div style="width: 1440px; min-height: 800px; background: var(--bg); display: flex; flex-direction: column">
 
   <!-- barre d'application -->
   <div style="height: 56px; flex: none; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 20px; padding: 0 28px">
@@ -138,7 +138,7 @@
   </div>
 
   <!-- ================= TOUTE LA VEILLE, ONGLET "TOUTES" ================= -->
-  <div style="flex-grow: 1; min-height: 0; background: #090b0f; padding: 13px 28px 0; display: flex; flex-direction: column">
+  <div style="background: #090b0f; padding: 13px 28px 16px; display: flex; flex-direction: column">
 
     <div class="tabs" role="tablist" aria-label="Statut de candidature" style="flex: none">
       <button class="tab" role="tab" aria-selected="false">
@@ -210,7 +210,7 @@
     </div>
     <div class="rowSep" style="flex: none"></div>
 
-    <div style="flex-grow: 1; min-height: 0; overflow: hidden">
+    <div>
 
       <div class="row">
         <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">100</span>

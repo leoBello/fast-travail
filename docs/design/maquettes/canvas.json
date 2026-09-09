@@ -1,23 +1,115 @@
 {
   "pages": [
-    { "id": "page-1", "name": "Application" },
-    { "id": "page-2", "name": "Systeme" },
-    { "id": "page-3", "name": "Directions" }
+    {
+      "id": "page-1",
+      "name": "Application"
+    },
+    {
+      "id": "page-2",
+      "name": "Systeme"
+    },
+    {
+      "id": "page-3",
+      "name": "Directions"
+    }
   ],
   "artboards": [
-    { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 1440, "h": 980, "title": "Ce matin" },
-    { "file": "Detail.dc.html", "page": "page-1", "x": 1540, "y": 0, "w": 900, "h": 1180, "title": "Detail d une offre" },
-    { "file": "VeilleRepliee.dc.html", "page": "page-1", "x": 2540, "y": 0, "w": 1440, "h": 980, "title": "Bande repliee, onglet Toutes" },
-    { "file": "Suivi.dc.html", "page": "page-1", "x": 0, "y": 1100, "w": 1280, "h": 940, "title": "Mes candidatures" },
-    { "file": "OngletsSuivi.dc.html", "page": "page-1", "x": 2540, "y": 1100, "w": 1440, "h": 1080, "title": "Ce que chaque onglet montre" },
-
-    { "file": "Composants.dc.html", "page": "page-2", "x": 0, "y": 0, "w": 1280, "h": 1200, "title": "Vocabulaire d interface" },
-    { "file": "Etats.dc.html", "page": "page-2", "x": 1380, "y": 0, "w": 1280, "h": 1180, "title": "Les etats qui decident" },
-
-    { "file": "DirectionA.dc.html", "page": "page-3", "x": 0, "y": 0, "w": 640, "h": 520 },
-    { "file": "DirectionB.dc.html", "page": "page-3", "x": 740, "y": 0, "w": 640, "h": 520 },
-    { "file": "DirectionC.dc.html", "page": "page-3", "x": 1480, "y": 0, "w": 640, "h": 520 },
-    { "file": "ArbitragesOnglets.dc.html", "page": "page-3", "x": 0, "y": 900, "w": 1440, "h": 760, "title": "Onglets et pagination, tranches" }
+    {
+      "file": "Main.dc.html",
+      "page": "page-1",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1120,
+      "title": "Ce matin"
+    },
+    {
+      "file": "Detail.dc.html",
+      "page": "page-1",
+      "x": 1540,
+      "y": 0,
+      "w": 900,
+      "h": 1180,
+      "title": "Detail d une offre"
+    },
+    {
+      "file": "VeilleRepliee.dc.html",
+      "page": "page-1",
+      "x": 2540,
+      "y": 0,
+      "w": 1440,
+      "h": 820,
+      "title": "Bande repliee, onglet Toutes"
+    },
+    {
+      "file": "Suivi.dc.html",
+      "page": "page-1",
+      "x": 0,
+      "y": 1260,
+      "w": 1280,
+      "h": 940,
+      "title": "Mes candidatures"
+    },
+    {
+      "file": "OngletsSuivi.dc.html",
+      "page": "page-1",
+      "x": 2540,
+      "y": 1100,
+      "w": 1440,
+      "h": 1080,
+      "title": "Ce que chaque onglet montre"
+    },
+    {
+      "file": "Composants.dc.html",
+      "page": "page-2",
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 1200,
+      "title": "Vocabulaire d interface"
+    },
+    {
+      "file": "Etats.dc.html",
+      "page": "page-2",
+      "x": 1380,
+      "y": 0,
+      "w": 1280,
+      "h": 1180,
+      "title": "Les etats qui decident"
+    },
+    {
+      "file": "DirectionA.dc.html",
+      "page": "page-3",
+      "x": 0,
+      "y": 0,
+      "w": 640,
+      "h": 520
+    },
+    {
+      "file": "DirectionB.dc.html",
+      "page": "page-3",
+      "x": 740,
+      "y": 0,
+      "w": 640,
+      "h": 520
+    },
+    {
+      "file": "DirectionC.dc.html",
+      "page": "page-3",
+      "x": 1480,
+      "y": 0,
+      "w": 640,
+      "h": 520
+    },
+    {
+      "file": "ArbitragesOnglets.dc.html",
+      "page": "page-3",
+      "x": 0,
+      "y": 900,
+      "w": 1440,
+      "h": 760,
+      "title": "Onglets et pagination, tranches"
+    }
   ],
   "annotations": [
     {
@@ -34,7 +126,7 @@
       "x": 2540,
       "y": -200,
       "w": 1440,
-      "text": "MIS A JOUR LE 2026-09-09 : la liste 'Toute la veille' porte desormais une barre d'onglets par statut de candidature, et une page qui vaut ce qui TIENT dans la fenetre.\n\nCe qui l'a impose, constate a l'usage : 1 272 lignes par pages de 50 font defiler la page, et les offres decidees restaient melees aux 1 258 sans decision sans qu'aucune colonne ne le dise.\n\nLes chiffres sont comptes en base le 2026-09-09 : 1 258 sans decision, 6 postulees, 1 relancee, 7 ecartees.\n\n'Rien de masque' ne se dit plus que sur l'onglet 'Toutes' — un onglet qui filtre et une phrase qui affirme le contraire seraient un mensonge (GUIDELINES 3.3)."
+      "text": "MIS A JOUR LE 2026-09-10 : la liste 'Toute la veille' porte une barre d'onglets par statut de candidature, et DIX offres par page.\n\nCe qui l'a impose, constate a l'usage : 1 272 lignes par pages de 50 font defiler la page sans fin, et les offres decidees restaient melees aux 1 258 sans decision sans qu'aucune colonne ne le dise.\n\nLa taille de page a d'abord ete MESUREE sur la hauteur disponible. Essayee sur un ecran de portable, elle tombait a zero et la liste n'affichait plus AUCUNE ligne : la coque a hauteur fixe est abandonnee, la page coule et defile normalement, et dix lignes est une constante.\n\n'Rien de masque' ne se dit que sur l'onglet 'Toutes' — un onglet qui filtre et une phrase qui affirme le contraire seraient un mensonge (GUIDELINES 3.3)."
     },
     {
       "id": "note-doublons",
@@ -66,8 +158,11 @@
       "x": 1540,
       "y": 900,
       "w": 900,
-      "text": "TRANCHE LE 2026-09-09, apres validation : un onglet par statut, et une page qui vaut ce qui tient.\n\nLes deux autres options de chaque rangee restent ici comme trace, avec leur cout — pas comme options ouvertes.\n\nUn troisieme choix est acquis sans dessin concurrent : le repli de la bande 'Ce matin' est memorise d'une visite a l'autre."
+      "text": "TRANCHE LE 2026-09-09, apres validation : un onglet par statut, et une page qui vaut ce qui tient.\n\nAMENDE LE 2026-09-10, sur ecran reel : la mesure de hauteur est ABANDONNEE. Elle rendait zero sur un ecran de portable, donc aucune ligne visible. Dix par page, en dur, et la page defile normalement.\n\nLes options ecartees restent ici comme trace, avec leur cout.\n\nUn troisieme choix est acquis sans dessin concurrent : le repli de la bande 'Ce matin' est memorise d'une visite a l'autre."
     }
   ],
-  "launch": { "view": "canvas", "page": "page-1" }
+  "launch": {
+    "view": "canvas",
+    "page": "page-1"
+  }
 }

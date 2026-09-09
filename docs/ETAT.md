@@ -1685,6 +1685,17 @@ onglets :
 | g | Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas | `theme.css` — voir la cause ci-dessous |
 | h | Le couple de scores ne porte pas les couleurs de la maquette (`77`/`68` en ambre là où la maquette met encre et gris) | `Score` / `OfferCard` |
 | i | Le badge « Texte coupé à 500 car. » paraît plein là où la maquette le veut **discontinu** | `OfferCard` |
+| j | **La légende `MODE DE TRAVAIL` chevauche la ligne « Full remote »** dans le panneau de filtres | `FilterPanel.module.css` |
+| k | Le responsive n'a jamais été éprouvé à plusieurs largeurs ni à plusieurs hauteurs | tout l'écran |
+
+**Cause de (j)**, trouvée en lisant le CSS : `.fieldset` remet `border` et
+`padding` à zéro, et `.titreSection` — qui est un `<legend>` — porte un
+`margin-bottom`. Or un `<legend>` n'est pas un bloc ordinaire : il est ancré
+sur le bord supérieur du `fieldset`, ses marges verticales sont ignorées, et
+avec un `padding` nul le premier enfant démarre à la même ordonnée que lui.
+D'où le chevauchement. Le remède connu est de rendre la légende bloc pour de
+bon (`float: left; width: 100%`, puis dégagement) plutôt que de bricoler un
+`padding-top` qui dépendrait de la hauteur du texte.
 
 **Deux causes déjà trouvées dans le code**, et la première explique bien plus
 que la ligne qu'elle occupe :

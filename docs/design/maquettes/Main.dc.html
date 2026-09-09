@@ -62,7 +62,7 @@
     .pgBtn-off { color: var(--faint); border-color: var(--border); }
   </style>
 </helmet>
-<div style="width: 1440px; height: 980px; background: var(--bg); overflow: hidden; display: flex; flex-direction: column">
+<div style="width: 1440px; min-height: 1100px; background: var(--bg); display: flex; flex-direction: column">
 
   <!-- barre d'application -->
   <div style="height: 56px; flex: none; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 20px; padding: 0 28px">
@@ -313,7 +313,7 @@
 
 
   <!-- ================= TOUTE LA VEILLE ================= -->
-  <div style="flex-grow: 1; min-height: 0; border-top: 1px solid var(--border); background: #090b0f; padding: 13px 28px 0; display: flex; flex-direction: column">
+  <div style="border-top: 1px solid var(--border); background: #090b0f; padding: 13px 28px 16px; display: flex; flex-direction: column">
 
     <!-- barre d'onglets : un onglet par statut de candidature, jamais un statut masque -->
     <div class="tabs" role="tablist" aria-label="Statut de candidature" style="flex: none">
@@ -384,7 +384,7 @@
     </div>
     <div class="rowSep" style="flex: none"></div>
 
-    <div style="flex-grow: 1; min-height: 0; overflow: hidden">
+    <div>
 
       <div class="row">
         <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">77</span>
@@ -498,14 +498,40 @@
         <span class="trunc" style="color: var(--muted); font-size: 12px">Paris</span>
         <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">20 j</span>
       </div>
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">66</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">55</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Développeur FullStack H/F (CDI)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">FIGARO CLASSIFIEDS</span>
+        <span class="trunc" style="color: var(--muted); font-size: 12px">Paris 9<sup>e</sup></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">13 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">66</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">72</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Senior Fullstack Engineer H/F</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">Autre</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">Malt</span>
+        <span class="trunc" style="color: var(--muted); font-size: 12px">Paris</span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">28 j</span>
+      </div>
     </div>
 
-    <!-- pagination : la page vaut ce qui tient, PLAFONNE a 10 lignes
-         (decide le 2026-09-10). Au-dela de ce que la hauteur permet, la zone
-         de liste defile ; la PAGE, elle, ne defile jamais. -->
+    <!-- pagination : DIX lignes par page, taille fixe (decide le 2026-09-10,
+         sur ecran reel). La coque a hauteur fixe est abandonnee : la page coule
+         et DEFILE normalement. Mesuree, la hauteur disponible tombait a zero sur
+         un ecran de portable et la liste n'affichait plus AUCUNE ligne. -->
     <div style="flex: none; display: flex; align-items: center; gap: 10px; height: 44px; border-top: 1px solid var(--border)">
-      <span style="font-size: 11.5px; color: var(--faint)"><span class="num">1</span>&ndash;<span class="num">8</span> sur <span class="num">1 258</span></span>
-      <span class="badge sm b-mute b-dash">8 par page</span>
+      <span style="font-size: 11.5px; color: var(--faint)"><span class="num">1</span>&ndash;<span class="num">10</span> sur <span class="num">1 258</span></span>
+      <span class="badge sm b-mute b-dash">10 par page</span>
 
       <div style="flex-grow: 1"></div>
 
@@ -519,7 +545,7 @@
         <button class="pgBtn">3</button>
         <button class="pgBtn">4</button>
         <span class="pgBtn" style="color: var(--faint)">&hellip;</span>
-        <button class="pgBtn">158</button>
+        <button class="pgBtn">126</button>
         <button class="pgBtn pgBtn-nav" aria-label="Page suivante">
           Suivantes
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
