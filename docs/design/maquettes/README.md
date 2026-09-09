@@ -3,7 +3,7 @@
 Les maquettes du tableau de bord. Les règles qu'elles fixent sont dans
 [`../GUIDELINES.md`](../GUIDELINES.md), qui est contraignant.
 
-**Canvas publié** : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
+**Canvas publié** : <https://claude.ai/code/artifact/6aad5c99-ca9d-49d3-ae81-333830aafc42>
 
 **Il n'y a qu'un seul canvas, et c'est celui-là.** Toute évolution de
 l'interface met ces fichiers à jour puis republie **au même lien** : une

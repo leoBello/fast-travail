@@ -500,10 +500,12 @@
       </div>
     </div>
 
-    <!-- pagination : la page vaut ce qui TIENT, jamais un nombre fixe qui deborde -->
+    <!-- pagination : la page vaut ce qui tient, PLAFONNE a 10 lignes
+         (decide le 2026-09-10). Au-dela de ce que la hauteur permet, la zone
+         de liste defile ; la PAGE, elle, ne defile jamais. -->
     <div style="flex: none; display: flex; align-items: center; gap: 10px; height: 44px; border-top: 1px solid var(--border)">
       <span style="font-size: 11.5px; color: var(--faint)"><span class="num">1</span>&ndash;<span class="num">8</span> sur <span class="num">1 258</span></span>
-      <span class="badge sm b-mute b-dash">8 par page &mdash; ce que la fenêtre tient</span>
+      <span class="badge sm b-mute b-dash">8 par page</span>
 
       <div style="flex-grow: 1"></div>
 

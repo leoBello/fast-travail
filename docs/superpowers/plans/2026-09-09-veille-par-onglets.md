@@ -4,6 +4,8 @@
 
 **Goal:** « Toute la veille » porte une barre d'onglets par statut de candidature, et une page qui tient dans la fenêtre sans jamais la faire défiler.
 
+**Amendement du 2026-09-10, après essai à l'écran** : la taille de page est **plafonnée à 10 lignes**, et la zone de liste **défile** si elles ne tiennent pas. La page, elle, ne défile toujours pas. Motif : la mesure seule laissait trop peu de place bande dépliée, et trop de lignes sur un grand écran. Voir les tâches 7 et 10.
+
 **Architecture:** Un onglet est un filtre `statut` déjà supporté par `GET /offers`, élargi d'une valeur `aucune` qui vaut `candidature_statut is null` — le miroir exact de `non_precise` pour `work_mode`. Les comptes d'onglets viennent d'une **vue de comptage** (`offers_dashboard_status_counts`), jamais de sept `pageSize=1`. La taille de page est **mesurée** sur la hauteur disponible plutôt que fixée, ce qui supprime le défilement au lieu de le déplacer.
 
 **Tech Stack:** Postgres (migration), Deno + `@std/assert` (Edge Function `api-dashboard`), React 19 + Vite + Vitest + Testing Library (SPA `dashboard/`).
@@ -1123,7 +1125,9 @@ Dans `dashboard/src/i18n/fr.ts`, groupe `matin` :
 ```ts
     pageNumero: (n: number) => `Page ${n}`,
     ellipsePages: '…',
-    parPage: (n: number) => `${n} par page — ce que la fenêtre tient`,
+    // Pas « ce que la fenêtre tient » : la taille est PLAFONNÉE à 10, donc
+    // cette phrase serait fausse sur un grand écran (GUIDELINES §3.3).
+    parPage: (n: number) => `${n} par page`,
 ```
 
 - [ ] **Step 2 : écrire le test qui échoue**
@@ -1448,6 +1452,10 @@ export const PAGE_SIZE_MIN = 5;
  * mesurable. Correspond à la maquette bande « Ce matin » dépliée. */
 export const PAGE_SIZE_DEFAUT = 8;
 
+/** Au-delà, une page cesse d'être une page : on ne lit pas vingt lignes d'un
+ * coup le matin. Plafond décidé le 2026-09-10, après essai à l'écran. */
+export const PAGE_SIZE_MAX = 10;
+
 /**
  * La taille de page **mesurée** sur la hauteur réellement disponible, plutôt
  * que fixée : c'est ce qui fait tenir la liste dans la fenêtre au lieu de
@@ -1472,7 +1480,9 @@ export function usePageSizeAjustee(ref: RefObject<HTMLElement | null>): number {
     function mesurer() {
       const hauteur = element === null ? 0 : element.clientHeight;
       if (hauteur <= 0) return;
-      setPageSize(Math.max(PAGE_SIZE_MIN, Math.floor(hauteur / HAUTEUR_LIGNE)));
+      setPageSize(
+        Math.min(PAGE_SIZE_MAX, Math.max(PAGE_SIZE_MIN, Math.floor(hauteur / HAUTEUR_LIGNE))),
+      );
     }
 
     mesurer();
@@ -2294,13 +2304,13 @@ Ajouter à `dashboard/src/screens/matin/OfferList.module.css` :
 
 ```css
 /* La zone dont la hauteur détermine la taille de page (`usePageSizeAjustee`).
-   `overflow: hidden` plutôt qu'`auto` : la page vaut ce qui TIENT, donc rien
-   ne doit défiler ici — si quelque chose déborde, c'est la mesure qu'il faut
-   corriger, pas une barre de défilement qu'il faut ajouter. */
+   `overflow-y: auto` : la page est plafonnée à 10 lignes (2026-09-10), et si
+   ces dix ne tiennent pas dans la hauteur disponible, c'est CETTE zone qui
+   défile — jamais la page. La distinction est tout l'objet du chantier. */
 .zoneLignes {
   flex-grow: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .liste {
