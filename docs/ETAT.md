@@ -1114,16 +1114,56 @@ Canvas : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
 
 | # | Tâche | État |
 |---|---|---|
-| 1 | `offer_applications` + les vues de groupe et de propagation | ✅ |
-| 2 | Échafaudage `dashboard/`, et `verify` étendu aux deux côtés | ⬜ |
-| 3 | Thème et vocabulaire d'interface, avec les tests de garde-fous | ⬜ |
-| 4 | i18n | ⬜ |
-| 5 | Vue `offers_dashboard` — repli et élection par confiance | ⬜ |
+| 1 | `offer_applications` + les vues de groupe et de propagation | ✅ `a223c12..9664995` |
+| 2 | Échafaudage `dashboard/`, et `verify` étendu aux deux côtés | ✅ `9664995..ba0604f` |
+| 3 | Thème et vocabulaire d'interface, avec les tests de garde-fous | ✅ `ba0604f..12bdb7d` |
+| 4 | i18n | ✅ `12bdb7d..dbaec57` |
+| 5 | Vue `offers_dashboard` — repli et élection par confiance | ✅ `dbaec57..4a157ed` |
 | 6 | Edge Function `api-dashboard` | ⬜ |
 | 7 | L'écran du matin | ⬜ |
 | 8 | Le détail d'une offre | ⬜ |
 | 9 | Le suivi et la gamification | ⬜ |
 | 10 | Déploiement, mesure, documentation | ⬜ |
+
+### Ce que les cinq premières tâches ont mesuré
+
+**`offers_dashboard`, la vue que le tableau de bord lira** *(tâche 5)* :
+
+| Mesure | Valeur |
+|---|---:|
+| Lignes dans `offers_scored` | 1 269 |
+| Lignes dans `offers_dashboard` | **1 187** |
+| Groupes repliés | **66** |
+| Offres perdues au repli | **0** |
+| Coût (`explain analyze`) | **93 à 100 ms** |
+
+**Le zéro est le chiffre qui compte.** Toute ligne d'`offers_scored` se retrouve
+affichée ou représentée par une autre de son groupe — vérifié par une requête
+d'écart, indépendamment par l'implémenteur, le relecteur et le coordinateur.
+C'est le critère fondateur du dépôt rendu contrôlable : un repli qui avalerait
+silencieusement une offre serait le pire défaut possible ici.
+
+**L'élection par confiance fonctionne en conditions réelles** : ALLEGIS GROUP et
+Digistrat consulting rendent chacune une ligne unique, et l'élue est dans les
+deux cas celle de **Free-Work, confiance haute** (`fit` 58 et 68) — pas celle
+d'Adzuna, mieux notée (75) mais jugée sur 500 caractères tronqués.
+
+**Le brief annonçait 79 lignes repliées, la mesure en donne 82.** L'écart n'est
+pas une erreur : le corpus grossit à chaque collecte, et les nombres du plan
+datent du 2026-09-09 au matin. **Remesurer, jamais recopier.**
+
+**Coûts des autres vues, remesurés** : `offer_display_groups` ~70 ms (contre
+~50 ms avant l'ajout de la liste blanche de suffixes), `offer_application_state`
+~79 ms avec une ligne. Aucun index d'expression posé : les temps ne le
+justifient pas, et le plan ne montre aucune boucle imbriquée qui grandirait avec
+le corpus — le seul `Nested Loop` passe par `offers_pkey`, à coût constant par
+itération.
+
+**Outillage** *(tâche 2)* : `npm run verify` couvre désormais les deux moitiés du
+dépôt — `verify:deno` puis `verify:dashboard`. Les quatre pattes de la moitié
+dashboard ont été éprouvées séparément par une faute provoquée (format, lint,
+type, test). `npm audit` est à **0 vulnérabilité** après la montée de Vite et
+Vitest.
 
 **Une décision d'architecture prise en écrivant le plan** : **Vite, pas
 Next.js**. Le `ROADMAP` annonçait Next.js et `.vscode/settings.json` le
