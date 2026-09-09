@@ -129,4 +129,47 @@ describe('App — la superposition, pas le remplacement (revue de tâche 8)', ()
       expect(screen.getAllByText('Offre liste').length).toBeGreaterThan(0);
     },
   );
+
+  it(
+    'ouvrir le détail DEPUIS le suivi le peint PAR-DESSUS le suivi, pas dessous — la ' +
+      'contrainte que le commentaire de App.tsx décrit (montage de SuiviScreen avant ' +
+      'DetailScreen dans le JSX), vérifiée par l’ordre réel du DOM plutôt qu’affirmée ' +
+      'seulement en commentaire',
+    async () => {
+      const user = userEvent.setup();
+      render(<App />);
+
+      // Ouvre le suivi depuis le bouton d'en-tête de l'écran du matin.
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Mes candidatures' })).toBeDefined(),
+      );
+      await user.click(screen.getByRole('button', { name: 'Mes candidatures' }));
+
+      const titreSuivi = await waitFor(() =>
+        screen.getByRole('heading', { name: 'Mes candidatures' }),
+      );
+
+      // Ouvre le détail depuis une carte du pipeline (le mock rend la même
+      // offre pour n'importe quel filtre `statut`, donc chaque colonne en
+      // affiche un exemplaire) — pas depuis l'écran du matin, qui reste
+      // monté dessous mais hors de propos pour CETTE contrainte.
+      const cartesPipeline = await waitFor(() => {
+        const boutons = screen.getAllByRole('button', { name: 'Offre liste' });
+        expect(boutons.length).toBeGreaterThan(0);
+        return boutons;
+      });
+      await user.click(cartesPipeline[0]!);
+
+      const retourDetail = await waitFor(() => screen.getByRole('button', { name: 'Retour' }));
+
+      // Le suivi n'a pas été démonté par l'ouverture du détail…
+      expect(screen.getByRole('heading', { name: 'Mes candidatures' })).toBeDefined();
+      // …et son titre précède le bouton "Retour" du détail dans le DOM :
+      // à z-index égal (`--z-panel`), c'est l'ORDRE qui décide de ce qui
+      // peint par-dessus quoi. Un réordonnancement du JSX inverserait ce
+      // résultat sans qu'aucune autre suite ne le remarque.
+      const position = titreSuivi.compareDocumentPosition(retourDetail);
+      expect(Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    },
+  );
 });

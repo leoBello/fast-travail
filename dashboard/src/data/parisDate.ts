@@ -46,3 +46,47 @@ export function formatDateLongue(iso: string | null): string | null {
   if (Number.isNaN(parsed)) return null;
   return formateurDateLongue.format(new Date(parsed));
 }
+
+/** « vendredi 15 h » — jour de semaine et heure, en heure de Paris.
+ * `hourCycle: 'h23'` fixe la lecture sur 24 h : sans lui, le rendu dépend du
+ * réglage régional de l'environnement d'exécution plutôt que de rester
+ * stable comme le reste de ce fichier. */
+const formateurJourHeure = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  weekday: 'long',
+  hour: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** Sert uniquement à détecter minuit PARISIEN (voir `formatJourHeure`) — pas
+ * à être affiché : `formateurJourHeure` porte le rendu réel. */
+const formateurHeureMinute = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/**
+ * « vendredi 15 h » — jour de semaine et heure, en heure de Paris.
+ *
+ * `null` sur date absente/invalide, **et aussi** sur une heure à MINUIT
+ * PILE (00 h 00 heure de Paris) : `interview_at` est un `timestamptz` que
+ * n'importe quel appelant peut renseigner avec une date SANS heure choisie
+ * (ex. la chaîne `"2026-09-11"`, que `Date.parse` interprète à minuit UTC) —
+ * rien dans le schéma ne distingue « rendez-vous réellement fixé à minuit »
+ * de « seule la date a été saisie ». Un entretien professionnel à minuit
+ * pile est assez improbable pour que le doute penche du côté de l'absence
+ * d'heure plutôt que de l'affirmer — même principe que GUIDELINES §3.6 (une
+ * unité incertaine ne s'affiche jamais comme si elle était sûre) : ne
+ * jamais prétendre savoir ce qu'on ignore. L'appelant retombe alors sur
+ * `formatDateLongue`, qui ne prétend rien sur l'heure.
+ */
+export function formatJourHeure(iso: string | null): string | null {
+  if (iso === null) return null;
+  const parsed = Date.parse(iso);
+  if (Number.isNaN(parsed)) return null;
+  const date = new Date(parsed);
+  if (formateurHeureMinute.format(date) === '00:00') return null;
+  return formateurJourHeure.format(date);
+}

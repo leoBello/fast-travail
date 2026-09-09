@@ -24,20 +24,26 @@ describe('PipelineColumn', () => {
     expect(screen.getByText('…')).toBeDefined();
   });
 
-  it('affiche un état nommé, et permet de réessayer, sur une erreur réseau', async () => {
-    const onReessayer = vi.fn();
-    render(
-      <PipelineColumn
-        statut="retenue"
-        state={{ statut: 'erreur', erreur: new Error('x') }}
-        onReessayer={onReessayer}
-        onOuvrirOffre={() => {}}
-      />,
-    );
-    expect(screen.getByText('Le chargement a échoué')).toBeDefined();
-    await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
-    expect(onReessayer).toHaveBeenCalledOnce();
-  });
+  it(
+    "affiche un état nommé, et permet de réessayer, sur une erreur réseau — l'en-tête ne " +
+      'confond pas ce cas avec le chargement (« — », pas « … »)',
+    async () => {
+      const onReessayer = vi.fn();
+      render(
+        <PipelineColumn
+          statut="retenue"
+          state={{ statut: 'erreur', erreur: new Error('x') }}
+          onReessayer={onReessayer}
+          onOuvrirOffre={() => {}}
+        />,
+      );
+      expect(screen.getByText('Le chargement a échoué')).toBeDefined();
+      expect(screen.getByText('—')).toBeDefined();
+      expect(screen.queryByText('…')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Réessayer' }));
+      expect(onReessayer).toHaveBeenCalledOnce();
+    },
+  );
 
   it('le jour zéro confirmé (0 offre à ce statut) affiche un vide NOMMÉ, pas une zone blanche', () => {
     render(
@@ -136,18 +142,51 @@ describe('PipelineColumn', () => {
     expect(screen.getByText('relancée il y a 2 j')).toBeDefined();
   });
 
-  it('affiche la date d’entretien sur la colonne « entretien »', () => {
-    render(
-      <PipelineColumn
-        statut="entretien"
-        state={{
-          statut: 'succes',
-          donnees: page([ligneOffre({ candidature_entretien_le: '2026-09-11T13:00:00.000Z' })], 1),
-        }}
-        onReessayer={() => {}}
-        onOuvrirOffre={() => {}}
-      />,
-    );
-    expect(screen.getByText('entretien le 11 septembre')).toBeDefined();
-  });
+  it(
+    "affiche le jour ET l'heure de l'entretien — le fait le plus actionnable de la carte, " +
+      'et candidature_entretien_le la porte réellement (revue de tâche 9)',
+    () => {
+      render(
+        <PipelineColumn
+          statut="entretien"
+          state={{
+            statut: 'succes',
+            donnees: page(
+              [ligneOffre({ candidature_entretien_le: '2026-09-11T13:00:00.000Z' })],
+              1,
+            ),
+          }}
+          onReessayer={() => {}}
+          onOuvrirOffre={() => {}}
+        />,
+      );
+      // 13 h UTC le 11 septembre = 15 h à Paris (été, UTC+2) = vendredi.
+      expect(screen.getByText('entretien le vendredi 15 h')).toBeDefined();
+    },
+  );
+
+  it(
+    "retombe sur la date SEULE quand l'heure vaut minuit pile heure de Paris — le cas " +
+      'limite tranché : rien ne distingue alors « entretien à minuit » de « heure non ' +
+      'saisie », l’affichage ne prétend donc pas savoir ce qu’il ignore',
+    () => {
+      render(
+        <PipelineColumn
+          statut="entretien"
+          state={{
+            statut: 'succes',
+            // 22 h UTC le 10 septembre = minuit (00:00) le 11 septembre à Paris (été).
+            donnees: page(
+              [ligneOffre({ candidature_entretien_le: '2026-09-10T22:00:00.000Z' })],
+              1,
+            ),
+          }}
+          onReessayer={() => {}}
+          onOuvrirOffre={() => {}}
+        />,
+      );
+      expect(screen.getByText('entretien le 11 septembre')).toBeDefined();
+      expect(screen.queryByText(/h$/)).toBeNull();
+    },
+  );
 });

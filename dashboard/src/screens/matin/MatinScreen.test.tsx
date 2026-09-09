@@ -103,4 +103,21 @@ describe('MatinScreen', () => {
     );
     expect(screen.getByText('Offre C')).toBeDefined();
   });
+
+  it("n'affiche aucun bouton vers le suivi quand onVoirSuivi n'est pas fourni", () => {
+    const client = clientFactice();
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Mes candidatures' })).toBeNull();
+  });
+
+  it('le bouton d’en-tête "Mes candidatures" appelle onVoirSuivi au clic, quand il est fourni', async () => {
+    const user = userEvent.setup();
+    const client = clientFactice();
+    const onVoirSuivi = vi.fn();
+    render(<MatinScreen client={client} onOuvrirOffre={() => {}} onVoirSuivi={onVoirSuivi} />);
+
+    const bouton = screen.getByRole('button', { name: 'Mes candidatures' });
+    await user.click(bouton);
+    expect(onVoirSuivi).toHaveBeenCalledOnce();
+  });
 });

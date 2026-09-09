@@ -370,6 +370,10 @@ export const fr = {
     etapePostulees: 'postulées',
 
     colonneAutres: (n: number) => `+ ${n} autre${n === 1 ? '' : 's'}`,
+    // Distinct de `matin.compteEnAttente` (« … », le chargement) : une
+    // erreur qui se lirait comme un chargement encouragerait à attendre une
+    // réponse qui ne viendra pas (revue de tâche 9).
+    compteErreur: '—',
     colonneVideTitre: 'Rien pour le moment',
     colonneVideDetail: 'Aucune offre à ce statut.',
 

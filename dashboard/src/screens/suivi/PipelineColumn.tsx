@@ -3,7 +3,7 @@ import { StatusBadge } from '../../ui/kit/StatusBadge';
 import { EmptyState } from '../../ui/kit/EmptyState';
 import { Absence } from '../../ui/kit/Absence';
 import { badgesDeFaits, formatEmployeur } from '../../data/format';
-import { formatDateLongue } from '../../data/parisDate';
+import { formatDateLongue, formatJourHeure } from '../../data/parisDate';
 import type { OfferDashboardRow, PageResult } from '../../data/types';
 import { t } from '../../i18n/i18n';
 import type { AsyncState } from '../matin/useAsync';
@@ -29,14 +29,23 @@ interface ColumnProps {
  * ont déjà répondu.
  */
 export function PipelineColumn({ statut, state, onReessayer, onOuvrirOffre }: ColumnProps) {
-  const total = state.statut === 'succes' ? state.donnees.total : null;
+  // Le corps de la colonne distingue déjà chargement/erreur/vide : l'en-tête
+  // doit dire la MÊME chose, pas confondre les deux dans un même « … » — une
+  // erreur qui se lit comme un chargement encourage à attendre indéfiniment
+  // une réponse qui ne viendra pas.
+  const compte =
+    state.statut === 'succes'
+      ? state.donnees.total
+      : state.statut === 'erreur'
+        ? t('suivi.compteErreur')
+        : t('matin.compteEnAttente');
 
   return (
     <div className={styles.colonne}>
       <div className={styles.entete}>
         <StatusBadge status={statut} label={t(`statuts.${statut}`)} taille="compacte" />
         <div className={styles.spacer} />
-        <span className={styles.compte}>{total === null ? t('matin.compteEnAttente') : total}</span>
+        <span className={styles.compte}>{compte}</span>
       </div>
 
       {state.statut === 'erreur' ? (
@@ -142,6 +151,15 @@ function StatutDuJour({ statut, offer }: { statut: ColonnePipeline; offer: Offer
   }
 
   if (statut === 'entretien') {
+    // L'heure prime : c'est le fait le plus actionnable de la carte, et
+    // `candidature_entretien_le` la porte réellement. `formatJourHeure`
+    // rend `null` sur minuit pile — cas où l'heure n'a vraisemblablement
+    // pas été saisie — et l'affichage retombe alors sur la date seule
+    // plutôt que d'affirmer une heure qu'il ignore.
+    const jourHeure = formatJourHeure(offer.candidature_entretien_le);
+    if (jourHeure !== null) {
+      return <span className={styles.entretien}>{t('suivi.entretienLe', jourHeure)}</span>;
+    }
     const date = formatDateLongue(offer.candidature_entretien_le);
     if (date === null) return null;
     return <span className={styles.entretien}>{t('suivi.entretienLe', date)}</span>;
