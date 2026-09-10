@@ -476,6 +476,40 @@ Deno.test('GET /config — route vers la configuration : 200, forme attendue', a
 });
 
 // --------------------------------------------------------------------------
+// GET /robot-status (ETAT.md P25, point d)
+// --------------------------------------------------------------------------
+
+Deno.test("GET /robot-status — route vers l'état des deux robots : 200, forme attendue", async () => {
+  // Table `sources` et `collection_runs` vides : le résultat (pas_encore,
+  // derniere null) est déterministe quelle que soit la date d'exécution du
+  // test — la construction précise des états est éprouvée par
+  // dashboard-query_test.ts, ce test-ci ne prouve que le ROUTAGE.
+  const db = {
+    from(table: string) {
+      if (table === 'sources') {
+        return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
+      }
+      if (table === 'offer_ai_scores') {
+        return {
+          select: () => ({
+            gte: () => ({
+              order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+
+  const res = await routeDashboardRequest(req('GET', '/robot-status'), { db });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.collecte, { etat: 'pas_encore', derniere: null });
+  assertEquals(body.jugement, { etat: 'pas_encore' });
+});
+
+// --------------------------------------------------------------------------
 // POST /candidate-profile — l'import du CV (tâche 10)
 // --------------------------------------------------------------------------
 

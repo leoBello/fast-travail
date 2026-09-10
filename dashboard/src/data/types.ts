@@ -363,3 +363,25 @@ export interface ImportCandidateProfileResult {
    * ce nombre dit seulement ce que l'import laisse inchangé. */
   staleProfileOfferCount: number;
 }
+
+/**
+ * Les quatre états de la collecte et les deux du jugement — miroir de
+ * `CollecteStatus` / `JugementStatus` / `RobotStatusResult`
+ * (`dashboard-query.ts`), validés par `Etats.dc.html`, planche « L'état des
+ * deux robots, quatre cas ».
+ *
+ * Les horodatages sont BRUTS (ISO) : la mise en forme (« 8 h 30 », « hier »)
+ * appartient à la SPA, jamais au module runtime-neutre qui les produit.
+ */
+export type CollecteStatus =
+  | { etat: 'nominal'; at: string }
+  | { etat: 'partielle'; at: string; sourcesIncompletes: number; sourcesTotal: number }
+  | { etat: 'en_echec'; at: string; derniereReussite: string | null }
+  | { etat: 'pas_encore'; derniere: string | null };
+
+export type JugementStatus = { etat: 'fait'; at: string; count: number } | { etat: 'pas_encore' };
+
+export interface RobotStatusResult {
+  collecte: CollecteStatus;
+  jugement: JugementStatus;
+}

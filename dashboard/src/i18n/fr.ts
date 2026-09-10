@@ -31,7 +31,10 @@ import type {
  */
 export const fr = {
   app: {
-    nom: 'fast-travail',
+    // Rebranding du 2026-09-10. Le NOM AFFICHE change ; le depot, la base et
+    // les documents gardent `fast-travail` — les renommer serait un autre
+    // chantier, et il n'a pas ete demande.
+    nom: 'SignFlow',
     tagline: 'veille',
     erreurConfigTitre: 'Configuration manquante',
     erreurConfigDetail:
@@ -378,6 +381,36 @@ export const fr = {
     // (GUIDELINES §3.3), la même règle que le tiret cadratin de
     // `StatusTabs`.
     videVersATraiter: (n: number) => `Voir les ${n} à traiter`,
+  },
+
+  /**
+   * La bande « état des deux robots » de la barre d'application
+   * (`Main.dc.html`, `Etats.dc.html` — « L'état des deux robots, quatre
+   * cas », ETAT.md P25 point d). Quatre états pour la collecte
+   * (`nominal`/`partielle`/`en_echec`/`pas_encore`), deux pour le jugement
+   * (`fait`/`pas_encore`) — voir `RobotStatusBand.tsx`.
+   *
+   * Toutes les heures et dates sont mises en forme par l'APPELANT
+   * (`data/parisDate.ts`) : ce dictionnaire ne porte que du vocabulaire,
+   * jamais un format de date en dur.
+   */
+  robots: {
+    collecte: 'Collecte',
+    jugement: 'Jugement',
+    partielle: 'partielle',
+    enEchec: 'en échec',
+    // Le "quand" est déjà formaté par l'appelant (« hier 8 h 30 », ou une
+    // date complète) — même convention que `vides.collectePasTourneeDetail`.
+    derniereReussite: 'dernière réussite',
+    derniere: 'dernière',
+    // Jamais de date inventée quand aucune réussite n'est connue du tout
+    // (GUIDELINES §3.3) : ce mot dit l'absence plutôt que de la taire.
+    jamais: 'jamais',
+    pasEncoreAujourdhui: "pas encore aujourd'hui",
+    hier: 'hier',
+    sourcesIncompletes: (n: number, total: number) =>
+      `${n} source${n === 1 ? '' : 's'} sur ${total} incomplète${n === 1 ? '' : 's'}`,
+    jugees: (n: number) => `${n} jugée${n === 1 ? '' : 's'}`,
   },
 
   /**

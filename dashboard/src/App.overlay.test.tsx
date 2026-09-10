@@ -128,6 +128,10 @@ vi.mock('./data/client', async (importOriginal) => {
         terminee: 0,
         ecartee: 7,
       }),
+      getRobotStatus: vi.fn().mockResolvedValue({
+        collecte: { etat: 'pas_encore', derniere: null },
+        jugement: { etat: 'pas_encore' },
+      }),
     }),
   };
 });

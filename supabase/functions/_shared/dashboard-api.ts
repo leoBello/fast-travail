@@ -11,6 +11,7 @@ import {
   ENGAGEMENTS,
   getConfig,
   getOfferDetail,
+  getRobotStatus,
   getStats,
   getStatutCounts,
   getWorkModeCounts,
@@ -367,6 +368,10 @@ export async function routeDashboardRequest(
 
     if (req.method === 'GET' && path === '/config') {
       return Response.json(await getConfig(db));
+    }
+
+    if (req.method === 'GET' && path === '/robot-status') {
+      return Response.json(await getRobotStatus(db));
     }
 
     if (req.method === 'POST' && path === '/candidate-profile') {

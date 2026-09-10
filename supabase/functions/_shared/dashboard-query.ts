@@ -1021,3 +1021,248 @@ export async function importCandidateProfile(
 
   return { profile, staleProfileOfferCount };
 }
+
+// ----------------------------------------------------------------------------
+// GET /robot-status — l'état des deux robots (ETAT.md P25, point d)
+// ----------------------------------------------------------------------------
+
+/** Miroir des colonnes lues sur `collection_runs` — jamais la ligne entière :
+ * `getRobotStatus` n'a besoin d'aucun compte d'offres ni message d'erreur ici
+ * (`offers_new`/`error` restent l'affaire de `collection_runs` lui-même). */
+export interface CollectionRunFact {
+  source: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+}
+
+/** Miroir des colonnes lues sur `offer_ai_scores` pour ce seul usage. */
+export interface AiScoreFact {
+  scored_at: string;
+  error: string | null;
+}
+
+/**
+ * Les quatre états validés par la maquette (`Etats.dc.html`, « L'état des
+ * deux robots, quatre cas »). `at` est un horodatage BRUT (ISO) — jamais mis
+ * en forme ici : « 8 h 30 », « hier » sont du texte, donc du ressort de la
+ * SPA (GUIDELINES §3.8, `t()`), pas de ce module runtime-neutre.
+ *
+ * `en_echec` porte `at` EN PLUS de `derniereReussite` : la maquette montre
+ * l'heure de la TENTATIVE du jour (échouée), séparément de la dernière fois
+ * où une collecte a réussi — deux faits différents, jamais confondus.
+ */
+export type CollecteStatus =
+  | { etat: 'nominal'; at: string }
+  | { etat: 'partielle'; at: string; sourcesIncompletes: number; sourcesTotal: number }
+  | { etat: 'en_echec'; at: string; derniereReussite: string | null }
+  | { etat: 'pas_encore'; derniere: string | null };
+
+/** Le jugement n'a que deux états observables : il a tourné aujourd'hui (avec
+ * un compte de succès et l'heure de la dernière écriture), ou pas — jamais de
+ * notion de « partiel » ou « en échec » ici, `offer_ai_scores` n'écrivant
+ * jamais d'échec bloquant pour tout le lot (une offre en erreur écrit sa
+ * propre ligne, voir P16 dans ETAT.md et `error is not null` plus bas). */
+export type JugementStatus = { etat: 'fait'; at: string; count: number } | { etat: 'pas_encore' };
+
+export interface RobotStatusResult {
+  collecte: CollecteStatus;
+  jugement: JugementStatus;
+}
+
+/** Le plus tardif de `finished_at` (ou `started_at` si non terminé) parmi des
+ * runs déjà connus non vides — jamais appelé sur un tableau vide. */
+function mostRecentCompletion(runs: readonly CollectionRunFact[]): string {
+  let best = runs[0].finished_at ?? runs[0].started_at;
+  for (const run of runs) {
+    const at = run.finished_at ?? run.started_at;
+    if (Date.parse(at) > Date.parse(best)) best = at;
+  }
+  return best;
+}
+
+/** Le plus tardif de `finished_at`/`started_at`, une source par clé, parmi
+ * les dernières lignes connues de CHAQUE source active — `null` si aucune
+ * source active n'a la moindre ligne. */
+function mostRecentAmong(
+  activeSources: readonly string[],
+  latestBySource: ReadonlyMap<string, CollectionRunFact>,
+): string | null {
+  let best: string | null = null;
+  for (const source of activeSources) {
+    const run = latestBySource.get(source);
+    if (!run) continue;
+    const at = run.finished_at ?? run.started_at;
+    if (best === null || Date.parse(at) > Date.parse(best)) best = at;
+  }
+  return best;
+}
+
+/** La dernière réussite, toutes sources actives confondues, parmi TOUTES les
+ * lignes connues (pas seulement celles d'aujourd'hui) — `null` si aucune
+ * réussite n'apparaît dans la fenêtre lue par `getRobotStatus`. */
+function mostRecentSuccess(runs: readonly CollectionRunFact[]): string | null {
+  let best: string | null = null;
+  for (const run of runs) {
+    if (run.status !== 'success') continue;
+    const at = run.finished_at ?? run.started_at;
+    if (best === null || Date.parse(at) > Date.parse(best)) best = at;
+  }
+  return best;
+}
+
+/**
+ * Détermine l'état de la collecte à partir des faits mesurés — fonction PURE,
+ * testable sans base (même principe que `computeStreak` plus haut).
+ *
+ * Priorité, dans cet ordre :
+ * 1. **`pas_encore`** — aucune source active n'a le moindre run aujourd'hui
+ *    (heure de Paris, `todayKey`). C'est le cas le plus fréquent (ETAT.md
+ *    P25 d) : les crons partent à 8 h/8 h 30 à Paris, le Planificateur
+ *    Windows plus tard encore, et rien n'a de sens à affirmer avant.
+ * 2. **`en_echec`** — au moins une source a tourné aujourd'hui, mais AUCUNE
+ *    n'a réussi (`status = 'success'`) : la collecte du jour, dans son
+ *    ensemble, n'a rien produit de fiable.
+ * 3. **`nominal`** — TOUTES les sources actives ont réussi aujourd'hui.
+ * 4. **`partielle`** — le reste : au moins une réussite aujourd'hui, mais pas
+ *    toutes les sources actives à `success` (qu'une source ait échoué, soit
+ *    encore `partial`, soit n'ait simplement pas encore tourné aujourd'hui —
+ *    les trois comptent comme « incomplète », la maquette ne distinguant pas
+ *    la cause dans la bande elle-même).
+ */
+export function computeCollecteStatus(
+  activeSources: readonly string[],
+  runs: readonly CollectionRunFact[],
+  todayKey: string,
+): CollecteStatus {
+  // Comparaison explicite par `started_at`, jamais « le premier rencontré » :
+  // `getRobotStatus` interroge bien `order('started_at', {ascending: false})`,
+  // mais faire dépendre la justesse de cette fonction PURE d'un tri fait par
+  // l'appelant serait un couplage à distance fragile — une reprise manuelle
+  // après un échec du matin doit rester la plus récente quel que soit l'ordre
+  // dans lequel les lignes arrivent ici.
+  const latestBySource = new Map<string, CollectionRunFact>();
+  const todayBySource = new Map<string, CollectionRunFact>();
+  for (const run of runs) {
+    const currentLatest = latestBySource.get(run.source);
+    if (!currentLatest || Date.parse(run.started_at) > Date.parse(currentLatest.started_at)) {
+      latestBySource.set(run.source, run);
+    }
+    if (parisDateKey(new Date(run.started_at)) === todayKey) {
+      const currentToday = todayBySource.get(run.source);
+      if (!currentToday || Date.parse(run.started_at) > Date.parse(currentToday.started_at)) {
+        todayBySource.set(run.source, run);
+      }
+    }
+  }
+
+  if (todayBySource.size === 0) {
+    return { etat: 'pas_encore', derniere: mostRecentAmong(activeSources, latestBySource) };
+  }
+
+  const ranToday = [...todayBySource.values()];
+  const successToday = ranToday.filter((r) => r.status === 'success');
+
+  if (successToday.length === 0) {
+    return {
+      etat: 'en_echec',
+      at: mostRecentCompletion(ranToday),
+      derniereReussite: mostRecentSuccess(runs),
+    };
+  }
+
+  if (successToday.length === activeSources.length) {
+    return { etat: 'nominal', at: mostRecentCompletion(ranToday) };
+  }
+
+  return {
+    etat: 'partielle',
+    at: mostRecentCompletion(ranToday),
+    sourcesIncompletes: activeSources.length - successToday.length,
+    sourcesTotal: activeSources.length,
+  };
+}
+
+/**
+ * Détermine l'état du jugement — fonction PURE, même principe que
+ * `computeCollecteStatus`. Le compte affiché ne porte que les offres
+ * RÉELLEMENT jugées aujourd'hui (`error is null`, voir CLAUDE.md et P16
+ * dans ETAT.md) : une ligne en erreur ne doit jamais gonfler ce nombre,
+ * même si elle date bien d'aujourd'hui — écrire une ligne d'erreur n'est pas
+ * juger une offre.
+ */
+export function computeJugementStatus(
+  scores: readonly AiScoreFact[],
+  todayKey: string,
+): JugementStatus {
+  const today = scores.filter((s) => parisDateKey(new Date(s.scored_at)) === todayKey);
+  if (today.length === 0) return { etat: 'pas_encore' };
+
+  let at = today[0].scored_at;
+  let count = 0;
+  for (const score of today) {
+    if (Date.parse(score.scored_at) > Date.parse(at)) at = score.scored_at;
+    if (score.error === null) count += 1;
+  }
+  return { etat: 'fait', at, count };
+}
+
+/** Marge large sur un cycle quotidien (collecte + jugement une fois par
+ * jour) : couvre la fenêtre « aujourd'hui, heure de Paris » quel que soit le
+ * moment où cette route est appelée, sans jamais balayer les 1 269+ lignes
+ * historiques d'`offer_ai_scores` pour ne retenir que celles du jour. */
+const ROBOT_STATUS_SCORE_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** Large mais borné : `collection_runs` ne porte que quelques lignes par jour
+ * (40 au 2026-09-10) — cette limite couvre des années avant de tronquer quoi
+ * que ce soit, y compris la recherche de la dernière réussite CONNUE, qui
+ * peut remonter à avant aujourd'hui. */
+const ROBOT_STATUS_RUNS_LIMIT = 1000;
+const ROBOT_STATUS_SCORES_LIMIT = 2000;
+
+/**
+ * `GET /robot-status` : l'état des deux robots (collecte, jugement) pour la
+ * bande compacte de la barre d'application (`Main.dc.html`, `Etats.dc.html`).
+ *
+ * Le total de sources n'est JAMAIS codé en dur : il vient de `sources` (les
+ * lignes `enabled`), pour qu'un cinquième collecteur un jour ne fasse pas
+ * mentir la bande (ETAT.md P25 d).
+ */
+export async function getRobotStatus(
+  db: DbClient,
+  now: Date = new Date(),
+): Promise<RobotStatusResult> {
+  const todayKey = parisDateKey(now);
+
+  const { data: sourceRows, error: sourceError } = await db
+    .from('sources')
+    .select('key')
+    .eq('enabled', true);
+  if (sourceError) throw new Error(`lecture des sources actives : ${sourceError.message}`);
+  const activeSources = ((sourceRows ?? []) as { key: string }[]).map((row) => row.key);
+
+  let runs: CollectionRunFact[] = [];
+  if (activeSources.length > 0) {
+    const { data: runRows, error: runError } = await db
+      .from('collection_runs')
+      .select('source, status, started_at, finished_at')
+      .in('source', activeSources)
+      .order('started_at', { ascending: false })
+      .limit(ROBOT_STATUS_RUNS_LIMIT);
+    if (runError) throw new Error(`lecture des collectes du jour : ${runError.message}`);
+    runs = (runRows ?? []) as CollectionRunFact[];
+  }
+  const collecte = computeCollecteStatus(activeSources, runs, todayKey);
+
+  const lookback = new Date(now.getTime() - ROBOT_STATUS_SCORE_LOOKBACK_MS).toISOString();
+  const { data: scoreRows, error: scoreError } = await db
+    .from('offer_ai_scores')
+    .select('scored_at, error')
+    .gte('scored_at', lookback)
+    .order('scored_at', { ascending: false })
+    .limit(ROBOT_STATUS_SCORES_LIMIT);
+  if (scoreError) throw new Error(`lecture des jugements du jour : ${scoreError.message}`);
+  const jugement = computeJugementStatus((scoreRows ?? []) as AiScoreFact[], todayKey);
+
+  return { collecte, jugement };
+}

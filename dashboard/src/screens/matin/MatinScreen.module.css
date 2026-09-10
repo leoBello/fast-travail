@@ -12,15 +12,29 @@
   padding: 0 28px 16px;
 }
 
+/*
+ * DEUX niveaux, comme `Main.dc.html` — et c'est la raison d'être de ce
+ * commentaire. Aplatie en un seul `align-items: baseline`, la barre alignait
+ * TOUT sur la ligne de base du titre : mesuré au navigateur, le titre avait
+ * 0 px au-dessus de lui et 34 en dessous, plaqué contre le haut d'une barre
+ * de 56 px. Le conteneur centre ses blocs ; seule la paire nom + tagline
+ * (`.marque` ci-dessous) s'aligne sur la ligne de base.
+ */
 .barre {
   flex: none;
   height: 56px;
   display: flex;
-  align-items: baseline;
-  gap: 9px;
+  align-items: center;
+  gap: 20px;
   border-bottom: 1px solid var(--color-border);
   margin: 0 -28px;
   padding: 0 28px;
+}
+
+.marque {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
 }
 
 .nom {

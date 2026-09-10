@@ -6,6 +6,7 @@ import {
   useBrief,
   useConfig,
   useOffersList,
+  useRobotStatus,
   useStats,
   useStatutCounts,
   useWorkModeCounts,
@@ -14,6 +15,7 @@ import type { FilterState } from './FilterPanel';
 import { FilterPanel } from './FilterPanel';
 import { MorningBand } from './MorningBand';
 import { OfferList } from './OfferList';
+import { RobotStatusBand } from './RobotStatusBand';
 import { ecrireRepli, lireRepli } from './repliStorage';
 import { comptePourOnglet, filtreStatutPourOnglet, ONGLET_PAR_DEFAUT } from './statusTabsLogic';
 import type { OngletId } from './statusTabsLogic';
@@ -169,6 +171,7 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
     ...filtres,
   });
   const [countsState] = useWorkModeCounts(client);
+  const [robotsState] = useRobotStatus(client);
 
   function changerOnglet(suivant: OngletId) {
     setOnglet(suivant);
@@ -198,9 +201,12 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
   return (
     <div className={styles.ecran}>
       <header className={styles.barre}>
-        <span className={styles.nom}>{t('app.nom')}</span>
-        <span className={styles.tagline}>{t('app.tagline')}</span>
+        <div className={styles.marque}>
+          <span className={styles.nom}>{t('app.nom')}</span>
+          <span className={styles.tagline}>{t('app.tagline')}</span>
+        </div>
         <div className={styles.spacer} />
+        <RobotStatusBand etat={robotsState.statut === 'succes' ? robotsState.donnees : null} />
         {onImporterCv === undefined ? null : (
           <button type="button" className={styles.suiviBouton} onClick={onImporterCv}>
             <svg

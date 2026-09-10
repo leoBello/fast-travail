@@ -46,6 +46,10 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
       terminee: 0,
       ecartee: 7,
     }),
+    getRobotStatus: vi.fn().mockResolvedValue({
+      collecte: { etat: 'pas_encore', derniere: null },
+      jugement: { etat: 'pas_encore' },
+    }),
     ...overrides,
   };
 }

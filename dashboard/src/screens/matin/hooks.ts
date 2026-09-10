@@ -5,6 +5,7 @@ import type {
   Engagement,
   OfferDashboardRow,
   PageResult,
+  RobotStatusResult,
   SortField,
   Source,
   StatsResult,
@@ -105,5 +106,20 @@ export function useStatutCounts(client: DashboardClient): [AsyncState<StatutCoun
  */
 export function useConfig(client: DashboardClient): [AsyncState<ConfigResult>, () => void] {
   const fn = useCallback(() => client.getConfig(), [client]);
+  return useAsync(fn);
+}
+
+/**
+ * `GET /robot-status` : l'état des deux robots, pour la bande de la barre
+ * d'application (`Etats.dc.html`, « L'état des deux robots, quatre cas »).
+ *
+ * Appel indépendant, comme `useStats` et `useConfig` : chaque écran reste la
+ * seule couche de LUI-MÊME qui appelle le réseau. Tant qu'il n'a pas répondu,
+ * la bande n'affirme rien — ni coche, ni heure, ni zéro (GUIDELINES §3.3).
+ */
+export function useRobotStatus(
+  client: DashboardClient,
+): [AsyncState<RobotStatusResult>, () => void] {
+  const fn = useCallback(() => client.getRobotStatus(), [client]);
   return useAsync(fn);
 }
