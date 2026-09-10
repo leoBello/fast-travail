@@ -110,6 +110,44 @@ describe('createDashboardClient', () => {
     expect(appels[1]?.method).toBe('PATCH');
     expect(appels[1]?.body).toBe(JSON.stringify({ status: 'ecartee' }));
   });
+
+  it('getStatutCounts appelle GET /statut-counts', async () => {
+    let url = '';
+    const client = createDashboardClient({
+      ...CONFIG,
+      fetchImpl: fakeFetch((u) => {
+        url = u;
+        return jsonResponse(200, {
+          aucune: 1258,
+          a_traiter: 0,
+          retenue: 0,
+          postulee: 6,
+          relancee: 1,
+          entretien: 0,
+          terminee: 0,
+          ecartee: 7,
+        });
+      }),
+    });
+    const counts = await client.getStatutCounts();
+    expect(url.endsWith('/statut-counts')).toBe(true);
+    expect(counts.aucune).toBe(1258);
+    expect(counts.postulee).toBe(6);
+  });
+
+  it('listOffers pose statut une fois par valeur (?statut=aucune&statut=a_traiter)', async () => {
+    let url = '';
+    const client = createDashboardClient({
+      ...CONFIG,
+      fetchImpl: fakeFetch((u) => {
+        url = u;
+        return jsonResponse(200, { rows: [], total: 0, page: 1, pageSize: 8 });
+      }),
+    });
+    await client.listOffers({ statut: ['aucune', 'a_traiter'] });
+    expect(url).toContain('statut=aucune');
+    expect(url).toContain('statut=a_traiter');
+  });
 });
 
 describe('partage des lectures en vol', () => {

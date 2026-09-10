@@ -476,6 +476,40 @@ Deno.test('GET /config — route vers la configuration : 200, forme attendue', a
 });
 
 // --------------------------------------------------------------------------
+// GET /robot-status (ETAT.md P25, point d)
+// --------------------------------------------------------------------------
+
+Deno.test("GET /robot-status — route vers l'état des deux robots : 200, forme attendue", async () => {
+  // Table `sources` et `collection_runs` vides : le résultat (pas_encore,
+  // derniere null) est déterministe quelle que soit la date d'exécution du
+  // test — la construction précise des états est éprouvée par
+  // dashboard-query_test.ts, ce test-ci ne prouve que le ROUTAGE.
+  const db = {
+    from(table: string) {
+      if (table === 'sources') {
+        return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
+      }
+      if (table === 'offer_ai_scores') {
+        return {
+          select: () => ({
+            gte: () => ({
+              order: () => ({ limit: () => Promise.resolve({ data: [], error: null }) }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+
+  const res = await routeDashboardRequest(req('GET', '/robot-status'), { db });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.collecte, { etat: 'pas_encore', derniere: null });
+  assertEquals(body.jugement, { etat: 'pas_encore' });
+});
+
+// --------------------------------------------------------------------------
 // POST /candidate-profile — l'import du CV (tâche 10)
 // --------------------------------------------------------------------------
 
@@ -599,4 +633,41 @@ Deno.test('POST /candidate-profile — même profileVersion que le profil actif 
     { db },
   );
   assertEquals(res.status, 400);
+});
+
+// --------------------------------------------------------------------------
+// GET /statut-counts, et statut=aucune sur /offers (tâche 3)
+// --------------------------------------------------------------------------
+
+Deno.test('GET /statut-counts — répond 200 et rend les huit clefs', async () => {
+  const db = fakeDb(
+    {
+      offers_dashboard_status_counts: {
+        data: [{ statut: 'aucune', total: 1258 }],
+        error: null,
+      },
+    },
+    { data: [], error: null, count: 0 },
+  );
+  const res = await routeDashboardRequest(req('GET', '/statut-counts'), { db });
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.aucune, 1258);
+  assertEquals(body.postulee, 0);
+  assertEquals(Object.keys(body).length, 8);
+});
+
+Deno.test('GET /offers?statut=aucune — accepté (la valeur « sans décision »)', async () => {
+  const db = fakeDb({}, { data: [], error: null, count: 0 });
+  const res = await routeDashboardRequest(req('GET', '/offers?statut=aucune'), { db });
+  assertEquals(res.status, 200);
+});
+
+Deno.test('GET /offers?statut=inventee — rejeté en 400, jamais un repli silencieux', async () => {
+  const res = await routeDashboardRequest(req('GET', '/offers?statut=inventee'), {
+    db: untouchableDb(),
+  });
+  assertEquals(res.status, 400);
+  const body = await res.json();
+  assertEquals(String(body.error).includes('statut'), true);
 });

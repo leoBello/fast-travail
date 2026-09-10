@@ -63,7 +63,19 @@ describe('Absence', () => {
     expect(container.querySelector('[data-ton="neutre"]')).not.toBeNull();
   });
 
-  it('porte `data-nature` pour chacune des huit natures répertoriées, sans jamais rendre une case vide', () => {
+  it(
+    '"non datée" (tâche 9) porte le même rendu que "non précisée" — la distinction ' +
+      'est dans le mot affiché, pas dans la forme',
+    () => {
+      const { container } = render(<Absence nature="non-datee">non datée</Absence>);
+      expect(screen.getByText('non datée')).toBeDefined();
+      expect(container.querySelector('[data-ton]')).toBeNull();
+      expect(container.querySelector('[data-absent="true"]')).not.toBeNull();
+      expect(container.querySelector('[data-nature="non-datee"]')).not.toBeNull();
+    },
+  );
+
+  it('porte `data-nature` pour chacune des neuf natures répertoriées, sans jamais rendre une case vide', () => {
     const natures: AbsenceNature[] = [
       'non-publiee',
       'non-precisee',
@@ -73,6 +85,7 @@ describe('Absence', () => {
       'unite-incertaine',
       'hors-perimetre',
       'echec-jugement',
+      'non-datee',
     ];
     for (const nature of natures) {
       const { container, unmount } = render(<Absence nature={nature}>texte de test</Absence>);

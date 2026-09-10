@@ -34,15 +34,19 @@
 
 /*
  * `fit_score` : chasse fixe, comme tout chiffre comparable d'une ligne à
- * l'autre (GUIDELINES §1). Couleur ambre : c'est un jugement du modèle, pas
- * un fait réglable — la même distinction visuelle qui isole la confiance
- * basse (§3.7) marque ici la nature « payée » de ce nombre.
+ * l'autre (GUIDELINES §1). Gris (`--color-text-muted`), comme `Main.dc.html`
+ * l'écrit (`color: var(--muted)`) — pas d'ambre : `theme.css` réserve
+ * `--color-warning` et ses voisines aux ÉTATS, jamais au décoratif, et
+ * colorer CE nombre en ambre sur toutes les cartes en aurait fait une
+ * décoration permanente. La nature « payée » de `fit_score` (voir le
+ * commentaire de `Score` plus bas) ne se lit pas dans sa couleur, mais dans
+ * ce qu'il coûte à faire changer d'avis (docs/ETAT.md, section scoring).
  */
 .fit {
   font-family: var(--font-mono);
   font-size: var(--text-lg);
   font-weight: 600;
-  color: var(--color-warning);
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 

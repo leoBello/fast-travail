@@ -1,0 +1,323 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --accent: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .badge.sm { height: 19px; padding: 0 7px; font-size: 10px; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-accent { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-dash { background: transparent; border-style: dashed; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; font-weight: 500; }
+    .btn-p { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+    .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-family: var(--mono); border: 1px solid var(--border2); color: var(--muted); white-space: nowrap; }
+    .chip-pos { color: #86e3c1; border-color: rgba(79,209,165,0.28); background: rgba(79,209,165,0.08); }
+    .chip-nil { color: var(--faint); border-style: dashed; }
+    .row { display: grid; grid-template-columns: 52px 40px minmax(0, 1fr) 190px 122px 58px; align-items: center; gap: 14px; height: 46px; padding: 0 14px; border-radius: 10px; }
+    .rowSep { height: 1px; background: var(--border); }
+    .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .absent { color: var(--faint); font-size: 12px; font-style: italic; }
+
+    /* --- Ajouts de cette maquette : la barre d'onglets et la pagination --- */
+    .tabs { display: flex; align-items: stretch; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .tab .pt { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+    .tab .ring { width: 5px; height: 5px; border-radius: 999px; border: 1px dashed currentColor; flex: none; }
+    .tab .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--faint); }
+    .tab-on { color: var(--text); font-weight: 600; background: var(--surface2); border-bottom-color: var(--accent); }
+    .tab-on .n { color: var(--text); }
+    .tab-zero .n { color: var(--faint); }
+    .pgBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 27px; height: 27px; padding: 0 7px; border-radius: 7px; border: 1px solid transparent; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .pgBtn-on { color: var(--text); background: var(--surface3); border-color: var(--border2); font-weight: 700; }
+    .pgBtn-nav { border-color: var(--border2); padding: 0 9px; font-family: var(--ui); font-size: 12px; gap: 5px; }
+    .pgBtn-off { color: var(--faint); border-color: var(--border); }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 1080px; background: var(--bg); overflow: hidden; padding: 26px 28px; display: flex; flex-direction: column; gap: 24px">
+
+  <div>
+    <h2 style="font-size: 19px">Ce que chaque onglet montre</h2>
+    <p style="margin: 4px 0 0; font-size: 12px; color: var(--muted)">
+      Les quatre situations que la barre d'onglets crée, et qu'aucune n'a aujourd'hui : une colonne qui change de sens, un onglet vide, une date qui manque, un compte pas encore connu.
+    </p>
+  </div>
+
+  <!-- ============ A. POSTULEES : la derniere colonne change de sens ============ -->
+  <div class="card" style="padding: 14px 16px 12px; display: flex; flex-direction: column">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px">
+      <span class="sectT">A &mdash; Onglet «&nbsp;Postulées&nbsp;»</span>
+      <span style="font-size: 11.5px; color: var(--muted)">la colonne «&nbsp;Publiée&nbsp;» devient «&nbsp;Postulée le&nbsp;» : sur cet onglet, c'est la date qui commande la relance</span>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Statut de candidature">
+      <button class="tab" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--muted)"></span>
+        À traiter <span class="n">1 258</span>
+      </button>
+      <button class="tab tab-zero" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--accent)"></span>
+        Retenues <span class="n">0</span>
+      </button>
+      <button class="tab tab-on" role="tab" aria-selected="true">
+        <span class="pt" style="background: var(--violet)"></span>
+        Postulées <span class="n">6</span>
+      </button>
+      <button class="tab" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--amber)"></span>
+        Relancées <span class="n">1</span>
+      </button>
+      <button class="tab tab-zero" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--mint)"></span>
+        Entretien <span class="n">0</span>
+      </button>
+      <button class="tab tab-zero" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--muted)"></span>
+        Terminées <span class="n">0</span>
+      </button>
+      <button class="tab" role="tab" aria-selected="false" style="color: #ffa8b0">
+        <span class="ring"></span>
+        Écartées <span class="n">7</span>
+      </button>
+      <span style="width: 1px; height: 18px; background: var(--border2); align-self: center; margin: 0 6px"></span>
+      <button class="tab" role="tab" aria-selected="false">
+        Toutes <span class="n">1 272</span>
+      </button>
+    </div>
+
+    <div class="row" style="height: 26px; margin-top: 8px">
+      <span class="sectT" style="text-align: right">Rang</span>
+      <span class="sectT" style="text-align: right">Corr.</span>
+      <span class="sectT">Intitulé</span>
+      <span class="sectT">Employeur</span>
+      <span class="sectT">Statut</span>
+      <span class="sectT" style="text-align: right">Postulée</span>
+    </div>
+    <div class="rowSep"></div>
+
+    <div class="row">
+      <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">100</span>
+      <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">88</span>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Développeur Front-End React Senior H/F (CDI)</span>
+        <span class="badge sm b-accent" style="flex: none">Full remote</span>
+        <span class="badge sm b-mute" style="flex: none">CDI</span>
+      </div>
+      <span class="trunc" style="color: var(--muted)">MICHAEL PAGE</span>
+      <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+      <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">auj.</span>
+    </div>
+
+    <div class="row">
+      <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">100</span>
+      <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">72</span>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Software Engineer &mdash; First Engineering Hire</span>
+        <span class="badge sm b-accent" style="flex: none">Full remote</span>
+        <span class="badge sm b-violet" style="flex: none">IA</span>
+      </div>
+      <span class="trunc" style="color: var(--muted)">Revalue</span>
+      <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+      <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">auj.</span>
+    </div>
+
+    <div class="row">
+      <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">93.5</span>
+      <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">68</span>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Développeur Full Stack (H/F)</span>
+        <span class="badge sm b-accent" style="flex: none">Full remote</span>
+        <span class="badge sm b-mute" style="flex: none">CDI</span>
+        <span class="badge sm b-violet" style="flex: none">IA</span>
+      </div>
+      <span class="trunc" style="color: var(--muted)">Agence intuition</span>
+      <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+      <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">auj.</span>
+    </div>
+
+    <div class="row">
+      <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">88</span>
+      <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">90</span>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Développeur Front-end React / TypeScript (H/F)</span>
+        <span class="badge sm b-accent" style="flex: none">Full remote</span>
+        <span class="badge sm b-mute" style="flex: none">CDI</span>
+      </div>
+      <span class="absent">non publié</span>
+      <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+      <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">auj.</span>
+    </div>
+
+    <div class="row" style="background: var(--surface2)">
+      <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">86.5</span>
+      <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">58</span>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Developpeur React/Node/NestJS &mdash; Anglais courant obligatoire</span>
+        <span class="badge sm b-mint" style="flex: none">450 &euro;/j</span>
+        <span class="badge sm b-mute b-dash" style="flex: none">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/></svg>
+          2 sources
+        </span>
+      </div>
+      <span class="trunc" style="color: var(--muted)">ALLEGIS GROUP</span>
+      <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+      <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">auj.</span>
+    </div>
+
+    <div class="row">
+      <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">79</span>
+      <span class="num" style="font-size: 12.5px; color: var(--amber); text-align: right">42</span>
+      <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+        <span class="trunc" style="font-weight: 500">Développeur Front-end Expert Accessibilité (H/F)</span>
+        <span class="badge sm b-accent" style="flex: none">Full remote</span>
+        <span class="badge sm b-mint" style="flex: none">Freelance</span>
+      </div>
+      <span class="trunc" style="color: var(--muted)">Clostera</span>
+      <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+      <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">auj.</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px; height: 36px; border-top: 1px solid var(--border); margin-top: 4px">
+      <span style="font-size: 11.5px; color: var(--faint)"><span class="num">1</span>&ndash;<span class="num">6</span> sur <span class="num">6</span></span>
+      <span style="font-size: 11.5px; color: var(--faint)">&mdash; une seule page&nbsp;: les boutons de page ne s'affichent pas</span>
+      <div style="flex-grow: 1"></div>
+      <span class="badge sm b-mute b-dash">Aucune date de relance affichée &mdash; rien en base ne la calcule</span>
+    </div>
+  </div>
+
+  <!-- ============ B. RETENUES : un onglet vide se nomme ============ -->
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px">
+
+    <div class="card" style="padding: 14px 16px 16px; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px">
+        <span class="sectT">B &mdash; Onglet «&nbsp;Retenues&nbsp;», à zéro</span>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Statut de candidature" style="margin-bottom: 14px">
+        <button class="tab" role="tab" aria-selected="false">
+          <span class="pt" style="background: var(--muted)"></span>
+          À traiter <span class="n">1 258</span>
+        </button>
+        <button class="tab tab-on tab-zero" role="tab" aria-selected="true">
+          <span class="pt" style="background: var(--accent)"></span>
+          Retenues <span class="n">0</span>
+        </button>
+        <button class="tab" role="tab" aria-selected="false">
+          <span class="pt" style="background: var(--violet)"></span>
+          Postulées <span class="n">6</span>
+        </button>
+        <button class="tab" role="tab" aria-selected="false">
+          <span class="pt" style="background: var(--amber)"></span>
+          Relancées <span class="n">1</span>
+        </button>
+      </div>
+
+      <div style="flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 26px 20px; border: 1px dashed var(--border2); border-radius: 12px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6b7488" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <span style="font-size: 13px; font-weight: 600">Aucune offre retenue pour l'instant</span>
+        <span style="font-size: 12px; color: var(--muted); text-align: center; max-width: 380px">Une offre gardée depuis «&nbsp;Ce matin&nbsp;» ou depuis son détail arrive ici. L'onglet reste visible à zéro&nbsp;: c'est une étape du parcours, pas une absence de données.</span>
+        <button class="btn" style="height: 30px; margin-top: 4px">Voir les 1 258 à traiter</button>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 20px">
+
+      <!-- ============ C. RELANCEES : la date manque vraiment ============ -->
+      <div class="card" style="padding: 14px 16px 12px">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px">
+          <span class="sectT">C &mdash; Onglet «&nbsp;Relancées&nbsp;»</span>
+          <span style="font-size: 11.5px; color: var(--muted)">mesuré en base&nbsp;: le statut existe, la date de relance non</span>
+        </div>
+
+        <div class="row" style="height: 26px">
+          <span class="sectT" style="text-align: right">Rang</span>
+          <span class="sectT" style="text-align: right">Corr.</span>
+          <span class="sectT">Intitulé</span>
+          <span class="sectT">Employeur</span>
+          <span class="sectT">Statut</span>
+          <span class="sectT" style="text-align: right">Relancée</span>
+        </div>
+        <div class="rowSep"></div>
+
+        <div class="row">
+          <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">100</span>
+          <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">90</span>
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+            <span class="trunc" style="font-weight: 500">Senior Fullstack Engineer (Future Bras Droit CTO)</span>
+            <span class="badge sm b-mint" style="flex: none">Freelance</span>
+          </div>
+          <span class="trunc" style="color: var(--muted)">Katchme</span>
+          <span><span class="badge sm b-amber"><span class="dot"></span>Relancée</span></span>
+          <span class="absent" style="text-align: right">non datée</span>
+        </div>
+
+        <p style="margin: 8px 2px 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          «&nbsp;non datée&nbsp;» plutôt qu'une case vide ou une date inventée&nbsp;: <span class="num">last_followup_at</span> est nul sur cette ligne, le statut ayant été posé sans elle.
+        </p>
+      </div>
+
+      <!-- ============ D. COMPTES PAS ENCORE CONNUS ============ -->
+      <div class="card" style="padding: 14px 16px 16px">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px">
+          <span class="sectT">D &mdash; Comptes pas encore reçus</span>
+          <span style="font-size: 11.5px; color: var(--muted)">un zéro affiché avant la réponse serait une affirmation fausse</span>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="Statut de candidature">
+          <button class="tab tab-on" role="tab" aria-selected="true">
+            <span class="pt" style="background: var(--muted)"></span>
+            À traiter <span class="n" style="color: var(--faint)">&mdash;</span>
+          </button>
+          <button class="tab" role="tab" aria-selected="false">
+            <span class="pt" style="background: var(--accent)"></span>
+            Retenues <span class="n" style="color: var(--faint)">&mdash;</span>
+          </button>
+          <button class="tab" role="tab" aria-selected="false">
+            <span class="pt" style="background: var(--violet)"></span>
+            Postulées <span class="n" style="color: var(--faint)">&mdash;</span>
+          </button>
+          <button class="tab" role="tab" aria-selected="false">
+            <span class="pt" style="background: var(--amber)"></span>
+            Relancées <span class="n" style="color: var(--faint)">&mdash;</span>
+          </button>
+        </div>
+
+        <p style="margin: 12px 2px 0; font-size: 11.5px; color: var(--faint); line-height: 1.5">
+          Les onglets restent cliquables pendant l'attente&nbsp;; seul le compte est en suspens. Même règle que le badge «&nbsp;compte en attente&nbsp;» déjà posé sur la liste.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

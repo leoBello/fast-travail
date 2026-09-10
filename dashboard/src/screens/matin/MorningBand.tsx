@@ -43,6 +43,14 @@ export interface MorningBandProps {
   /** Le plancher `scoring_weights.salaire_floor` (tâche 10, `GET /config`) —
    * `null` tant qu'il n'a pas été lu, voir `data/format.ts`. */
   salaireFloor: number | null;
+  /** Repliée, la bande garde ses chiffres sur une seule ligne
+   * (`VeilleRepliee.dc.html`) : moins de défilement avant d'atteindre la
+   * liste, dont la page reste de toute façon fixée à dix lignes — le repli
+   * ne change donc AUCUNE ligne affichée (constat de la revue du
+   * 2026-09-10, qui a aussi abandonné la coque à hauteur fixe). Rien ne
+   * disparaît — c'est le sens du repli, pas un masquage. */
+  replie: boolean;
+  onToggleRepli: () => void;
 }
 
 /**
@@ -76,9 +84,67 @@ export function MorningBand({
   erreur,
   onReessayer,
   salaireFloor,
+  replie,
+  onToggleRepli,
 }: MorningBandProps) {
   const debut = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const fin = Math.min(page * PAGE_SIZE, total);
+  // Le conteneur `#ce-matin-cartes` n'existe que dans CETTE branche (rendu
+  // plus bas), et seulement quand elle affiche la grille — jamais pendant un
+  // chargement, une erreur, ou un total confirmé à zéro. `aria-controls` ne
+  // doit jamais pointer vers un id absent du DOM (revue finale, M2) : la
+  // branche REPLIÉE, elle, ne rend cet id dans AUCUN cas, donc son bouton
+  // n'émet jamais l'attribut (voir plus bas).
+  const carteCiblePresente = !erreur && !chargement && total > 0;
+
+  if (replie) {
+    // La bande REPLIÉE (`VeilleRepliee.dc.html`, bloc « CE MATIN, REPLIEE ») :
+    // une seule ligne de hauteur fixe, tout en ligne — titre, compte, jauge
+    // des décidées, série — pour rendre moins de défilement avant d'atteindre
+    // la liste, sans qu'aucun chiffre ne disparaisse. Structure DÉLIBÉRÉMENT
+    // distincte de l'en-tête déplié ci-dessous (titre empilé sur la phrase
+    // complète) : un repli qui garderait cette structure ne compacterait
+    // rien et raterait l'objet même du repli (revue de tâche 8, défaut 1).
+    return (
+      <section className={styles.bandeRepliee} aria-label={t('jourZero.titre')}>
+        <h2 className={styles.titreReplie}>{t('jourZero.titre')}</h2>
+        <span className={styles.compteReplie}>
+          {chargement ? t('matin.chargement') : t('matin.resumeReplie', total)}
+        </span>
+        <span className={`${styles.separateur} ${styles.separateurReplie}`} aria-hidden="true" />
+        <DecidedProgress
+          decidees={decidees}
+          total={total + decidees}
+          chargement={chargement || decideesChargement}
+          compact
+        />
+        <span className={`${styles.separateur} ${styles.separateurReplie}`} aria-hidden="true" />
+        <StreakIndicator jours={streakDays} chargement={streakChargement} />
+        <div className={styles.spacer} />
+        <button
+          type="button"
+          className={`${styles.repli} ${styles.repliReplie}`}
+          aria-expanded={false}
+          onClick={onToggleRepli}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+          {t('matin.deplier', total)}
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className={styles.bande} aria-label={t('jourZero.titre')}>
@@ -98,6 +164,29 @@ export function MorningBand({
           />
           <span className={styles.separateur} aria-hidden="true" />
           <StreakIndicator jours={streakDays} chargement={streakChargement} />
+          <span className={styles.separateur} aria-hidden="true" />
+          <button
+            type="button"
+            className={styles.repli}
+            aria-expanded={true}
+            aria-controls={carteCiblePresente ? 'ce-matin-cartes' : undefined}
+            onClick={onToggleRepli}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m18 15-6-6-6 6" />
+            </svg>
+            {t('matin.replier')}
+          </button>
         </div>
       </div>
 
@@ -120,7 +209,7 @@ export function MorningBand({
         />
       ) : (
         <>
-          <div className={styles.grille}>
+          <div className={styles.grille} id="ce-matin-cartes">
             <AnimatePresence initial={false}>
               {offers.map((offer) => (
                 <OfferCard
@@ -136,15 +225,17 @@ export function MorningBand({
             </AnimatePresence>
           </div>
 
-          <Pagination
-            debut={debut}
-            fin={fin}
-            total={total}
-            onSuivant={() => onPageChange(page + 1)}
-            onPrecedent={() => onPageChange(page - 1)}
-            suivantDisponible={fin < total}
-            precedentDisponible={page > 1}
-          />
+          <div className={styles.paginationEspacement}>
+            <Pagination
+              debut={debut}
+              fin={fin}
+              total={total}
+              onSuivant={() => onPageChange(page + 1)}
+              onPrecedent={() => onPageChange(page - 1)}
+              suivantDisponible={fin < total}
+              precedentDisponible={page > 1}
+            />
+          </div>
         </>
       )}
 

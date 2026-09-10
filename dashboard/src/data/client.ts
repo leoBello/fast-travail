@@ -7,9 +7,11 @@ import type {
   OfferDashboardRow,
   OfferDetail,
   OffersListFilters,
+  RobotStatusResult,
   PageResult,
   Pagination,
   StatsResult,
+  StatutCounts,
   WorkModeCounts,
 } from './types';
 
@@ -87,6 +89,14 @@ export interface DashboardClient {
   /** `GET /work-mode-counts` : les quatre valeurs de `work_mode` chiffrées,
    * en un seul appel. */
   getWorkModeCounts(): Promise<WorkModeCounts>;
+  /** `GET /robot-status` : l'état des deux robots (collecte, jugement) pour
+   * la bande de la barre d'application. */
+  getRobotStatus(): Promise<RobotStatusResult>;
+
+  /** `GET /statut-counts` : les huit valeurs de statut de candidature
+   * chiffrées, en un seul appel — jamais sept `pageSize=1`, dont le coût ne
+   * dépend pas de `pageSize` sur ce schéma (CLAUDE.md). */
+  getStatutCounts(): Promise<StatutCounts>;
 }
 
 export function createDashboardClient(config: DashboardClientConfig): DashboardClient {
@@ -232,6 +242,14 @@ export function createDashboardClient(config: DashboardClientConfig): DashboardC
     // `20260910050000`.
     getWorkModeCounts() {
       return request<WorkModeCounts>('/work-mode-counts');
+    },
+
+    getRobotStatus() {
+      return request<RobotStatusResult>('/robot-status');
+    },
+
+    getStatutCounts() {
+      return request<StatutCounts>('/statut-counts');
     },
   };
 }

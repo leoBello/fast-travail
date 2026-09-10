@@ -31,11 +31,27 @@ import type {
  */
 export const fr = {
   app: {
-    nom: 'fast-travail',
+    // Rebranding du 2026-09-10. Le NOM AFFICHE change ; le depot, la base et
+    // les documents gardent `fast-travail` — les renommer serait un autre
+    // chantier, et il n'a pas ete demande.
+    nom: 'SignFlow',
     tagline: 'veille',
     erreurConfigTitre: 'Configuration manquante',
     erreurConfigDetail:
       'Les variables VITE_DASHBOARD_API_URL, VITE_SUPABASE_ANON_KEY et VITE_DASHBOARD_TOKEN doivent être définies (voir dashboard/.env.example).',
+    // Bouton de navigation de la barre d'application (`Main.dc.html`) vers
+    // l'écran de profil — distinct de `profil.boutonImporter`, le verbe d'une
+    // ACTION (soumettre un nouveau CV) que porte le bouton de cet écran-là.
+    // Un bouton de navigation et un bouton d'action ne portent pas le même
+    // verbe (P25, revue de l'écran du matin) : « Mon CV » ici, « Importer
+    // mon CV » là-bas.
+    monCv: 'Mon CV',
+    // Bouton de réglages (`Main.dc.html`, après « Mon CV ») : dessiné,
+    // volontairement DÉSACTIVÉ tant que l'écran de préférences n'existe pas
+    // (GUIDELINES §5.2 — un élément dessiné mais pas encore branché
+    // s'implémente désactivé, jamais retiré).
+    reglages: 'Réglages des préférences',
+    reglagesIndisponible: 'Écran de réglages pas encore disponible.',
   },
 
   /**
@@ -66,13 +82,17 @@ export const fr = {
   } satisfies Record<Issue, string>,
 
   /**
-   * Les huit absences (`AbsenceNature`, `Absence.tsx`), mesurées en base
-   * (GUIDELINES §3.1). `texte-coupe` et `aucune-techno` produisent la
+   * Les neuf absences (`AbsenceNature`, `Absence.tsx`). Huit mesurées en
+   * base (GUIDELINES §3.1). `texte-coupe` et `aucune-techno` produisent la
    * **même donnée** (`stack = []`) pour deux causes opposées — leurs
    * libellés sont délibérément aussi éloignés que possible pour qu'aucune
    * lecture rapide ne les confonde : l'un dit que l'information est
    * **absente du texte reçu**, l'autre qu'elle est **absente du texte
    * complet**. Voir le rapport de tâche pour le détail de ce choix.
+   *
+   * `non-datee` (tâche 9) est la neuvième, et ne recouvre aucune des huit :
+   * elle qualifie ce que le SUIVI a enregistré, pas ce qu'une annonce dit ou
+   * tait — une date d'étape n'a ni source ni modèle derrière elle.
    */
   absences: {
     'non-publiee': 'non publié par la source',
@@ -83,6 +103,12 @@ export const fr = {
     'unite-incertaine': 'unité incertaine',
     'hors-perimetre': 'Hors périmètre — jamais lue',
     'echec-jugement': 'Jugement en échec',
+    // Une NEUVIÈME absence, et elle ne recouvre aucune des huit : la date de
+    // l'étape n'a été ni publiée par une source (elle ne vient pas d'une
+    // annonce) ni « non précisée » par le modèle (il ne la produit pas). Elle
+    // n'a simplement pas été enregistrée au moment où le statut a été posé.
+    // Mesuré : la seule offre `relancee` du corpus a `last_followup_at` nul.
+    'non-datee': 'non datée',
   } satisfies Record<AbsenceNature, string>,
 
   /**
@@ -224,9 +250,23 @@ export const fr = {
     // vaut donc que le tout premier jour, jamais recopié ici.
     resume: (n: number) =>
       `${n} offre${n === 1 ? '' : 's'} au-dessus de 50 sans décision. Les autres attendent dans la liste.`,
+    // Le résumé REPLIÉ (`VeilleRepliee.dc.html`, bande d'une seule ligne) :
+    // la même mesure que `resume` ci-dessus, mais sans « Les autres
+    // attendent dans la liste » — cette phrase n'a plus sa place quand le
+    // repli l'a déjà rendue à la liste. Clé distincte plutôt qu'une chaîne
+    // tronquée : les deux textes disent des choses différentes.
+    resumeReplie: (n: number) => `${n} offre${n === 1 ? '' : 's'} au-dessus de 50 sans décision`,
+    replier: 'Replier',
+    deplier: (n: number) => `Déplier les ${n} carte${n === 1 ? '' : 's'}`,
     suivantes: 'Suivantes',
     precedentes: 'Précédentes',
     pagination: (debut: number, fin: number, total: number) => `${debut}–${fin} sur ${total}`,
+    pageNumero: (n: number) => `Page ${n}`,
+    ellipsePages: '…',
+    // La taille de page est fixe (`LIST_PAGE_SIZE`, `MatinScreen.tsx`), pas
+    // mesurée sur la fenêtre : le badge dit donc un fait stable, jamais une
+    // valeur qui pourrait varier d'un écran à l'autre (GUIDELINES §3.3).
+    parPage: (n: number) => `${n} par page`,
     toutesLaVeille: 'Toute la veille',
     offresJugeesRienMasque: (n: number) =>
       `${n} offre${n === 1 ? '' : 's'} jugée${n === 1 ? '' : 's'}, rien de masqué`,
@@ -243,6 +283,41 @@ export const fr = {
     colEmployeur: 'Employeur',
     colLieu: 'Lieu',
     colPubliee: 'Publiée',
+    // Les colonnes contextuelles (tâche 9) : sur tout onglet autre que
+    // « À traiter », la 5e colonne (`colLieu` ci-dessus) cède la place au
+    // statut, et la 6e (`colPubliee`) à la date de l'étape — voir
+    // `DateColonne`, `data/format.ts`.
+    colStatut: 'Statut',
+    colPostulee: 'Postulée',
+    colRelancee: 'Relancée',
+    colEntretien: 'Entretien',
+    // La 5e colonne quand `candidature_statut` est nul : une absence NOMMÉE
+    // (GUIDELINES §3.1), jamais une case vide — distincte de `statuts.*`, qui
+    // ne couvre que les statuts CONNUS.
+    sansDecision: 'sans décision',
+    // La barre d'onglets de « Toute la veille » (`Main.dc.html`, bloc
+    // « barre d'onglets »). Libellés DÉDIÉS, distincts de `statuts.*` :
+    // `statuts.*` qualifie UNE offre (`StatusBadge` sur une ligne), un
+    // onglet nomme une COLLECTION — d'où le pluriel (« Retenues », pas
+    // « Retenue »). Réutiliser `statuts.*` mettrait le mauvais nombre
+    // grammatical à l'écran, l'écart (c) déjà constaté sur cette maquette
+    // (« Importer mon CV » là où elle écrit « Mon CV »). « À traiter »,
+    // « Entretien » et « Toutes » restent au singulier/invariable : c'est
+    // ce que la maquette écrit déjà pour ces trois-là.
+    ongletsLabel: 'Statut de candidature',
+    ongletATraiter: 'À traiter',
+    ongletRetenues: 'Retenues',
+    ongletPostulees: 'Postulées',
+    ongletRelancees: 'Relancées',
+    ongletEntretien: 'Entretien',
+    ongletTerminees: 'Terminées',
+    ongletEcartees: 'Écartées',
+    ongletToutes: 'Toutes',
+    // Le compte d'un onglet tant que `GET /statut-counts` n'a pas répondu :
+    // un tiret cadratin, jamais « 0 » (GUIDELINES §3.3 — une absence se
+    // nomme, elle ne se vide pas). Version courte de `compteEnAttente`
+    // (« … »), pour un espace d'onglet plus étroit qu'une carte.
+    compteEnAttenteCourt: '—',
     sources: (n: number) => `${n} sources`,
     // Fait distinct de l'absence `absences.texte-coupe` (celle-ci porte sur
     // `stack` vide) : ce badge dit que LE TEXTE REÇU par le modèle est
@@ -272,6 +347,77 @@ export const fr = {
     decisionEchouee: "La décision n'a pas pu être enregistrée. L'offre reste dans la bande.",
     listeVideTitre: 'Aucune offre ne correspond',
     listeVideDetail: 'Essayez de retirer un filtre — la liste complète ne masque rien par défaut.',
+    // « Rien de masqué » ne se dit QUE sur l'onglet « Toutes » : un onglet
+    // qui filtre et une phrase qui affirme le contraire seraient un
+    // mensonge (GUIDELINES §3.3).
+    compteOnglet: (n: number, total: number) =>
+      `${n} dans cet onglet, sur ${total} jugée${total === 1 ? '' : 's'}`,
+    compteOngletFiltre: (n: number, total: number) =>
+      `${n} sur ${total} dans cet onglet — filtres actifs`,
+    // Le détail du vide d'un onglet à zéro : commun aux sept onglets de
+    // statut (le titre, lui, est dédié — voir `videATraiter` et suivants
+    // ci-dessous), repris mot pour mot d'`OngletsSuivi.dc.html`.
+    listeOngletVideDetail:
+      "L'onglet reste visible à zéro : c'est une étape du parcours, pas une absence de données.",
+    // Sept titres DÉDIÉS, un par statut (`OngletsSuivi.dc.html`, panneau B :
+    // « Aucune offre retenue pour l'instant », le participe, jamais une
+    // formule passe-partout). Consommés par un `switch` exhaustif SANS
+    // `default` sur `Exclude<OngletId, 'toutes'>` (`OfferList.tsx`) : un
+    // huitième statut ajouté un jour serait une erreur de compilation, pas
+    // un titre manquant à l'écran. L'onglet « Toutes » à zéro garde
+    // `listeVideTitre` ci-dessus, inchangé : ce n'est pas une étape, c'est
+    // un corpus vide.
+    videATraiter: 'Aucune offre à traiter pour l’instant',
+    videRetenue: 'Aucune offre retenue pour l’instant',
+    videPostulee: 'Aucune offre postulée pour l’instant',
+    videRelancee: 'Aucune offre relancée pour l’instant',
+    videEntretien: 'Aucune offre en entretien pour l’instant',
+    videTerminee: 'Aucune candidature terminée pour l’instant',
+    videEcartee: 'Aucune offre écartée pour l’instant',
+    // Le bouton du vide d'un onglet de statut, qui bascule vers « À
+    // traiter » (`OngletsSuivi.dc.html`) — rendu SEULEMENT quand
+    // `comptesStatut` est connu : afficher un nombre avant que
+    // `GET /statut-counts` ait répondu serait une affirmation fausse
+    // (GUIDELINES §3.3), la même règle que le tiret cadratin de
+    // `StatusTabs`.
+    videVersATraiter: (n: number) => `Voir les ${n} à traiter`,
+    // Le vide d'un onglet de statut quand un FILTRE, pas l'étape, en est la
+    // cause (revue finale, corollaire d'I2) : `filtresActifs` fait basculer
+    // ici plutôt que sur `libelleVideOnglet`/`listeOngletVideDetail`, qui
+    // accuseraient l'étape à tort.
+    videFiltreTitre: 'Aucune offre ne correspond, avec ces filtres',
+    videFiltreDetail:
+      'Essayez de retirer un filtre — cet onglet peut contenir des offres qu’il masque.',
+  },
+
+  /**
+   * La bande « état des deux robots » de la barre d'application
+   * (`Main.dc.html`, `Etats.dc.html` — « L'état des deux robots, quatre
+   * cas », ETAT.md P25 point d). Quatre états pour la collecte
+   * (`nominal`/`partielle`/`en_echec`/`pas_encore`), deux pour le jugement
+   * (`fait`/`pas_encore`) — voir `RobotStatusBand.tsx`.
+   *
+   * Toutes les heures et dates sont mises en forme par l'APPELANT
+   * (`data/parisDate.ts`) : ce dictionnaire ne porte que du vocabulaire,
+   * jamais un format de date en dur.
+   */
+  robots: {
+    collecte: 'Collecte',
+    jugement: 'Jugement',
+    partielle: 'partielle',
+    enEchec: 'en échec',
+    // Le "quand" est déjà formaté par l'appelant (« hier 8 h 30 », ou une
+    // date complète) — même convention que `vides.collectePasTourneeDetail`.
+    derniereReussite: 'dernière réussite',
+    derniere: 'dernière',
+    // Jamais de date inventée quand aucune réussite n'est connue du tout
+    // (GUIDELINES §3.3) : ce mot dit l'absence plutôt que de la taire.
+    jamais: 'jamais',
+    pasEncoreAujourdhui: "pas encore aujourd'hui",
+    hier: 'hier',
+    sourcesIncompletes: (n: number, total: number) =>
+      `${n} source${n === 1 ? '' : 's'} sur ${total} incomplète${n === 1 ? '' : 's'}`,
+    jugees: (n: number) => `${n} jugée${n === 1 ? '' : 's'}`,
   },
 
   /**
@@ -427,7 +573,6 @@ export const fr = {
    * explicitement ce que l'import NE fait PAS.
    */
   profil: {
-    importerCv: 'Importer mon CV',
     titre: 'Importer mon CV',
     sousTitre:
       'Met à jour le CV utilisé pour juger les offres. Ne rejuge rien : les jugements déjà ' +

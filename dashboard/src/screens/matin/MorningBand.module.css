@@ -45,6 +45,19 @@
   gap: 18px;
 }
 
+/*
+ * L'espace entre la grille de cartes et « Suivantes » (`Main.dc.html` :
+ * `margin-top: 11px` sur la ligne de pagination) — posé ICI, sur la BANDE,
+ * jamais dans `Pagination.module.css` : ce composant est partagé avec la
+ * liste « Toute la veille », où la maquette ne pose pas cette marge (P25
+ * point f). 11px ne correspond à aucun token de `theme.css` (échelle
+ * 4/8/12/16/24) ; `--space-3` (12px) est le plus proche — écart de 1px
+ * documenté ici, comme l'exige GUIDELINES §5.1.
+ */
+.paginationEspacement {
+  margin-top: var(--space-3);
+}
+
 .reessayer {
   margin-top: var(--space-3);
   height: 32px;
@@ -57,4 +70,73 @@
 
 .reessayer:hover {
   background: var(--color-surface-2);
+}
+
+/*
+ * La bande REPLIÉE (`VeilleRepliee.dc.html`) : une ligne unique de hauteur
+ * fixe, tout en ligne, avec une bordure basse (revue de tâche 8, défaut 1).
+ * La page défile désormais normalement et la liste garde une taille de page
+ * fixe (dix lignes) : le repli ne change plus le nombre de lignes affichées,
+ * seulement le défilement à parcourir pour les atteindre (revue du
+ * 2026-09-10). Remplace `.bande` (padding vertical 20px/22px) plutôt que de
+ * s'y imbriquer : additionner les deux aurait gardé une bonne partie de la
+ * hauteur que le repli est censé rendre à la liste.
+ */
+.bandeRepliee {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 52px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.titreReplie {
+  flex: none;
+  font-family: var(--font-display);
+  /* 15px dans la maquette : correspond exactement à --text-lg, aucun écart
+     à consigner. */
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.compteReplie {
+  /* 12px dans la maquette : correspond exactement à --text-sm. */
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* La maquette repliée dessine ce séparateur à 16px de haut, pas 18 — plus
+   court que celui de l'en-tête déplié (`.separateur` ci-dessous). Modificateur
+   posé EN PLUS de `.separateur`, qui garde la largeur et la couleur communes
+   aux deux états. */
+.separateurReplie {
+  height: 16px;
+}
+
+.repli {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  background: transparent;
+}
+
+.repli:hover {
+  background: var(--color-surface-2);
+}
+
+/* Le bouton de la bande repliée est un peu plus grand dans la maquette
+   (28px/12px, contre 26px/11.5px déplié) — modificateur posé EN PLUS de
+   `.repli`, qui garde le reste (fond, bordure, rayon, couleur) commun. */
+.repliReplie {
+  height: 28px;
+  font-size: var(--text-sm);
 }

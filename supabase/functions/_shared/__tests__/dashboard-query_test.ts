@@ -1,9 +1,15 @@
 import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import {
+  type AiScoreFact,
+  type CollectionRunFact,
+  computeCollecteStatus,
+  computeJugementStatus,
   computeStreak,
   getConfig,
   getOfferDetail,
+  getRobotStatus,
   getStats,
+  getStatutCounts,
   getWorkModeCounts,
   importCandidateProfile,
   listOffers,
@@ -497,6 +503,39 @@ Deno.test('listOffers — aucun filtre : aucun appel de restriction (rien ne mas
   for (const method of ['eq', 'in', 'is', 'or', 'gte']) {
     assertEquals(calls.some((c) => c.method === method), false);
   }
+});
+
+Deno.test('listOffers — statut = [aucune] seul : .is(candidature_statut, null), pas de .or', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, statut: ['aucune'] });
+  assertEquals(calls.find((c) => c.method === 'is')?.args, ['candidature_statut', null]);
+  assertEquals(calls.some((c) => c.method === 'or'), false);
+});
+
+Deno.test("listOffers — statut = [aucune, a_traiter] : composé en OU (c'est l'onglet « À traiter »)", async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, statut: ['aucune', 'a_traiter'] });
+  assertEquals(
+    calls.find((c) => c.method === 'or')?.args,
+    ['candidature_statut.is.null,candidature_statut.in.(a_traiter)'],
+  );
+  // Jamais un `.in`/`.is` séparé EN PLUS du `.or` : deux appels successifs de
+  // PostgREST se combinent en ET, jamais en OU — la liste serait vide.
+  assertEquals(calls.some((c) => c.method === 'is'), false);
+  assertEquals(calls.some((c) => c.method === 'in' && c.args[0] === 'candidature_statut'), false);
+});
+
+Deno.test('listOffers — statut sans « aucune » : .in seul, comportement inchangé', async () => {
+  const calls: RecordedCall[] = [];
+  const db = recordingOffersDashboard(calls);
+  await listOffers(db, { ...BASE_FILTERS, statut: ['postulee'] });
+  assertEquals(
+    calls.find((c) => c.method === 'in' && c.args[0] === 'candidature_statut')?.args,
+    ['candidature_statut', ['postulee']],
+  );
+  assertEquals(calls.some((c) => c.method === 'or'), false);
 });
 
 // --------------------------------------------------------------------------
@@ -1112,4 +1151,378 @@ Deno.test('getWorkModeCounts remonte une erreur de base plutôt que des zéros',
   const { db } = fakeDbForWorkModeCounts(null, { message: 'base indisponible' });
 
   await assertRejects(() => getWorkModeCounts(db), Error, 'comptage par mode de travail');
+});
+
+// --------------------------------------------------------------------------
+// getStatutCounts
+// --------------------------------------------------------------------------
+
+function fakeDbForStatutCounts(
+  rows: { statut: string; total: number | string }[] | null,
+  error?: { message: string },
+): { db: DbClient; tablesLues: string[] } {
+  const tablesLues: string[] = [];
+  const db = {
+    from(table: string) {
+      tablesLues.push(table);
+      return {
+        select: (_cols: string) => Promise.resolve({ data: rows, error: error ?? null }),
+      };
+    },
+  } as unknown as DbClient;
+  return { db, tablesLues };
+}
+
+Deno.test('getStatutCounts — lit la vue de comptage, jamais offers_dashboard', async () => {
+  const { db, tablesLues } = fakeDbForStatutCounts([{ statut: 'aucune', total: 1258 }]);
+  await getStatutCounts(db);
+  assertEquals(tablesLues, ['offers_dashboard_status_counts']);
+});
+
+Deno.test('getStatutCounts — complète à 0 les huit clefs, y compris absentes de la vue', async () => {
+  const { db } = fakeDbForStatutCounts([
+    { statut: 'aucune', total: 1258 },
+    { statut: 'postulee', total: 6 },
+  ]);
+  const counts = await getStatutCounts(db);
+  assertEquals(counts, {
+    aucune: 1258,
+    a_traiter: 0,
+    retenue: 0,
+    postulee: 6,
+    relancee: 0,
+    entretien: 0,
+    terminee: 0,
+    ecartee: 0,
+  });
+});
+
+Deno.test('getStatutCounts — un total rendu en chaîne est converti en nombre', async () => {
+  const { db } = fakeDbForStatutCounts([{ statut: 'ecartee', total: '7' }]);
+  const counts = await getStatutCounts(db);
+  assertEquals(counts.ecartee, 7);
+});
+
+Deno.test('getStatutCounts — une valeur inconnue de la vue est ignorée, jamais ajoutée', async () => {
+  const { db } = fakeDbForStatutCounts([{ statut: 'inventee', total: 3 }]);
+  const counts = await getStatutCounts(db);
+  assertEquals(Object.keys(counts).length, 8);
+  assertEquals('inventee' in counts, false);
+});
+
+Deno.test('getStatutCounts — une erreur de lecture est propagée, jamais avalée', async () => {
+  const { db } = fakeDbForStatutCounts(null, { message: 'boom' });
+  await assertRejects(() => getStatutCounts(db), Error, 'comptage par statut');
+});
+
+// --------------------------------------------------------------------------
+// computeCollecteStatus / computeJugementStatus / getRobotStatus
+// (ETAT.md P25, point d — « l'état des deux robots »)
+// --------------------------------------------------------------------------
+
+const TODAY_KEY = '2026-09-10';
+const ACTIVE_SOURCES = ['adzuna', 'collective', 'france_travail', 'free_work'];
+
+function run(
+  source: string,
+  status: string,
+  startedAt: string,
+  finishedAt: string | null = null,
+): CollectionRunFact {
+  return { source, status, started_at: startedAt, finished_at: finishedAt };
+}
+
+Deno.test(
+  "computeCollecteStatus — pas_encore : AUCUNE source active n'a de run aujourd'hui, " +
+    'même si des runs plus anciens existent (le cas le plus fréquent, ETAT.md P25 d)',
+  () => {
+    const runs = ACTIVE_SOURCES.map((source) =>
+      run(source, 'success', '2026-09-09T06:30:00Z', '2026-09-09T06:30:23Z')
+    );
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    assertEquals(status, { etat: 'pas_encore', derniere: '2026-09-09T06:30:23Z' });
+  },
+);
+
+Deno.test('computeCollecteStatus — pas_encore : aucun run du tout, jamais → derniere null', () => {
+  const status = computeCollecteStatus(ACTIVE_SOURCES, [], TODAY_KEY);
+  assertEquals(status, { etat: 'pas_encore', derniere: null });
+});
+
+Deno.test(
+  'computeCollecteStatus — pas_encore : la DERNIÈRE connue est retenue, pas la première ' +
+    "(une reprise manuelle après échec ne doit pas être ignorée au profit d'un échec plus ancien)",
+  () => {
+    const runs = [
+      run('adzuna', 'failed', '2026-09-08T06:30:00Z', '2026-09-08T06:30:05Z'),
+      run('adzuna', 'success', '2026-09-09T06:30:00Z', '2026-09-09T06:30:23Z'),
+      run('collective', 'success', '2026-09-09T05:20:00Z', '2026-09-09T05:21:27Z'),
+      run('france_travail', 'partial', '2026-09-09T06:00:00Z', '2026-09-09T06:00:25Z'),
+      run('free_work', 'success', '2026-09-09T05:15:00Z', '2026-09-09T05:20:08Z'),
+    ];
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    assertEquals(status, { etat: 'pas_encore', derniere: '2026-09-09T06:30:23Z' });
+  },
+);
+
+Deno.test(
+  "computeCollecteStatus — nominal : les QUATRE sources actives ont réussi aujourd'hui",
+  () => {
+    const runs = [
+      run('adzuna', 'success', '2026-09-10T06:30:00Z', '2026-09-10T06:30:23Z'),
+      run('collective', 'success', '2026-09-10T05:20:00Z', '2026-09-10T05:21:27Z'),
+      run('france_travail', 'success', '2026-09-10T06:00:00Z', '2026-09-10T06:00:25Z'),
+      run('free_work', 'success', '2026-09-10T05:15:00Z', '2026-09-10T05:20:08Z'),
+    ];
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    // Le plus tardif des quatre `finished_at` du jour, PAS le premier ni un
+    // ordre arbitraire — c'est celui que la maquette montre (« Collecte
+    // 8 h 30 », adzuna, le dernier des quatre à finir ce matin-là).
+    assertEquals(status, { etat: 'nominal', at: '2026-09-10T06:30:23Z' });
+  },
+);
+
+Deno.test(
+  'computeCollecteStatus — partielle : une source du jour est "partial", les trois autres ' +
+    '"success" — 1 source sur 4 incomplète (le cas mesuré sur France Travail, Etats.dc.html)',
+  () => {
+    const runs = [
+      run('adzuna', 'success', '2026-09-10T06:30:00Z', '2026-09-10T06:30:23Z'),
+      run('collective', 'success', '2026-09-10T05:20:00Z', '2026-09-10T05:21:27Z'),
+      run('france_travail', 'partial', '2026-09-10T06:00:00Z', '2026-09-10T06:00:25Z'),
+      run('free_work', 'success', '2026-09-10T05:15:00Z', '2026-09-10T05:20:08Z'),
+    ];
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    assertEquals(status, {
+      etat: 'partielle',
+      at: '2026-09-10T06:30:23Z',
+      sourcesIncompletes: 1,
+      sourcesTotal: 4,
+    });
+  },
+);
+
+Deno.test(
+  "computeCollecteStatus — partielle : une source active n'a SIMPLEMENT PAS ENCORE tourné " +
+    "aujourd'hui, les autres ont réussi — compte comme incomplète, pas comme un échec",
+  () => {
+    const runs = [
+      run('adzuna', 'success', '2026-09-10T06:30:00Z', '2026-09-10T06:30:23Z'),
+      run('collective', 'success', '2026-09-10T05:20:00Z', '2026-09-10T05:21:27Z'),
+      run('france_travail', 'success', '2026-09-10T06:00:00Z', '2026-09-10T06:00:25Z'),
+      // free_work : rien aujourd'hui, seulement hier.
+      run('free_work', 'success', '2026-09-09T05:15:00Z', '2026-09-09T05:20:08Z'),
+    ];
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    assertEquals(status, {
+      etat: 'partielle',
+      at: '2026-09-10T06:30:23Z',
+      sourcesIncompletes: 1,
+      sourcesTotal: 4,
+    });
+  },
+);
+
+Deno.test(
+  "computeCollecteStatus — en_echec : au moins une source a tourné aujourd'hui, mais AUCUNE " +
+    "n'a réussi — porte l'heure de la TENTATIVE et, séparément, la dernière réussite connue",
+  () => {
+    const runs = [
+      run('adzuna', 'failed', '2026-09-10T06:30:00Z', '2026-09-10T06:30:05Z'),
+      run('collective', 'success', '2026-09-09T05:20:00Z', '2026-09-09T05:21:27Z'),
+      run('france_travail', 'failed', '2026-09-10T06:00:00Z', '2026-09-10T06:00:04Z'),
+      run('free_work', 'success', '2026-09-09T05:15:00Z', '2026-09-09T05:20:08Z'),
+    ];
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    assertEquals(status, {
+      etat: 'en_echec',
+      at: '2026-09-10T06:30:05Z',
+      derniereReussite: '2026-09-09T05:21:27Z',
+    });
+  },
+);
+
+Deno.test(
+  'computeCollecteStatus — en_echec : aucune réussite CONNUE du tout → derniereReussite null, ' +
+    'jamais une date inventée',
+  () => {
+    const runs = [run('adzuna', 'failed', '2026-09-10T06:30:00Z', '2026-09-10T06:30:05Z')];
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    assertEquals(status, {
+      etat: 'en_echec',
+      at: '2026-09-10T06:30:05Z',
+      derniereReussite: null,
+    });
+  },
+);
+
+Deno.test(
+  'computeCollecteStatus — un run SANS finished_at (encore "running") retombe sur started_at',
+  () => {
+    const runs = [
+      run('adzuna', 'running', '2026-09-10T06:30:00Z', null),
+      run('collective', 'success', '2026-09-10T05:20:00Z', '2026-09-10T05:21:27Z'),
+      run('france_travail', 'success', '2026-09-10T06:00:00Z', '2026-09-10T06:00:25Z'),
+      run('free_work', 'success', '2026-09-10T05:15:00Z', '2026-09-10T05:20:08Z'),
+    ];
+    const status = computeCollecteStatus(ACTIVE_SOURCES, runs, TODAY_KEY);
+    assertEquals(status, {
+      etat: 'partielle',
+      at: '2026-09-10T06:30:00Z',
+      sourcesIncompletes: 1,
+      sourcesTotal: 4,
+    });
+  },
+);
+
+Deno.test("computeJugementStatus — pas_encore : aucune ligne aujourd'hui", () => {
+  const scores: AiScoreFact[] = [{ scored_at: '2026-09-09T13:08:03.836Z', error: null }];
+  assertEquals(computeJugementStatus(scores, TODAY_KEY), { etat: 'pas_encore' });
+});
+
+Deno.test(
+  'computeJugementStatus — fait : ne compte QUE les lignes error IS NULL, jamais celles en ' +
+    "erreur (CLAUDE.md, P16 — une ligne en erreur n'est pas une offre jugée)",
+  () => {
+    const scores: AiScoreFact[] = [
+      { scored_at: '2026-09-10T07:00:00Z', error: null },
+      { scored_at: '2026-09-10T07:00:05Z', error: 'panne transitoire' },
+      { scored_at: '2026-09-10T07:00:10Z', error: null },
+    ];
+    assertEquals(computeJugementStatus(scores, TODAY_KEY), {
+      etat: 'fait',
+      at: '2026-09-10T07:00:10Z',
+      count: 2,
+    });
+  },
+);
+
+Deno.test(
+  'computeJugementStatus — fait : "at" est la ligne la plus tardive du jour, ' +
+    "même si elle est en erreur (l'heure dit quand le robot a tourné, pas seulement ce " +
+    "qu'il a réussi)",
+  () => {
+    const scores: AiScoreFact[] = [
+      { scored_at: '2026-09-10T07:00:00Z', error: null },
+      { scored_at: '2026-09-10T09:00:00Z', error: 'panne transitoire' },
+    ];
+    assertEquals(computeJugementStatus(scores, TODAY_KEY), {
+      etat: 'fait',
+      at: '2026-09-10T09:00:00Z',
+      count: 1,
+    });
+  },
+);
+
+Deno.test(
+  "computeJugementStatus — fait, mais 0 réussite aujourd'hui : le compte le dit sans mentir " +
+    "(le robot a tourné, il n'a simplement rien jugé avec succès)",
+  () => {
+    const scores: AiScoreFact[] = [{ scored_at: '2026-09-10T07:00:00Z', error: 'panne' }];
+    assertEquals(computeJugementStatus(scores, TODAY_KEY), {
+      etat: 'fait',
+      at: '2026-09-10T07:00:00Z',
+      count: 0,
+    });
+  },
+);
+
+// --------------------------------------------------------------------------
+// getRobotStatus — le total de sources vient de `sources`, jamais en dur
+// --------------------------------------------------------------------------
+
+function fakeDbForRobotStatus(opts: {
+  sources: { key: string }[];
+  runs: CollectionRunFact[];
+  scores: AiScoreFact[];
+}): { db: DbClient; tablesLues: string[] } {
+  const tablesLues: string[] = [];
+  const db = {
+    from(table: string) {
+      tablesLues.push(table);
+      if (table === 'sources') {
+        return {
+          select: () => ({
+            eq: () => Promise.resolve({ data: opts.sources, error: null }),
+          }),
+        };
+      }
+      if (table === 'collection_runs') {
+        return {
+          select: () => ({
+            in: () => ({
+              order: () => ({
+                limit: () => Promise.resolve({ data: opts.runs, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === 'offer_ai_scores') {
+        return {
+          select: () => ({
+            gte: () => ({
+              order: () => ({
+                limit: () => Promise.resolve({ data: opts.scores, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`table inattendue : ${table}`);
+    },
+  } as unknown as DbClient;
+  return { db, tablesLues };
+}
+
+Deno.test(
+  'getRobotStatus — le total de sources vient de `sources` (enabled), jamais codé en dur ' +
+    '(ETAT.md P25 d : un cinquième collecteur un jour ne doit pas faire mentir la bande)',
+  async () => {
+    const now = new Date('2026-09-10T10:00:00Z');
+    const { db, tablesLues } = fakeDbForRobotStatus({
+      sources: [{ key: 'adzuna' }, { key: 'collective' }, { key: 'france_travail' }],
+      runs: [
+        run('adzuna', 'success', '2026-09-10T06:30:00Z', '2026-09-10T06:30:23Z'),
+        run('collective', 'success', '2026-09-10T05:20:00Z', '2026-09-10T05:21:27Z'),
+        run('france_travail', 'success', '2026-09-10T06:00:00Z', '2026-09-10T06:00:25Z'),
+      ],
+      scores: [{ scored_at: '2026-09-10T07:00:00Z', error: null }],
+    });
+    const status = await getRobotStatus(db, now);
+    assertEquals(tablesLues, ['sources', 'collection_runs', 'offer_ai_scores']);
+    assertEquals(status.collecte, { etat: 'nominal', at: '2026-09-10T06:30:23Z' });
+    assertEquals(status.jugement, { etat: 'fait', at: '2026-09-10T07:00:00Z', count: 1 });
+  },
+);
+
+Deno.test(
+  'getRobotStatus — aucune source active : pas_encore sans jamais interroger collection_runs',
+  async () => {
+    const now = new Date('2026-09-10T10:00:00Z');
+    const { db, tablesLues } = fakeDbForRobotStatus({ sources: [], runs: [], scores: [] });
+    const status = await getRobotStatus(db, now);
+    assertEquals(tablesLues.includes('collection_runs'), false);
+    assertEquals(status.collecte, { etat: 'pas_encore', derniere: null });
+  },
+);
+
+Deno.test('getRobotStatus — état réel mesuré le 2026-09-10 : pas_encore pour les deux robots', async () => {
+  // Dernière collecte connue : adzuna, la veille à 06:30:23Z (08 h 30 Paris).
+  // Dernier jugement connu : la veille à 13:08:03Z. Rien aujourd'hui — voir
+  // le rapport de tâche : c'est l'état réellement affiché à l'écran.
+  const now = new Date('2026-09-10T07:00:00Z');
+  const { db } = fakeDbForRobotStatus({
+    sources: [
+      { key: 'adzuna' },
+      { key: 'collective' },
+      { key: 'france_travail' },
+      { key: 'free_work' },
+    ],
+    runs: [run('adzuna', 'success', '2026-09-09T06:30:00Z', '2026-09-09T06:30:23Z')],
+    scores: [{ scored_at: '2026-09-09T13:08:03.836Z', error: null }],
+  });
+  const status = await getRobotStatus(db, now);
+  assertEquals(status.collecte, { etat: 'pas_encore', derniere: '2026-09-09T06:30:23Z' });
+  assertEquals(status.jugement, { etat: 'pas_encore' });
 });

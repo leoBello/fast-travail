@@ -1,20 +1,40 @@
 .ecran {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* La PAGE défile désormais normalement (revue du 2026-09-10, sur écran
+     réel) : une coque à hauteur FIXE rognait la liste à zéro ligne visible
+     sur un portable, la zone mesurée recevant 0 px d'un parent qui ne lui en
+     donnait aucun. `min-height`, pas `height` : la coque occupe au moins un
+     écran plein, mais grandit avec son contenu au lieu de le couper.
+     `dvh`, jamais `vh` : sur mobile, `vh` compte la barre d'adresse
+     rétractée et ferait dépasser la hauteur minimale annoncée. */
+  min-height: 100dvh;
   padding: 0 28px 16px;
-  min-height: 0;
 }
 
+/*
+ * DEUX niveaux, comme `Main.dc.html` — et c'est la raison d'être de ce
+ * commentaire. Aplatie en un seul `align-items: baseline`, la barre alignait
+ * TOUT sur la ligne de base du titre : mesuré au navigateur, le titre avait
+ * 0 px au-dessus de lui et 34 en dessous, plaqué contre le haut d'une barre
+ * de 56 px. Le conteneur centre ses blocs ; seule la paire nom + tagline
+ * (`.marque` ci-dessous) s'aligne sur la ligne de base.
+ */
 .barre {
   flex: none;
   height: 56px;
   display: flex;
-  align-items: baseline;
-  gap: 9px;
+  align-items: center;
+  gap: 20px;
   border-bottom: 1px solid var(--color-border);
   margin: 0 -28px;
   padding: 0 28px;
+}
+
+.marque {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
 }
 
 .nom {
@@ -34,6 +54,11 @@
 }
 
 .suiviBouton {
+  display: inline-flex;
+  align-items: center;
+  /* 7px dans la maquette (`.btn`, Main.dc.html) : l'espace entre l'icône et
+     le libellé. */
+  gap: 7px;
   height: 30px;
   padding: 0 13px;
   border-radius: var(--radius-md);
@@ -46,6 +71,31 @@
 
 .suiviBouton:hover {
   background: var(--color-surface-2);
+}
+
+/*
+ * Le bouton de réglages (`Main.dc.html`, après « Mon CV ») : carré, sans
+ * libellé — DESSINÉ mais DÉSACTIVÉ tant que l'écran de préférences n'existe
+ * pas (GUIDELINES §5.2, P25 point a). 32px/32px, comme la maquette.
+ */
+.reglagesBouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text);
+  align-self: center;
+}
+
+.reglagesBouton:disabled {
+  color: var(--color-text-faint);
+  border-color: var(--color-border);
+  cursor: not-allowed;
 }
 
 .bandeauErreur {

@@ -5,9 +5,12 @@ import type {
   Engagement,
   OfferDashboardRow,
   PageResult,
+  RobotStatusResult,
   SortField,
   Source,
   StatsResult,
+  StatutCounts,
+  StatutFilter,
   WorkModeCounts,
   WorkModeFilter,
 } from '../../data/types';
@@ -32,6 +35,7 @@ export interface OffersListParams {
   sort: SortField;
   page: number;
   pageSize: number;
+  statut?: StatutFilter[];
   workMode?: WorkModeFilter[];
   engagement?: Engagement[];
   source?: Source[];
@@ -44,10 +48,11 @@ export function useOffersList(
   client: DashboardClient,
   params: OffersListParams,
 ): [AsyncState<PageResult<OfferDashboardRow>>, () => void] {
-  const { sort, page, pageSize, workMode, engagement, source, agenticAi } = params;
+  const { sort, page, pageSize, statut, workMode, engagement, source, agenticAi } = params;
   const fn = useCallback(
-    () => client.listOffers({ sort, page, pageSize, workMode, engagement, source, agenticAi }),
-    [client, sort, page, pageSize, workMode, engagement, source, agenticAi],
+    () =>
+      client.listOffers({ sort, page, pageSize, statut, workMode, engagement, source, agenticAi }),
+    [client, sort, page, pageSize, statut, workMode, engagement, source, agenticAi],
   );
   return useAsync(fn);
 }
@@ -76,6 +81,21 @@ export function useWorkModeCounts(
   return useAsync(fn);
 }
 
+/** Les huit valeurs de statut chiffrées, pour les onglets de « Toute la
+ * veille ». UN appel, pas sept : le coût d'une lecture d'`offers_dashboard`
+ * ne dépend pas de `pageSize`, donc sept `pageSize=1` seraient sept
+ * balayages du corpus (migration `20260910060000`).
+ *
+ * **Ces comptes sont GLOBAUX**, jamais restreints par le panneau de filtres.
+ * C'est délibéré : un compte d'onglet répond à « combien y en a-t-il », pas
+ * à « combien en verrais-je avec mes filtres actuels ». Quand un filtre est
+ * actif, c'est la ligne de compte de la liste qui le dit (`OfferList`), pas
+ * l'onglet qui change de nombre sous les doigts. */
+export function useStatutCounts(client: DashboardClient): [AsyncState<StatutCounts>, () => void] {
+  const fn = useCallback(() => client.getStatutCounts(), [client]);
+  return useAsync(fn);
+}
+
 /**
  * `GET /config` (tâche 10) : poids réglables, profil actif, compétences.
  * Appelé indépendamment par chaque écran qui en a besoin (`MatinScreen`,
@@ -86,5 +106,20 @@ export function useWorkModeCounts(
  */
 export function useConfig(client: DashboardClient): [AsyncState<ConfigResult>, () => void] {
   const fn = useCallback(() => client.getConfig(), [client]);
+  return useAsync(fn);
+}
+
+/**
+ * `GET /robot-status` : l'état des deux robots, pour la bande de la barre
+ * d'application (`Etats.dc.html`, « L'état des deux robots, quatre cas »).
+ *
+ * Appel indépendant, comme `useStats` et `useConfig` : chaque écran reste la
+ * seule couche de LUI-MÊME qui appelle le réseau. Tant qu'il n'a pas répondu,
+ * la bande n'affirme rien — ni coche, ni heure, ni zéro (GUIDELINES §3.3).
+ */
+export function useRobotStatus(
+  client: DashboardClient,
+): [AsyncState<RobotStatusResult>, () => void] {
+  const fn = useCallback(() => client.getRobotStatus(), [client]);
   return useAsync(fn);
 }

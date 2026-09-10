@@ -107,3 +107,39 @@ export function formatJourHeure(iso: string | null): string | null {
   if (formateurHeureMinute.format(date) === '00:00') return null;
   return formateurJourHeure.format(date);
 }
+
+/** « 8 h 30 » — l'heure seule, en heure de Paris. Le français écrit l'heure
+ * avec « h » et sans zéro de tête ; `Intl` en `fr-FR` rend « 08:30 », d'où la
+ * reprise ci-dessous plutôt qu'un formateur de plus. */
+const formateurHeureParis = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: 'Europe/Paris',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+export function formatHeureParis(iso: string | null): string | null {
+  if (iso === null) return null;
+  const parsed = Date.parse(iso);
+  if (Number.isNaN(parsed)) return null;
+  const [heures, minutes] = formateurHeureParis.format(new Date(parsed)).split(':');
+  return `${Number(heures)} h ${minutes}`;
+}
+
+/** Le décalage en JOURS CALENDAIRES parisiens entre `iso` et `maintenant` :
+ * `0` aujourd'hui, `1` hier, davantage au-delà. `null` si `iso` est absent ou
+ * illisible.
+ *
+ * Compté sur les clés de jour (`parisDateKey`), jamais sur une différence de
+ * millisecondes divisée par 86 400 000 : ce calcul-là se trompe d'un jour à
+ * chaque changement d'heure, et deux instants séparés de 23 h peuvent tomber
+ * sur deux dates différentes comme sur la même. C'est le même piège que celui
+ * corrigé en tâche 6 de la phase 3, du côté serveur. */
+export function joursDepuisParis(iso: string | null, maintenant: Date = new Date()): number | null {
+  if (iso === null) return null;
+  const parsed = Date.parse(iso);
+  if (Number.isNaN(parsed)) return null;
+  const jour = (cle: string) => Date.UTC(+cle.slice(0, 4), +cle.slice(5, 7) - 1, +cle.slice(8, 10));
+  const ecart = jour(parisDateKey(maintenant)) - jour(parisDateKey(new Date(parsed)));
+  return Math.round(ecart / 86_400_000);
+}

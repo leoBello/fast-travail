@@ -123,7 +123,7 @@ describe('fr.ts — aucune clé manquante, aucune clé orpheline', () => {
     expect(Object.keys(fr.issues).sort()).toEqual(Object.keys(attendu).sort());
   });
 
-  it('absences : exactement les huit natures mesurées (AbsenceNature)', () => {
+  it('absences : exactement les neuf natures (huit mesurées, une neuvième sur la candidature — AbsenceNature)', () => {
     const attendu: Record<AbsenceNature, true> = {
       'non-publiee': true,
       'non-precisee': true,
@@ -133,6 +133,7 @@ describe('fr.ts — aucune clé manquante, aucune clé orpheline', () => {
       'unite-incertaine': true,
       'hors-perimetre': true,
       'echec-jugement': true,
+      'non-datee': true,
     };
     expect(Object.keys(fr.absences).sort()).toEqual(Object.keys(attendu).sort());
   });

@@ -1,0 +1,95 @@
+.onglets {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 34px;
+  border-bottom: 1px solid var(--color-border);
+  flex: none;
+}
+
+.onglet {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  margin-bottom: -1px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: none;
+  white-space: nowrap;
+}
+
+.onglet:hover {
+  color: var(--color-text);
+}
+
+.onglet[data-actif='oui'] {
+  color: var(--color-text);
+  font-weight: 600;
+  background: var(--color-surface-2);
+  border-bottom-color: var(--color-accent);
+}
+
+.compte {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+}
+
+.onglet[data-actif='oui'] .compte {
+  color: var(--color-text);
+}
+
+/* Le point DOUBLE le mot, il ne le remplace pas (GUIDELINES §3.7). */
+.point,
+.anneau {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  flex: none;
+}
+
+.point {
+  background: currentColor;
+}
+
+/* « Écartée » : un anneau discontinu, pas un point. La FORME dit « sortie »
+   avant même la couleur — même distinction que `StatusBadge`. */
+.anneau {
+  border: 1px dashed currentColor;
+}
+
+.onglet[data-ton='neutre'] .point {
+  background: var(--color-text-muted);
+}
+.onglet[data-ton='accent'] .point {
+  background: var(--color-accent);
+}
+.onglet[data-ton='info'] .point {
+  background: var(--color-info);
+}
+.onglet[data-ton='alerte'] .point {
+  background: var(--color-warning);
+}
+.onglet[data-ton='succes'] .point {
+  background: var(--color-success);
+}
+.onglet[data-ton='danger'] .anneau {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* Sépare « Toutes » des sept onglets de statut — repris de la maquette
+   (Main.dc.html), qui le dessine entre « Écartées » et « Toutes ». */
+.separateur {
+  width: 1px;
+  height: 18px;
+  background: var(--color-border-strong);
+  align-self: center;
+  margin: 0 6px;
+}

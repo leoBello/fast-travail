@@ -2,14 +2,30 @@ import { useMemo, useState } from 'react';
 import type { DashboardClient } from '../../data/client';
 import type { OfferDashboardRow, SortField } from '../../data/types';
 import { t } from '../../i18n/i18n';
-import { useBrief, useConfig, useOffersList, useStats, useWorkModeCounts } from './hooks';
+import {
+  useBrief,
+  useConfig,
+  useOffersList,
+  useRobotStatus,
+  useStats,
+  useStatutCounts,
+  useWorkModeCounts,
+} from './hooks';
 import type { FilterState } from './FilterPanel';
 import { FilterPanel } from './FilterPanel';
 import { MorningBand } from './MorningBand';
 import { OfferList } from './OfferList';
+import { RobotStatusBand } from './RobotStatusBand';
+import { ecrireRepli, lireRepli } from './repliStorage';
+import { comptePourOnglet, filtreStatutPourOnglet, ONGLET_PAR_DEFAUT } from './statusTabsLogic';
+import type { OngletId } from './statusTabsLogic';
 import styles from './MatinScreen.module.css';
 
-const LIST_PAGE_SIZE = 50;
+/** Fixe, plus mesurée : la page défile désormais normalement (revue du
+ * 2026-09-10, sur écran réel — une coque à hauteur fixe rognait la liste à
+ * zéro ligne visible sur un portable), donc la hauteur disponible ne veut
+ * plus rien dire. Dix lignes — au-delà, une page cesse d'être une page. */
+const LIST_PAGE_SIZE = 10;
 
 interface Props {
   client: DashboardClient;
@@ -37,6 +53,17 @@ interface Props {
  */
 export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }: Props) {
   // ---- Bande « Ce matin » ----
+  // `lireRepli` (la fonction, pas son appel) : `useState(lireRepli())`
+  // relirait `localStorage` à CHAQUE rendu de l'écran, pour un résultat qui
+  // n'est lu qu'au premier.
+  const [replie, setReplie] = useState(lireRepli);
+
+  function basculerRepli() {
+    const suivant = !replie;
+    ecrireRepli(suivant);
+    setReplie(suivant);
+  }
+
   const [briefPage, setBriefPage] = useState(1);
   const [briefState, recargerBrief] = useBrief(client, briefPage);
   // Ids retirés OPTIMISTEMENT (avant même que le serveur ne confirme) —
@@ -101,8 +128,14 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
       });
       // `decidesAujourdhui` est dérivé de `/stats` (tâche 10) : le recharger
       // suffit à le faire avancer, aucun état local à maintenir en plus.
+      // `recargerListe`/`recargerComptesStatut` (revue finale, I3) : sans
+      // eux, l'onglet « Retenues »/« Écartées » restait à son ancien compte
+      // et l'offre décidée restait visible sous « À traiter » jusqu'au
+      // prochain rechargement manuel.
       recargerBrief();
       recargerStats();
+      recargerListe();
+      recargerComptesStatut();
     } catch {
       // La décision a échoué : l'offre revient dans la bande plutôt que de
       // disparaître silencieusement (une absence de décision n'est pas une
@@ -123,19 +156,33 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
   }
 
   // ---- Liste « Toute la veille » ----
+  const [onglet, setOnglet] = useState<OngletId>(ONGLET_PAR_DEFAUT);
   const [sort, setSort] = useState<SortField>('final_score');
   const [listPage, setListPage] = useState(1);
   const [filtres, setFiltres] = useState<FilterState>({});
   const [filtresOuverts, setFiltresOuverts] = useState(false);
+  const [comptesStatutState, recargerComptesStatut] = useStatutCounts(client);
+
+  // `useMemo` obligatoire : `statut` est un TABLEAU, et il est la dépendance
+  // du `useCallback` d'`useOffersList`. Reconstruit à chaque rendu, il
+  // relancerait l'appel réseau à chaque `setState` de cet écran — exactement
+  // le défaut corrigé sur le client d'API dans `App.tsx` (CLAUDE.md).
+  const statut = useMemo(() => filtreStatutPourOnglet(onglet), [onglet]);
 
   const [listState, recargerListe] = useOffersList(client, {
     sort,
     page: listPage,
     pageSize: LIST_PAGE_SIZE,
+    statut,
     ...filtres,
   });
   const [countsState] = useWorkModeCounts(client);
+  const [robotsState] = useRobotStatus(client);
 
+  function changerOnglet(suivant: OngletId) {
+    setOnglet(suivant);
+    setListPage(1);
+  }
   function changerFiltres(suivant: FilterState) {
     setFiltres(suivant);
     setListPage(1);
@@ -145,25 +192,102 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
     setListPage(1);
   }
 
+  const filtresActifs =
+    filtres.workMode !== undefined ||
+    filtres.engagement !== undefined ||
+    filtres.source !== undefined ||
+    filtres.agenticAi !== undefined;
+
+  const comptesStatut = comptesStatutState.statut === 'succes' ? comptesStatutState.donnees : null;
+  // `null`, jamais `0`, tant que `GET /statut-counts` n'a pas répondu (ou a
+  // échoué) — confondre les deux affirmerait « 10 dans cet onglet, sur 0
+  // jugées » alors que dix lignes sont à l'écran (revue finale, I1).
+  const totalCorpus = comptesStatut === null ? null : comptePourOnglet('toutes', comptesStatut);
+
   const listeOffres = listState.statut === 'succes' ? listState.donnees.rows : [];
   const listeTotal = listState.statut === 'succes' ? listState.donnees.total : 0;
 
   return (
     <div className={styles.ecran}>
       <header className={styles.barre}>
-        <span className={styles.nom}>{t('app.nom')}</span>
-        <span className={styles.tagline}>{t('app.tagline')}</span>
+        <div className={styles.marque}>
+          <span className={styles.nom}>{t('app.nom')}</span>
+          <span className={styles.tagline}>{t('app.tagline')}</span>
+        </div>
         <div className={styles.spacer} />
+        <RobotStatusBand etat={robotsState.statut === 'succes' ? robotsState.donnees : null} />
         {onImporterCv === undefined ? null : (
           <button type="button" className={styles.suiviBouton} onClick={onImporterCv}>
-            {t('profil.importerCv')}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+            </svg>
+            {t('app.monCv')}
           </button>
         )}
         {onVoirSuivi === undefined ? null : (
           <button type="button" className={styles.suiviBouton} onClick={onVoirSuivi}>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M9 4v16" />
+              <path d="M15 4v16" />
+            </svg>
             {t('suivi.titre')}
           </button>
         )}
+        {/* Bouton de réglages (`Main.dc.html`, après « Mon CV ») : DESSINÉ
+         * mais DÉSACTIVÉ — l'écran de préférences n'existe pas encore
+         * (GUIDELINES §5.2). Un bouton désactivé n'annonce aucun fait
+         * (§3.3) : il se voit, se compte, et se rebranche en une ligne. */}
+        <button
+          type="button"
+          className={styles.reglagesBouton}
+          disabled
+          title={t('app.reglagesIndisponible')}
+          aria-label={t('app.reglages')}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 21v-7" />
+            <path d="M4 10V3" />
+            <path d="M12 21v-9" />
+            <path d="M12 8V3" />
+            <path d="M20 21v-5" />
+            <path d="M20 12V3" />
+            <path d="M1 14h6" />
+            <path d="M9 8h6" />
+            <path d="M17 16h6" />
+          </svg>
+        </button>
       </header>
 
       {erreurDecision ? (
@@ -188,6 +312,8 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
         erreur={briefState.statut === 'erreur'}
         onReessayer={recargerBrief}
         salaireFloor={salaireFloor}
+        replie={replie}
+        onToggleRepli={basculerRepli}
       />
 
       <OfferList
@@ -214,6 +340,11 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
         erreur={listState.statut === 'erreur'}
         onReessayer={recargerListe}
         salaireFloor={salaireFloor}
+        onglet={onglet}
+        onOngletChange={changerOnglet}
+        comptesStatut={comptesStatut}
+        totalCorpus={totalCorpus}
+        filtresActifs={filtresActifs}
       />
     </div>
   );
