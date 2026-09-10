@@ -1685,17 +1685,50 @@ onglets :
 | g | Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas | `theme.css` — voir la cause ci-dessous |
 | h | Le couple de scores ne porte pas les couleurs de la maquette (`77`/`68` en ambre là où la maquette met encre et gris) | `Score` / `OfferCard` |
 | i | Le badge « Texte coupé à 500 car. » paraît plein là où la maquette le veut **discontinu** | `OfferCard` |
-| j | **La légende `MODE DE TRAVAIL` chevauche la ligne « Full remote »** dans le panneau de filtres | `FilterPanel.module.css` |
-| k | Le responsive n'a jamais été éprouvé à plusieurs largeurs ni à plusieurs hauteurs | tout l'écran |
+| ~~j~~ | ~~La légende `MODE DE TRAVAIL` chevauche « Full remote »~~ — **retiré, ce n'était pas un défaut du panneau** | — |
+| k | **L'écran casse en dessous de ~1 024 px de large** | plusieurs composants, voir ci-dessous |
 
-**Cause de (j)**, trouvée en lisant le CSS : `.fieldset` remet `border` et
-`padding` à zéro, et `.titreSection` — qui est un `<legend>` — porte un
-`margin-bottom`. Or un `<legend>` n'est pas un bloc ordinaire : il est ancré
-sur le bord supérieur du `fieldset`, ses marges verticales sont ignorées, et
-avec un `padding` nul le premier enfant démarre à la même ordonnée que lui.
-D'où le chevauchement. Le remède connu est de rendre la légende bloc pour de
-bon (`float: left; width: 100%`, puis dégagement) plutôt que de bricoler un
-`padding-top` qui dépendrait de la hauteur du texte.
+**(j) est une erreur de ma part, et elle mérite d'être écrite plutôt
+qu'effacée.** J'avais diagnostiqué un chevauchement de `<legend>` **en lisant
+le CSS**, sans mesurer : un `<legend>` est ancré sur le bord du `fieldset`, ses
+marges verticales sont ignorées, donc l'explication était plausible. Mesurée au
+navigateur après le correctif de la coque, elle est **fausse** : l'écart entre
+le bas de chaque légende et le haut de sa première ligne vaut **8 px** sur les
+trois `fieldset`, à toutes les largeurs éprouvées.
+
+Ce que le propriétaire avait vu était un **symptôme de la coque à hauteur
+nulle** : `.panneau` était un enfant flex d'un conteneur sans hauteur, donc sa
+boîte se peignait sur quelques pixels pendant que son contenu débordait
+dessous. La cause et le remède étaient ailleurs. **Leçon : un diagnostic de
+mise en page déduit du CSS n'est pas un diagnostic.** C'est exactement ce que
+§5.4 impose de mesurer à l'écran.
+
+**(k) mesuré le 2026-09-10**, cinq gabarits, `GET`/`Playwright`, écran réel :
+
+| Largeur × hauteur | Verdict |
+|---|---|
+| 1 920 × 1 080 | correct |
+| 1 440 × 700 | correct — la page défile, rien n'est coupé |
+| 1 366 × 768 | correct |
+| 1 024 × 768 | correct |
+| 820 × 1 180 | **cassé** |
+
+Aucun débordement horizontal du document à aucune largeur, aucun
+chevauchement de légende, et la page défile partout où elle le doit. Ce qui
+casse à 820 px, précisément :
+
+- **le titre de la liste est écrasé à quelques caractères** (« Dév… », « Seni… »)
+  parce que les badges de faits sont `flex: none` et ne cèdent jamais : toute
+  la perte de largeur est absorbée par la seule colonne qui porte l'information
+  principale ;
+- **les badges de confiance des trois cartes sont rognés** au bord droit ;
+- **la barre d'onglets déborde** : « Toutes » est coupé ;
+- **une ligne se chevauche** — l'employeur et le badge de rémunération se
+  superposent.
+
+Rien de tout cela n'existe à 1 024 px. Le seuil de rupture est donc entre les
+deux, et **aucune requête média n'est déclarée nulle part dans `dashboard/`** :
+l'écran n'a jamais été pensé sous la largeur d'un portable.
 
 **Deux causes déjà trouvées dans le code**, et la première explique bien plus
 que la ligne qu'elle occupe :
