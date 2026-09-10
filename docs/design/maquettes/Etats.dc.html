@@ -50,7 +50,7 @@
   </style>
 </helmet>
 
-<div style="width: 1280px; height: 1180px; background: var(--bg); overflow: hidden; padding: 24px 26px">
+<div style="width: 1280px; min-height: 1660px; background: var(--bg); padding: 24px 26px">
 
   <div style="margin-bottom: 18px">
     <h1 style="font-size: 22px">Les etats qui decident</h1>
@@ -266,6 +266,91 @@
         <strong style="color: var(--muted)">Ma recommandation&nbsp;: ce panneau existe, mais pas sur l&rsquo;ecran du matin.</strong> Regler un poids est une action rare a effet global&nbsp;; la mettre a cote de la liste inviterait a bricoler le classement au lieu de decider sur les offres. Elle vit derriere l&rsquo;icone de reglages, avec cette previsualisation avant application.
       </p>
     </div>
+
+    <!-- ===== L'ETAT DES DEUX ROBOTS ===== -->
+    <div class="sect" style="grid-column: span 2">
+      <div class="sectT">L&rsquo;etat des deux robots, quatre cas &mdash; ajoute le 2026-09-10</div>
+
+      <p style="margin: 0 0 14px; font-size: 11.5px; color: var(--muted); line-height: 1.55">
+        La bande compacte de la barre d&rsquo;application. <strong style="color: var(--text); font-weight: 600">Main.dc.html ne dessinait que le premier cas</strong>, et c&rsquo;est le seul qu&rsquo;on ne voit pas en ouvrant l&rsquo;ecran a 7 h du matin. Les heures sont celles de <strong style="color: var(--text); font-weight: 600">Paris</strong> &mdash; les crons partent a 6 h et 6 h 30 <span class="num">UTC</span>, soit <span class="num">8 h</span> et <span class="num">8 h 30</span> ici, et le jugement a <span class="num">9 h</span>.
+      </p>
+
+      <!-- 1. Tout a tourne -->
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 9px">
+        <span class="num" style="width: 118px; flex: none; font-size: 10.5px; color: var(--faint)">1 &mdash; nominal</span>
+        <div style="display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--muted); padding: 7px 12px; border-radius: 9px; border: 1px solid var(--border)">
+          <span style="display: inline-flex; align-items: center; gap: 6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4fd1a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-label="reussie"><path d="M20 6 9 17l-5-5"/></svg>
+            Collecte <span class="num" style="color: var(--text)">8 h 30</span>
+          </span>
+          <span style="width: 1px; height: 14px; background: var(--border2)"></span>
+          <span style="display: inline-flex; align-items: center; gap: 6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4fd1a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-label="reussie"><path d="M20 6 9 17l-5-5"/></svg>
+            Jugement <span class="num" style="color: var(--text)">9 h 00</span>
+            <span style="color: var(--faint)">&middot;</span>
+            <span class="num" style="color: var(--text)">78</span> jugees
+          </span>
+        </div>
+      </div>
+
+      <!-- 2. Partielle -->
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 9px">
+        <span class="num" style="width: 118px; flex: none; font-size: 10.5px; color: var(--faint)">2 &mdash; partielle</span>
+        <div style="display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--muted); padding: 7px 12px; border-radius: 9px; border: 1px solid rgba(240,180,92,0.3); background: rgba(240,180,92,0.06)">
+          <span style="display: inline-flex; align-items: center; gap: 6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f0b45c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="partielle"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+            <span style="color: #f5cd92; font-weight: 600">Collecte <span class="num">8 h 30</span> partielle</span>
+            <span style="color: var(--faint)">&middot;</span>
+            <span class="num" style="color: var(--text)">1</span> source sur <span class="num" style="color: var(--text)">4</span> incomplete
+          </span>
+          <span style="width: 1px; height: 14px; background: var(--border2)"></span>
+          <span style="display: inline-flex; align-items: center; gap: 6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4fd1a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-label="reussie"><path d="M20 6 9 17l-5-5"/></svg>
+            Jugement <span class="num" style="color: var(--text)">9 h 00</span>
+            <span style="color: var(--faint)">&middot;</span>
+            <span class="num" style="color: var(--text)">78</span> jugees
+          </span>
+        </div>
+      </div>
+
+      <!-- 3. En echec -->
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 9px">
+        <span class="num" style="width: 118px; flex: none; font-size: 10.5px; color: var(--faint)">3 &mdash; en echec</span>
+        <div style="display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--muted); padding: 7px 12px; border-radius: 9px; border: 1px solid rgba(255,122,133,0.3); background: rgba(255,122,133,0.07)">
+          <span style="display: inline-flex; align-items: center; gap: 6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ff7a85" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="en echec"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/></svg>
+            <span style="color: #ffa8b0; font-weight: 600">Collecte <span class="num">8 h 30</span> en echec</span>
+            <span style="color: var(--faint)">&middot;</span>
+            derniere reussite hier <span class="num">8 h 30</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 4. Pas encore -->
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span class="num" style="width: 118px; flex: none; font-size: 10.5px; color: var(--faint)">4 &mdash; pas encore</span>
+        <div style="display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--muted); padding: 7px 12px; border-radius: 9px; border: 1px dashed var(--border2)">
+          <span style="display: inline-flex; align-items: center; gap: 6px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6b7488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="pas encore"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Collecte&nbsp;: <span style="color: var(--faint)">pas encore aujourd&rsquo;hui</span>
+            <span style="color: var(--faint)">&middot;</span>
+            derniere <span class="num" style="color: var(--text)">hier 8 h 30</span>
+          </span>
+          <span style="width: 1px; height: 14px; background: var(--border2)"></span>
+          <span style="display: inline-flex; align-items: center; gap: 6px">
+            Jugement&nbsp;: <span style="color: var(--faint)">pas encore aujourd&rsquo;hui</span>
+          </span>
+        </div>
+      </div>
+
+      <p class="note">
+        <strong style="color: var(--muted)">Le cas 4 est le plus frequent, et il n&rsquo;etait pas dessine.</strong> Mesure le 2026-09-10 a l&rsquo;aube&nbsp;: les dernieres collectes datent de la veille et <span class="num">0</span> offre a ete jugee aujourd&rsquo;hui. Afficher &laquo;&nbsp;<span class="num">8 h 30</span>&nbsp;&raquo; en lisant la ligne d&rsquo;hier dirait que le robot a tourne ce matin &mdash; c&rsquo;est exactement l&rsquo;affirmation que le §3.3 interdit. D&rsquo;ou le trait discontinu, la date explicite, et l&rsquo;absence de coche verte.
+      </p>
+      <p class="note">
+        <strong style="color: var(--muted)">Le cas 2 non plus, et il existe en base&nbsp;:</strong> <span class="num">collection_runs.status</span> vaut <span class="num">partial</span> sur France Travail depuis deux jours. Un &laquo;&nbsp;partiel&nbsp;&raquo; rendu comme un succes cacherait une source qui decroche. La bande dit combien de sources sur quatre sont incompletes&nbsp;; le detail par source vit dans le bandeau de &laquo;&nbsp;La collecte n&rsquo;a pas tourne&nbsp;&raquo; ci-dessus, pas dans la barre.
+      </p>
+    </div>
+
   </div>
 </div>
 </x-dc>
