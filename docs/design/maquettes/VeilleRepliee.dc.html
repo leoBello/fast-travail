@@ -1,0 +1,382 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+  <style>
+    :root {
+      --bg: #0b0d12; --surface: #14171f; --surface2: #1a1e28; --surface3: #232936;
+      --border: #252b38; --border2: #333c4e;
+      --text: #e4e8f0; --muted: #98a1b4; --faint: #6b7488;
+      --accent: #6d92ff; --mint: #4fd1a5; --amber: #f0b45c; --rose: #ff7a85; --violet: #a78bfa;
+      --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+      --ui: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ui); font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: #8fabff; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 600; letter-spacing: -0.02em; }
+    button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+    .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sectT { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; flex: none; }
+    .badge.sm { height: 19px; padding: 0 7px; font-size: 10px; }
+    .b-mute { color: var(--muted); background: rgba(152,161,180,0.10); border-color: var(--border2); }
+    .b-accent { color: #a9c2ff; background: rgba(109,146,255,0.13); border-color: rgba(109,146,255,0.28); }
+    .b-mint { color: #86e3c1; background: rgba(79,209,165,0.13); border-color: rgba(79,209,165,0.28); }
+    .b-amber { color: #f5cd92; background: rgba(240,180,92,0.13); border-color: rgba(240,180,92,0.28); }
+    .b-violet { color: #c4b5fd; background: rgba(167,139,250,0.13); border-color: rgba(167,139,250,0.30); }
+    .b-rose { color: #ffa8b0; background: rgba(255,122,133,0.13); border-color: rgba(255,122,133,0.28); }
+    .b-dash { background: transparent; border-style: dashed; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--border2); font-size: 12.5px; font-weight: 500; }
+    .btn-p { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+    .chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-size: 10.5px; font-family: var(--mono); border: 1px solid var(--border2); color: var(--muted); white-space: nowrap; }
+    .chip-pos { color: #86e3c1; border-color: rgba(79,209,165,0.28); background: rgba(79,209,165,0.08); }
+    .chip-nil { color: var(--faint); border-style: dashed; }
+    .row { display: grid; grid-template-columns: 52px 40px minmax(0, 1fr) 190px 122px 58px; align-items: center; gap: 14px; height: 46px; padding: 0 14px; border-radius: 10px; }
+    .rowSep { height: 1px; background: var(--border); }
+    .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .absent { color: var(--faint); font-size: 12px; font-style: italic; }
+
+    /* --- Ajouts de cette maquette : la barre d'onglets et la pagination --- */
+    .tabs { display: flex; align-items: stretch; gap: 2px; height: 34px; border-bottom: 1px solid var(--border); }
+    .tab { display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; border-radius: 8px 8px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 12.5px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+    .tab .pt { width: 5px; height: 5px; border-radius: 999px; flex: none; }
+    .tab .ring { width: 5px; height: 5px; border-radius: 999px; border: 1px dashed currentColor; flex: none; }
+    .tab .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--faint); }
+    .tab-on { color: var(--text); font-weight: 600; background: var(--surface2); border-bottom-color: var(--accent); }
+    .tab-on .n { color: var(--text); }
+    .tab-zero .n { color: var(--faint); }
+    .pgBtn { display: inline-flex; align-items: center; justify-content: center; min-width: 27px; height: 27px; padding: 0 7px; border-radius: 7px; border: 1px solid transparent; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    .pgBtn-on { color: var(--text); background: var(--surface3); border-color: var(--border2); font-weight: 700; }
+    .pgBtn-nav { border-color: var(--border2); padding: 0 9px; font-family: var(--ui); font-size: 12px; gap: 5px; }
+    .pgBtn-off { color: var(--faint); border-color: var(--border); }
+  </style>
+</helmet>
+<div style="width: 1440px; min-height: 800px; background: var(--bg); display: flex; flex-direction: column">
+
+  <!-- barre d'application -->
+  <div style="height: 56px; flex: none; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 20px; padding: 0 28px">
+    <div style="display: flex; align-items: baseline; gap: 9px">
+      <span style="font-family: var(--display); font-size: 15px; font-weight: 700; letter-spacing: -0.02em">SignFlow</span>
+      <span style="font-size: 11px; color: var(--faint)">veille</span>
+    </div>
+
+    <div style="flex-grow: 1"></div>
+
+    <div style="display: flex; align-items: center; gap: 14px; font-size: 11.5px; color: var(--muted)">
+      <span style="display: inline-flex; align-items: center; gap: 6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4fd1a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-label="reussie"><path d="M20 6 9 17l-5-5"/></svg>
+        Collecte <span class="num" style="color: var(--text)">6 h 30</span>
+      </span>
+      <span style="width: 1px; height: 14px; background: var(--border2)"></span>
+      <span style="display: inline-flex; align-items: center; gap: 6px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4fd1a5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-label="reussie"><path d="M20 6 9 17l-5-5"/></svg>
+        Jugement <span class="num" style="color: var(--text)">7 h 00</span>
+        <span style="color: var(--faint)">&middot;</span>
+        <span class="num" style="color: var(--text)">78</span> lues
+      </span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 8px">
+      <button class="btn" style="height: 32px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M15 4v16"/></svg>
+        Mes candidatures
+      </button>
+      <button class="btn" style="height: 32px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+        Mon CV
+      </button>
+      <button class="btn" style="height: 32px; width: 32px; padding: 0" aria-label="Reglages des preferences">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ================= CE MATIN, REPLIEE ================= -->
+  <!-- Repliee, la bande garde ses chiffres et rend sa hauteur a la liste :
+       15 lignes au lieu de 8, sans que rien ne disparaisse. -->
+  <div style="flex: none; height: 52px; padding: 0 28px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border)">
+    <h2 style="font-size: 15px">Ce matin</h2>
+    <span style="font-size: 12px; color: var(--muted)"><span class="num" style="color: var(--text); font-weight: 600">6</span> offres au-dessus de 50 sans décision</span>
+    <span style="width: 1px; height: 16px; background: var(--border2)"></span>
+    <span style="font-size: 11.5px; color: var(--muted)"><span class="num" style="color: var(--text); font-weight: 600">4</span> décidées</span>
+    <div style="display: flex; gap: 3px" role="img" aria-label="4 offres decidees sur 10 aujourd hui">
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--mint)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--mint)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--mint)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--mint)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+      <span style="width: 14px; height: 5px; border-radius: 999px; background: var(--surface3)"></span>
+    </div>
+    <span style="width: 1px; height: 16px; background: var(--border2)"></span>
+    <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f0b45c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="serie en cours"><path d="M12 2c1.5 4 5 5.5 5 9.5a5 5 0 0 1-10 0C7 8.5 9 7 9.5 5.5 10.5 7 11 8 12 8c0-2-1-4 0-6z"/></svg>
+      <span class="num" style="color: var(--text); font-weight: 600">3</span> jours de suite
+    </span>
+
+    <div style="flex-grow: 1"></div>
+
+    <button class="btn" style="height: 28px; font-size: 12px" aria-expanded="false" aria-controls="ce-matin-cartes">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      Déplier les 6 cartes
+    </button>
+  </div>
+
+  <!-- ================= TOUTE LA VEILLE, ONGLET "TOUTES" ================= -->
+  <div style="background: #090b0f; padding: 13px 28px 16px; display: flex; flex-direction: column">
+
+    <div class="tabs" role="tablist" aria-label="Statut de candidature" style="flex: none">
+      <button class="tab" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--muted)"></span>
+        À traiter <span class="n">1 258</span>
+      </button>
+      <button class="tab tab-zero" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--accent)"></span>
+        Retenues <span class="n">0</span>
+      </button>
+      <button class="tab" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--violet)"></span>
+        Postulées <span class="n">6</span>
+      </button>
+      <button class="tab" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--amber)"></span>
+        Relancées <span class="n">1</span>
+      </button>
+      <button class="tab tab-zero" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--mint)"></span>
+        Entretien <span class="n">0</span>
+      </button>
+      <button class="tab tab-zero" role="tab" aria-selected="false">
+        <span class="pt" style="background: var(--muted)"></span>
+        Terminées <span class="n">0</span>
+      </button>
+      <button class="tab" role="tab" aria-selected="false" style="color: #ffa8b0">
+        <span class="ring"></span>
+        Écartées <span class="n">7</span>
+      </button>
+      <span style="width: 1px; height: 18px; background: var(--border2); align-self: center; margin: 0 6px"></span>
+      <button class="tab tab-on" role="tab" aria-selected="true">
+        Toutes <span class="n">1 272</span>
+      </button>
+
+      <div style="flex-grow: 1"></div>
+
+      <div style="display: flex; align-items: center; gap: 7px; align-self: center; padding-bottom: 4px">
+        <button class="btn" style="height: 26px; font-size: 12px">
+          Tri&nbsp;: rang
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <button class="btn" style="height: 26px; font-size: 12px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+          Filtres
+        </button>
+      </div>
+    </div>
+
+    <!-- "rien de masque" ne se dit que sur l'onglet qui ne masque rien -->
+    <div style="flex: none; display: flex; align-items: center; gap: 12px; height: 24px; margin: 10px 0">
+      <span class="sectT">Toute la veille</span>
+      <span style="font-size: 11.5px; color: var(--muted)"><span class="num" style="color: var(--text)">1 272</span> offres jugées, rien de masqué</span>
+      <span class="badge sm b-amber b-dash">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        23 jamais ouvertes au-dessus de 50
+      </span>
+    </div>
+
+    <!-- sur "Toutes", la colonne Lieu cede la place au Statut : sans elle,
+         l'onglet melangerait quatorze decisions a mille lignes sans le dire -->
+    <div class="row" style="height: 22px; flex: none">
+      <span class="sectT" style="text-align: right">Rang</span>
+      <span class="sectT" style="text-align: right">Corr.</span>
+      <span class="sectT">Intitulé</span>
+      <span class="sectT">Employeur</span>
+      <span class="sectT">Statut</span>
+      <span class="sectT" style="text-align: right">Publiée</span>
+    </div>
+    <div class="rowSep" style="flex: none"></div>
+
+    <div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">100</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">88</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Développeur Front-End React Senior H/F (CDI)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">MICHAEL PAGE</span>
+        <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">4 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">100</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">72</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Software Engineer &mdash; First Engineering Hire</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+          <span class="badge sm b-violet" style="flex: none">IA</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">Revalue</span>
+        <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">0 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">100</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">90</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Senior Fullstack Engineer (Future Bras Droit CTO)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mint" style="flex: none">Freelance</span>
+          <span class="badge sm b-violet" style="flex: none">IA</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">Katchme</span>
+        <span><span class="badge sm b-amber"><span class="dot"></span>Relancée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">15 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">93.5</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">68</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Développeur Full Stack (H/F)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+          <span class="badge sm b-violet" style="flex: none">IA</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">Agence intuition</span>
+        <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">10 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">88</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">90</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Développeur Front-end React / TypeScript (H/F)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+        </div>
+        <span class="absent">non publié</span>
+        <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">32 j</span>
+      </div>
+
+      <div class="row" style="background: var(--surface2)">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">86.5</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">58</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Developpeur React/Node/NestJS &mdash; Anglais courant obligatoire</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mint" style="flex: none">450 &euro;/j</span>
+          <span class="badge sm b-mute b-dash" style="flex: none">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M4 16V5a1 1 0 0 1 1-1h11"/></svg>
+            2 sources
+          </span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">ALLEGIS GROUP</span>
+        <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">5 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">81</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">72</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Senior Full-Stack Developer &ndash; React / TypeScript / Node.js &ndash; GxP (IT)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">ematiss</span>
+        <span><span class="badge sm b-rose b-dash">Écartée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">0 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">81</span>
+        <span class="num" style="font-size: 12.5px; color: var(--amber); text-align: right">52</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Head of tech hands-on full remote</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">Bluecoders</span>
+        <span><span class="badge sm b-rose b-dash">Écartée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">0 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">79</span>
+        <span class="num" style="font-size: 12.5px; color: var(--amber); text-align: right">42</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Développeur Front-end Expert Accessibilité (H/F)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mint" style="flex: none">Freelance</span>
+          <span class="badge sm b-violet" style="flex: none">IA</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">Clostera</span>
+        <span><span class="badge sm b-violet"><span class="dot"></span>Postulée</span></span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">2 j</span>
+      </div>
+
+      <div class="row">
+        <span class="num" style="font-size: 15px; font-weight: 700; text-align: right">77</span>
+        <span class="num" style="font-size: 12.5px; color: var(--muted); text-align: right">68</span>
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0">
+          <span class="trunc" style="font-weight: 500">Développeur Front-End / UX Engineer (F/H)</span>
+          <span class="badge sm b-accent" style="flex: none">Full remote</span>
+          <span class="badge sm b-mute" style="flex: none">CDI</span>
+          <span class="badge sm b-violet" style="flex: none">IA</span>
+        </div>
+        <span class="trunc" style="color: var(--muted)">Konecta</span>
+        <span class="absent">sans décision</span>
+        <span class="num" style="color: var(--muted); font-size: 12px; text-align: right">25 j</span>
+      </div>
+    </div>
+
+    <div style="flex: none; display: flex; align-items: center; gap: 10px; height: 44px; border-top: 1px solid var(--border)">
+      <span style="font-size: 11.5px; color: var(--faint)"><span class="num">1</span>&ndash;<span class="num">10</span> sur <span class="num">1 272</span></span>
+      <span class="badge sm b-mute b-dash">10 par page</span>
+
+      <div style="flex-grow: 1"></div>
+
+      <div style="display: flex; align-items: center; gap: 4px">
+        <button class="pgBtn pgBtn-nav pgBtn-off" disabled aria-label="Page précédente">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          Précédentes
+        </button>
+        <button class="pgBtn pgBtn-on" aria-current="page">1</button>
+        <button class="pgBtn">2</button>
+        <button class="pgBtn">3</button>
+        <button class="pgBtn">4</button>
+        <span class="pgBtn" style="color: var(--faint)">&hellip;</span>
+        <button class="pgBtn">128</button>
+        <button class="pgBtn pgBtn-nav" aria-label="Page suivante">
+          Suivantes
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

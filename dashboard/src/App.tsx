@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { DashboardClient } from './data/client';
 import { dashboardClientFromEnv } from './data/client';
 import { t } from './i18n/i18n';
@@ -63,7 +63,17 @@ function construireClient():
  * l'ordre d'écriture ici.
  */
 export function App() {
-  const { client, erreur } = construireClient();
+  // `useMemo` avec un tableau de dépendances VIDE, et ce n'est pas une
+  // micro-optimisation : `client` est la dépendance de TOUS les `useCallback`
+  // de `screens/*/hooks.ts`, donc de tous les effets d'`useAsync`. Reconstruit
+  // à chaque rendu, il changeait d'identité à chaque `setState` de ce
+  // composant — ouvrir ou fermer un overlay relançait donc l'INTÉGRALITÉ des
+  // appels réseau de tous les écrans montés, écran du matin compris alors
+  // qu'il est caché sous l'overlay. Mesuré au navigateur avant correctif :
+  // 16 requêtes au chargement, 18 à l'ouverture du suivi, 8 au simple retour,
+  // jusqu'à 16 s pour la plus lente sous cette contention. Voir le rapport de
+  // la passe de performance.
+  const { client, erreur } = useMemo(() => construireClient(), []);
   const [offreOuverte, setOffreOuverte] = useState<string | null>(null);
   const [suiviOuvert, setSuiviOuvert] = useState(false);
   const [profilOuvert, setProfilOuvert] = useState(false);

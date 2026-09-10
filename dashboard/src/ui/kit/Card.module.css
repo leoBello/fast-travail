@@ -81,3 +81,7 @@
   margin: 0;
   line-height: 1.55;
 }
+
+.videAction {
+  margin-top: var(--space-3);
+}

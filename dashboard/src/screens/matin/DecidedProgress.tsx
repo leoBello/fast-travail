@@ -23,6 +23,10 @@ interface Props {
    * façon à fausser un ratio). La légende elle-même attend donc `chargement`
    * — jamais un « 0 décidée » qui pourrait être faux le temps d'une réponse. */
   chargement?: boolean;
+  /** Resserre les segments (14px au lieu de 20px) pour la bande « Ce matin »
+   * REPLIÉE (`VeilleRepliee.dc.html`) — même jauge, même logique, une
+   * largeur plus étroite pour tenir sur la ligne unique du repli. */
+  compact?: boolean;
 }
 
 /**
@@ -39,7 +43,7 @@ interface Props {
  * comme `total`, donc les deux attendent la même confirmation avant de
  * s'afficher.
  */
-export function DecidedProgress({ decidees, total, chargement = false }: Props) {
+export function DecidedProgress({ decidees, total, chargement = false, compact = false }: Props) {
   const rempli =
     !chargement && total > 0
       ? Math.min(SEGMENTS, Math.max(0, Math.round((decidees / total) * SEGMENTS)))
@@ -59,7 +63,9 @@ export function DecidedProgress({ decidees, total, chargement = false }: Props) 
         {Array.from({ length: SEGMENTS }, (_, i) => (
           <span
             key={i}
-            className={i < rempli ? styles.segmentRempli : styles.segmentVide}
+            className={`${i < rempli ? styles.segmentRempli : styles.segmentVide}${
+              compact ? ` ${styles.segmentCompact}` : ''
+            }`}
             data-rempli={i < rempli}
           />
         ))}

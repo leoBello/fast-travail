@@ -15,6 +15,7 @@ React / TypeScript, zone Marseille / Aix-en-Provence et full-remote national.
 | [`docs/design/GUIDELINES.md`](docs/design/GUIDELINES.md) | **Règles de conception de l'interface — contraignantes.** À lire avant d'écrire un composant |
 | [`docs/design/maquettes/README.md`](docs/design/maquettes/README.md) | Les maquettes de la phase 3, et ce que leurs données valent |
 | [`docs/superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](docs/superpowers/plans/2026-09-09-tableau-de-bord-phase3.md) | Plan de la phase 3, tâche par tâche |
+| [`docs/superpowers/plans/2026-09-09-veille-par-onglets.md`](docs/superpowers/plans/2026-09-09-veille-par-onglets.md) | Plan de la veille par onglets : onglets par statut, dix lignes par page |
 
 **Tenir `ETAT.md` à jour** fait partie du travail : chaque tâche terminée, chaque
 problème découvert et chaque décision prise y sont consignés. C'est le document
@@ -191,6 +192,35 @@ parallélisme.
 
   ```bash
   npx supabase db query --linked "select c.relname, coalesce(array_to_string(c.reloptions,','),'(aucune)') as options from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='v' order by 1"
+  ```
+
+  **La migration `20260910020000` n'avait couvert que les quatre vues du
+  tableau de bord** ; les sept autres sont restées ouvertes jusqu'au
+  2026-09-09, où la même sonde les a trouvées en passe de performance. Ce que
+  la clé `anon` rendait alors, mesuré par PostgREST avec
+  `Prefer: count=exact` — des lignes réellement servies sur Internet, pas une
+  lecture de catalogue :
+
+  | Vue | Lignes rendues à `anon`, avant `20260910040000` |
+  |---|---:|
+  | `offers_ranked` | 4 511 |
+  | `offer_dedup_keys` | 4 341 |
+  | `offer_duplicate_groups` | 4 341 |
+  | `offer_lexical_score` | 3 367 |
+  | `offers_ai_candidates` | 1 392 |
+  | `offers_hidden_duplicates` | 233 |
+  | `offers_shortlist` | 103 |
+
+  Refermé par `20260910040000` : les onze vues rendent désormais **0**. La
+  leçon vaut plus que le correctif — I1 avait cherché le trou *là où le
+  tableau de bord regardait*, pas là où il était. **Une vue nouvelle porte
+  `security_invoker = on` dès sa création**, jamais ajouté après coup.
+
+  La sonde qui répond directement, plutôt que la liste ci-dessus à relire à
+  l'œil (elle doit rendre zéro ligne) :
+
+  ```bash
+  npx supabase db query --linked "select c.relname, has_table_privilege('anon', c.oid, 'select') as anon_peut_lire from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='v' and coalesce(array_to_string(c.reloptions,','),'') not like '%security_invoker=on%' order by 1"
   ```
 - **Pour interroger ou modifier la base distante, utiliser
   `npx supabase db query --linked "<SQL>"`.** C'est le chemin direct : il
@@ -530,6 +560,33 @@ servie **qu'en local** : quiconque a le poste peut déjà lire `dashboard/.env`.
 le secret partagé se retrouverait alors dans un bundle JavaScript public,
 lisible par quiconque ouvre les outils de développement du navigateur.
 
+**« Toute la veille » porte une barre d'onglets par statut de candidature**
+(2026-09-10). Trois choses à savoir avant d'y toucher :
+
+- **« Rien de masqué » ne se dit QUE sur l'onglet « Toutes ».** Un onglet qui
+  filtre pendant qu'une phrase affirme le contraire est un mensonge à l'écran.
+  Les autres onglets écrivent « N dans cet onglet, sur M jugées », et
+  « N sur M dans cet onglet — filtres actifs » quand un filtre est posé.
+- **Les comptes d'onglets viennent d'une vue de comptage**
+  (`offers_dashboard_status_counts`, migration `20260910060000`, ~60 ms),
+  servie par `GET /statut-counts`. **Jamais sept `GET /offers?statut=…&pageSize=1`** :
+  le coût d'une lecture d'`offers_dashboard` ne dépend pas de `pageSize`, donc
+  ce serait sept balayages du corpus pour sept nombres.
+- **L'onglet « À traiter » porte DEUX valeurs de statut**, `aucune` et
+  `a_traiter`, composées en `OU`. Une offre jamais ouverte n'a aucune ligne
+  `offer_applications` (donc `candidature_statut` nul) ; une offre dont le
+  détail a été ouvert sans décision porte `a_traiter`. Et **`in` ne matche
+  jamais `null`** : sans ce `OU`, l'onglet par défaut rendrait zéro ligne sur
+  1 258, sans la moindre erreur.
+
+**La liste montre dix lignes par page, et la page défile.** La taille a
+d'abord été *mesurée* sur la hauteur disponible ; essayée sur un portable, la
+mesure rendait zéro — la coque `height: 100%` ne résolvait sur aucune hauteur —
+et la liste n'affichait **aucune** ligne alors que huit étaient chargées.
+Aucun test ne l'a vu, `jsdom` ne calculant pas de mise en page. **L'écran est
+conçu pour 1 024 px de large au minimum** ; en dessous il casse, et c'est
+assumé (P25 dans `ETAT.md`).
+
 **Redéployer après toute modification de `supabase/functions/api-dashboard/`
 ou de `_shared/dashboard-*.ts`** : la SPA appelle une fonction déployée, pas
 le code local. Un oubli de redéploiement est silencieux — aucun test ne le
@@ -551,23 +608,81 @@ groupe (`heritee = true` sur les autres membres) — c'est cette dernière vue,
 jamais `offer_applications` seule, qu'il faut lire pour savoir ce qu'affiche
 le tableau de bord sur une offre republiée par plusieurs sources.
 
-**Mesures (2026-09-09, en base à 4 511 offres / 1 339 jugées, bundle en
-production)** :
+**Mesures (2026-09-09, en base à 4 511 offres / 1 387 jugées, bundle en
+production)**. La colonne « avant » est l'état de la tâche 11, la colonne
+« après » celui de la passe de performance du même jour — migration
+`20260910030000` et mémoïsation du client :
 
-| Mesure | Valeur |
-|---|---:|
-| `offer_display_groups` (`explain analyze`, hors premier appel à froid) | ~76 ms |
-| `offer_application_state`, table vide | ~0,3 ms |
-| `offer_application_state`, avec une ligne réelle | ~87 ms |
-| `offers_dashboard` (`order by final_score desc limit 20`) | ~104-127 ms |
-| Bundle de production (`dashboard/dist`, JS + CSS, non gzippé) | 452 KiB (421 KiB JS, 35 KiB CSS) |
-| Bundle gzippé | 142 kB (136 kB JS, 6 kB CSS) |
-| Premier affichage (`first-paint`), 3 navigations à froid, Chromium headless | 120 à 184 ms |
-| Premier contenu peint (`first-contentful-paint`) | 168 à 236 ms |
+| Mesure | Avant | Après |
+|---|---:|---:|
+| `offer_display_groups` (`explain analyze`, hors premier appel à froid) | ~76 ms | **~4,3 ms** |
+| `offer_application_state`, table vide | ~0,3 ms | ~0,3 ms |
+| `offer_application_state`, avec des lignes réelles | ~87 ms | **~0,56 ms** |
+| `offers_dashboard` (`order by final_score desc limit 20`) | ~104-127 ms | **~74 ms** |
+| `offers_dashboard`, `count(*)` filtré sur `candidature_statut` | ~175 ms | **~59 ms** |
+| `GET /stats` de bout en bout (séquentiel, fonction chaude) | ~5,9 s | **~0,80 s** |
+| `GET /offers` de bout en bout (séquentiel, fonction chaude) | ~1,9 s | **~0,40 s** |
+| Requêtes au chargement du tableau de bord (navigateur, dev) | 16 | **5** |
+| Requêtes à l'ouverture du suivi | 18 | **5** |
+| Requêtes au retour à la veille | 8 | **0** |
+| La plus lente de ces requêtes, sous contention | ~16 s | **~1,5 s** |
+| Bundle de production (`dashboard/dist`, JS + CSS, non gzippé) | 452 KiB (421 KiB JS, 35 KiB CSS) | inchangé |
+| Bundle gzippé | 142 kB (136 kB JS, 6 kB CSS) | inchangé |
+| Premier affichage (`first-paint`), 3 navigations à froid, Chromium headless | 120 à 184 ms | inchangé |
+| Premier contenu peint (`first-contentful-paint`) | 168 à 236 ms | inchangé |
 
 Le premier appel à une vue après une connexion neuve (`db query --linked`) paie
-un coût de démarrage à froid isolé (~630 ms mesuré une fois) : toujours
-mesurer sur au moins trois appels et retenir les suivants, comme documenté
-plus haut pour `offer_display_groups`. Détail complet, sorties brutes de
-l'épreuve de bout en bout et méthode de mesure :
-`.superpowers/sdd/task-11-report.md`.
+un coût de démarrage à froid isolé (~630 ms mesuré une fois, ~222 ms remesuré
+en passe de performance) : toujours mesurer sur au moins trois appels et
+retenir les suivants, comme documenté plus haut pour `offer_display_groups`.
+Détail complet, sorties brutes de l'épreuve de bout en bout et méthode de
+mesure : `.superpowers/sdd/task-11-report.md`.
+
+**Le client d'API se construit UNE fois, et c'est structurel.** `App.tsx` le
+mémoïse (`useMemo(() => construireClient(), [])`) parce que `client` est la
+dépendance de tous les `useCallback` de `screens/*/hooks.ts`, donc de tous les
+effets d'`useAsync`. Reconstruit à chaque rendu, il changeait d'identité à
+chaque `setState` d'`App` — ouvrir ou fermer un overlay relançait
+l'**intégralité** des appels réseau de tous les écrans montés, l'écran du
+matin compris alors qu'il est caché dessous. Mesuré au navigateur : 16
+requêtes au chargement, 18 à l'ouverture du suivi, 8 au simple retour, et
+jusqu'à 16 s pour la plus lente sous cette contention ; après correctif 8, 5
+et **0**. Toute prop passée à un écran et consommée par un `useCallback` de
+hook tombe sous la même règle.
+
+**Le coût d'une lecture ne dépend pas de `pageSize`.** Ni le `distinct on` ni
+les fonctions de fenêtrage d'`offers_dashboard` ne laissent descendre un
+filtre : la vue est intégralement matérialisée avant que `candidature_statut`
+ou `work_mode` ne retienne quoi que ce soit (`Rows Removed by Filter: 1272`
+dans le plan). Un `pageSize=1` qui ne veut qu'un total coûte donc exactement
+ce que coûte la page complète.
+
+C'est ce qui rendait le panneau de filtres si cher : il chiffrait les quatre
+valeurs de `work_mode` par quatre `GET /offers?workMode=…&pageSize=1` dont
+seul le `total` était lu — quatre balayages du corpus pour quatre nombres, la
+moitié des requêtes du chargement. Le comptage se fait désormais en base
+(`offers_dashboard_work_mode_counts`, un `group by`), servi par
+`GET /work-mode-counts` en **un** appel. **Compter par un `pageSize=1` est un
+réflexe à ne pas avoir sur ce schéma** : la bonne réponse est une vue de
+comptage.
+
+**`display_key` est une colonne générée stockée sur `offers`**, plus une
+expression de vue (migration `20260910030000`). L'écrire ainsi n'est pas un
+détail de rangement : la regexp était évaluée ligne à ligne sur les 4 511
+offres, **trois fois** dans une même requête du tableau de bord —
+l'auto-jointure d'`offer_application_state`, puis le `distinct on`
+d'`offers_dashboard`. Le seul balayage de la branche `offer_application_state`
+coûtait 73,8 ms, et le tri posé dessus 83,5 ms. Deux conséquences à retenir :
+
+- **Ne jamais remettre l'expression dans une vue.** `offer_display_groups`
+  n'est plus qu'une projection de la colonne.
+- **Toute évolution de la règle de regroupement change une colonne générée**,
+  donc passe par une migration qui la redéfinit — et il faut comparer
+  l'empreinte avant/après, sans quoi un regroupement peut bouger en silence :
+
+  ```bash
+  npx supabase db query --linked "select md5(string_agg(offer_id::text || '=' || display_key, ',' order by offer_id)) as empreinte, count(*) as lignes, count(distinct display_key) as groupes from offer_display_groups"
+  ```
+
+  Valeur au 2026-09-09, inchangée de part et d'autre de la migration :
+  `1f5a5eac2529377e1b23c411d033e280`, 4 511 lignes, 4 104 groupes.

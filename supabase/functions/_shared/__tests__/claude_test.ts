@@ -199,10 +199,169 @@ Deno.test('isRetryableFailure : un echec sans echange HTTP est rejouable', () =>
   assertEquals(isRetryableFailure('une chaine'), true);
 });
 
-Deno.test('isRetryableFailure : un HTTP 200 illisible est PERMANENT', () => {
-  // Le JSON tronque ou malforme porte le statut de la reponse, soit 200. Ce
-  // n'est pas rejouable : l'offre doit sortir de la file, sans quoi un
-  // jugement irrecuperable la ferait repayer a chaque passage.
-  assertEquals(isRetryableFailure(new ClaudeApiError('sortie illisible', 200)), false);
-  assertEquals(isRetryableFailure(new ClaudeApiError('reponse tronquee', 200)), false);
+Deno.test('isRetryableFailure : un HTTP 200 illisible est REJOUABLE', () => {
+  // RENVERSE PAR LA MESURE du 2026-09-10. Cette regle disait l'inverse : un
+  // 200 illisible etait repute imputable a l'offre, donc permanent. Puis les
+  // 18 offres perdues en deux jours ont ete remises dans la file telles
+  // quelles, sans qu'un octet de leur texte ne change, et les 18 ont ete
+  // jugees SANS ERREUR au premier essai. Un echec qui ne se reproduit pas sur
+  // une entree identique n'est pas attribuable a cette entree.
+  //
+  // L'arbitrage que le fichier enonce deja tranche alors tout seul : se
+  // tromper vers « permanent » perd l'offre pour toujours, se tromper vers
+  // « rejouable » coute un centime et un tour de plus.
+  assertEquals(isRetryableFailure(new ClaudeApiError('sortie illisible', 200)), true);
+  assertEquals(isRetryableFailure(new ClaudeApiError('reponse tronquee', 200)), true);
+});
+
+// --- Diagnostic des echecs sur HTTP 200 (P31) -------------------------------
+//
+// Mesure du 2026-09-10 : 19 offres perdues en deux jours sur des reponses
+// HTTP 200 illisibles, sans que rien ne dise POURQUOI. Le message d'erreur ne
+// retenait que l'exception de `JSON.parse`, et `stop_reason` — la seule
+// information qui distingue une troncature d'un refus — etait jete. Ces tests
+// figent la regle : tout echec sur un 200 porte desormais son `stop_reason`.
+
+Deno.test('un refus est nomme comme tel, avec sa categorie et son explication', async () => {
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          stop_reason: 'refusal',
+          stop_details: { type: 'refusal', category: 'cyber', explanation: 'exemple' },
+          content: [],
+          usage: {},
+        }),
+        { status: 200 },
+      ),
+    );
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.message.includes('refus'), true);
+  assertEquals(error.message.includes('cyber'), true);
+  assertEquals(error.message.includes('exemple'), true);
+  // Le refus se diagnostique AVANT la recherche d'un bloc de texte : sans ça
+  // un refus avant sortie (content vide) se deguiserait en « sans bloc de
+  // texte », ce qui est exactement ce qui a masque la cause pendant deux jours.
+  assertEquals(error.message.includes('sans bloc de texte'), false);
+});
+
+Deno.test('un refus en cours de generation ne passe pas pour un JSON malforme', async () => {
+  // La forme mesuree le 2026-09-10 : un texte coupe en plein milieu, donc un
+  // `JSON.parse` qui echoue sur « Unterminated string ». Sans le test de
+  // `stop_reason` en amont, la cause reelle restait invisible.
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          stop_reason: 'refusal',
+          stop_details: { type: 'refusal', category: null, explanation: 'coupe' },
+          content: [{ type: 'text', text: '{"fit_score": 40, "verdict": "un debut' }],
+          usage: {},
+        }),
+        { status: 200 },
+      ),
+    );
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.message.includes('refus'), true);
+  assertEquals(error.message.includes('sortie structuree illisible'), false);
+});
+
+Deno.test('tout echec sur un HTTP 200 porte son stop_reason', async () => {
+  // Le cas qu'on ne sait PAS expliquer doit rester diagnosticable : c'est la
+  // lecon de P31. `end_turn` avec un JSON malforme n'a pas d'explication
+  // connue — raison de plus pour que la ligne d'erreur le dise.
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: 'pas du json' }],
+          usage: {},
+        }),
+        { status: 200 },
+      ),
+    );
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.message.includes('sortie structuree illisible'), true);
+  assertEquals(error.message.includes('stop_reason=end_turn'), true);
+});
+
+Deno.test('un stop_reason absent se dit, plutot que de disparaitre', async () => {
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(JSON.stringify({ content: [], usage: {} }), { status: 200 }),
+    );
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.message.includes('sans bloc de texte'), true);
+  assertEquals(error.message.includes('stop_reason=(absent)'), true);
+});
+
+Deno.test('isRetryableFailure : seul un refus reste PERMANENT sur un 200', () => {
+  // Le refus est la SEULE exception a la regle ci-dessus, et il ne peut pas se
+  // reconnaitre au statut : un refus et une troncature portent tous deux 200.
+  // D'ou le drapeau explicite, plutot qu'un test sur le texte du message —
+  // qui ferait dependre une decision de facturation d'une chaine de
+  // caracteres.
+  assertEquals(isRetryableFailure(new ClaudeApiError('refus du modele', 200, true)), false);
+  // Un refus est deterministe : rejouer le MEME texte d'offre se ferait
+  // refuser pareil, donc remettre l'offre dans la file ne ferait que repayer
+  // sans jamais converger.
+  assertEquals(isRetryableFailure(new ClaudeApiError('sortie illisible', 200, false)), true);
+});
+
+Deno.test('un refus est leve avec le drapeau permanent', async () => {
+  // Le lien entre les deux moities : `callClaudeStructured` doit POSER le
+  // drapeau, sans quoi `isRetryableFailure` ne peut pas le lire et un refus
+  // repasserait indefiniment dans la file.
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({ stop_reason: 'refusal', content: [], usage: {} }),
+        { status: 200 },
+      ),
+    );
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.permanent, true);
+  assertEquals(isRetryableFailure(error), false);
+});
+
+Deno.test('une troncature inexpliquee est levee SANS le drapeau permanent', async () => {
+  const fetchImpl = () =>
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          stop_reason: 'end_turn',
+          content: [{ type: 'text', text: '{"fit_score": 40, "verdict": "coup' }],
+          usage: {},
+        }),
+        { status: 200 },
+      ),
+    );
+
+  const error = await assertRejects(
+    () => callClaudeStructured({ ...cfg, fetchImpl }, call),
+    ClaudeApiError,
+  );
+  assertEquals(error.permanent, false);
+  assertEquals(isRetryableFailure(error), true);
 });

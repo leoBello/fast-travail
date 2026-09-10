@@ -206,6 +206,33 @@ export function formatPublication(
 }
 
 /**
+ * Ce que la dernière colonne de la liste montre, selon l'onglet actif.
+ *
+ * **Trois étapes seulement ont une date en base** : `offers_dashboard` porte
+ * `candidature_envoyee_le`, `candidature_relancee_le` et
+ * `candidature_entretien_le` — rien pour `retenue`, `terminee` ni `ecartee`.
+ * Ces onglets-là gardent « Publiée » : inventer une date à partir d'un champ
+ * que la vue n'expose pas serait une affordance qui annonce un fait
+ * qu'aucun code ne rend vrai (GUIDELINES §3.3).
+ */
+export type DateColonne = 'publiee' | 'envoyee' | 'relancee' | 'entretien';
+
+const CHAMP_DATE: Record<DateColonne, (row: OfferDashboardRow) => string | null> = {
+  publiee: (row) => row.published_at,
+  envoyee: (row) => row.candidature_envoyee_le,
+  relancee: (row) => row.candidature_relancee_le,
+  entretien: (row) => row.candidature_entretien_le,
+};
+
+export function formatDateCandidature(
+  row: OfferDashboardRow,
+  colonne: DateColonne,
+  maintenant: Date = new Date(),
+): Publication {
+  return formatPublication(CHAMP_DATE[colonne](row), maintenant);
+}
+
+/**
  * La décomposition en jetons signés (`Score`, GUIDELINES §3.4) : chaque
  * bonus/malus non nul de la ligne, avec un libellé qui dit CE QUI a été
  * récompensé ou pénalisé. Un bonus/malus à zéro est filtré — un jeton à

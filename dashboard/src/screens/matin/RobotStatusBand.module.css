@@ -1,0 +1,86 @@
+/*
+ * L'état des deux robots dans la barre d'application.
+ * Valeurs reprises de `Main.dc.html` (cas nominal) et d'`Etats.dc.html`
+ * (planche « L'état des deux robots, quatre cas »).
+ */
+.bande {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.bloc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/*
+ * La couleur double le mot, elle ne le remplace jamais (GUIDELINES §3.7) :
+ * chaque état porte aussi son libellé et une icône de forme distincte. Seule
+ * l'ICÔNE prend la couleur d'état — colorer toute la ligne ferait de
+ * `--color-warning` une décoration, ce que `theme.css` réserve aux états.
+ */
+.bloc[data-ton='succes'] svg {
+  color: var(--color-success);
+}
+.bloc[data-ton='alerte'] svg {
+  color: var(--color-warning);
+}
+.bloc[data-ton='danger'] svg {
+  color: var(--color-danger);
+}
+.bloc[data-ton='attente'] svg {
+  color: var(--color-text-faint);
+}
+
+/* Le mot qui nomme l'état anormal, pour qu'il se lise avant la couleur. */
+.bloc[data-ton='alerte'] .fort {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+.bloc[data-ton='danger'] .fort {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* Un chiffre ou une heure : encre pleine, le reste de la ligne est en gris. */
+.valeur {
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Une absence se nomme, jamais elle ne se vide (GUIDELINES §3.1). */
+.absent {
+  color: var(--color-text-faint);
+}
+
+.point {
+  color: var(--color-text-faint);
+}
+
+.separateur {
+  width: 1px;
+  height: 14px;
+  background: var(--color-border-strong);
+}
+
+/* Séparateur purement décoratif — généré en CSS plutôt qu'en texte JSX
+   littéral, comme `OfferCard.module.css` le fait déjà (GUIDELINES §3.8 :
+   aucune chaîne affichée en dur). */
+.apres::before {
+  content: '\00B7';
+  margin: 0 7px;
+  color: var(--color-text-faint);
+}
+
+/* Les deux-points d'une étiquette suivie d'une absence — ponctuation, pas
+   du vocabulaire : même traitement que le séparateur ci-dessus. L'espace
+   insécable évite un deux-points rejeté en début de ligne. */
+.etiquette::after {
+  content: '\00A0:';
+}

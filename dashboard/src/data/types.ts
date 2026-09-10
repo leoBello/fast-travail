@@ -41,6 +41,25 @@ export type WorkMode = (typeof WORK_MODES)[number];
 export const WORK_MODE_UNSPECIFIED = 'non_precise' as const;
 export type WorkModeFilter = WorkMode | typeof WORK_MODE_UNSPECIFIED;
 
+/** Ce que rend `GET /work-mode-counts` : TOUJOURS les quatre clés, y compris
+ * à zéro. La vue de comptage ne rend que les valeurs présentes ; le serveur
+ * complète (voir `getWorkModeCounts`, dashboard-query.ts), pour qu'un mode
+ * dont aucune offre ne relève s'affiche « 0 » plutôt que de disparaître du
+ * panneau. */
+export type WorkModeCounts = Record<WorkModeFilter, number>;
+
+// Même valeur que `STATUT_UNDECIDED` (dashboard-query.ts) : une offre sans
+// ligne `offer_applications`, donc `candidature_statut` nul. `in` ne matche
+// jamais `null` — c'est ce qui rend l'onglet « À traiter » possible.
+export const STATUT_UNDECIDED = 'aucune' as const;
+export type StatutFilter = ApplicationStatus | typeof STATUT_UNDECIDED;
+
+/** Ce que rend `GET /statut-counts` : TOUJOURS les huit clefs, y compris à
+ * zéro. La vue de comptage ne rend que les valeurs présentes ; le serveur
+ * complète (voir `getStatutCounts`, dashboard-query.ts), pour qu'un onglet
+ * dont aucune offre ne relève affiche « 0 » plutôt que de disparaître. */
+export type StatutCounts = Record<StatutFilter, number>;
+
 // Mêmes valeurs que `ENGAGEMENTS` (dashboard-query.ts).
 export const ENGAGEMENTS = ['freelance', 'cdi', 'cdd', 'autre'] as const;
 export type Engagement = (typeof ENGAGEMENTS)[number];
@@ -156,7 +175,7 @@ export interface OffersListFilters {
   sort?: SortField;
   page?: number;
   pageSize?: number;
-  statut?: ApplicationStatus[];
+  statut?: StatutFilter[];
   workMode?: WorkModeFilter[];
   engagement?: Engagement[];
   source?: Source[];
@@ -343,4 +362,30 @@ export interface ImportCandidateProfileResult {
   /** Recompté APRÈS l'écriture — voir CLAUDE.md : l'import ne rejuge RIEN,
    * ce nombre dit seulement ce que l'import laisse inchangé. */
   staleProfileOfferCount: number;
+}
+
+/**
+ * Les quatre états de la collecte et les deux du jugement — miroir de
+ * `CollecteStatus` / `JugementStatus` / `RobotStatusResult`
+ * (`dashboard-query.ts`), validés par `Etats.dc.html`, planche « L'état des
+ * deux robots, quatre cas ».
+ *
+ * Les horodatages sont BRUTS (ISO) : la mise en forme (« 8 h 30 », « hier »)
+ * appartient à la SPA, jamais au module runtime-neutre qui les produit.
+ */
+export type CollecteStatus =
+  | { etat: 'nominal'; at: string }
+  | { etat: 'partielle'; at: string; sourcesIncompletes: number; sourcesTotal: number }
+  | { etat: 'en_echec'; at: string; derniereReussite: string | null }
+  | { etat: 'pas_encore'; derniere: string | null };
+
+/** `count` est PLAFONNÉ côté serveur (`ROBOT_STATUS_SCORES_LIMIT`,
+ * `dashboard-query.ts`) : un jour de rejugement complet du corpus
+ * sous-compterait en silence — voir le commentaire de ce champ côté serveur
+ * (revue finale, M6) avant d'afficher ce nombre comme un fait absolu. */
+export type JugementStatus = { etat: 'fait'; at: string; count: number } | { etat: 'pas_encore' };
+
+export interface RobotStatusResult {
+  collecte: CollecteStatus;
+  jugement: JugementStatus;
 }

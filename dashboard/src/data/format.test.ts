@@ -8,6 +8,7 @@ import {
   badgeTexteCoupe,
   estTechnoDuCv,
   formatCompensation,
+  formatDateCandidature,
   formatEmployeur,
   formatLieu,
   formatPublication,
@@ -184,6 +185,31 @@ describe('formatPublication', () => {
   it('signale une date de publication absente ou invalide', () => {
     expect(formatPublication(null, maintenant)).toEqual({ connu: false });
     expect(formatPublication('pas une date', maintenant)).toEqual({ connu: false });
+  });
+});
+
+describe('formatDateCandidature', () => {
+  const maintenant = new Date('2026-09-09T12:00:00Z');
+
+  it('rend la date d’envoi sur la colonne « envoyee »', () => {
+    const offer = ligne({ candidature_envoyee_le: '2026-09-09T08:00:00Z' });
+    expect(formatDateCandidature(offer, 'envoyee', maintenant)).toEqual({
+      connu: true,
+      texte: "aujourd'hui",
+    });
+  });
+
+  it('une date absente reste une absence, jamais une date inventée', () => {
+    const offer = ligne({ candidature_relancee_le: null });
+    expect(formatDateCandidature(offer, 'relancee', maintenant)).toEqual({ connu: false });
+  });
+
+  it('la colonne « publiee » retombe sur published_at', () => {
+    const offer = ligne({ published_at: '2026-09-05T08:00:00Z' });
+    expect(formatDateCandidature(offer, 'publiee', maintenant)).toEqual({
+      connu: true,
+      texte: '4 j',
+    });
   });
 });
 

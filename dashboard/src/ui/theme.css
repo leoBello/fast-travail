@@ -139,9 +139,22 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/*
+ * `background: none` et `border: none` font partie de la remise à zéro, pas
+ * seulement `font`/`color`/`cursor` : le navigateur habille tout `<button>`
+ * non stylé d'un fond `buttonface` opaque ET d'un relief `2px outset
+ * buttonborder` (gris sous Chromium pour les deux). Sans ces deux lignes,
+ * cet habillage traverse tout composant qui ne déclare ni fond ni bordure
+ * propres — c'est ce qui faisait le fond gris sur le titre des cartes
+ * « Ce matin » (P25 g), et le contour parasite qu'ôter seulement le fond a
+ * révélé autour du même titre : la bordure était déjà là, seulement masquée
+ * par le fond opaque qui la recouvrait.
+ */
 button {
   font: inherit;
   color: inherit;
+  background: none;
+  border: none;
   cursor: pointer;
 }
 

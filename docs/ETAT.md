@@ -302,9 +302,24 @@ Collective, deux `robots.txt` — sont commitées sous `supabase/functions/_scra
 
 **Planification quotidienne** : `scripts/scrape-daily.cmd` lance les deux
 scrapers en `--mode delta --trigger cron`, déclaré au Planificateur Windows
-sous le nom « fast-travail scrapers », tous les jours à 07 h 15 — après
-`ft-daily` (6 h UTC) et `adzuna-daily` (6 h 30 UTC), pour une sélection
-complète en une fois. Piège vérifié avant commit : le nom d'utilisateur
+sous le nom « fast-travail scrapers », tous les jours à 07 h 15.
+
+**Correction du 2026-09-10 — cette phrase disait « après `ft-daily` (6 h UTC)
+et `adzuna-daily` (6 h 30 UTC) », et c'était faux.** Le Planificateur Windows
+raisonne en heure **locale**, `pg_cron` en **UTC** (`cron.timezone` vaut `GMT`,
+vérifié) : 07 h 15 Paris = 05 h 15 UTC, donc les scrapers passent **avant** les
+deux API, pas après. Mesuré sur les horodatages du 2026-09-09, heure de Paris :
+07:15 `free_work`, 07:20 `collective`, 08:00 `france_travail`, 08:30 `adzuna`.
+L'intention — tout collecter avant de juger — était donc respectée par accident,
+pas par la raison invoquée. L'ordre réel, en été :
+
+| Heure Paris | Ce qui tourne | Par quoi |
+|---|---|---|
+| 07:15 | Free-Work, Collective.work | Planificateur Windows (PC allumé) |
+| 08:00 | France Travail | `pg_cron` |
+| 08:30 | Adzuna | `pg_cron` |
+| 09:00 | Jugement IA | `pg_cron` |
+| 14:00 | Jugement IA, second passage | `pg_cron` *(depuis `20260910070000`)* | Piège vérifié avant commit : le nom d'utilisateur
 (`Léo`) porte un accent, et un accent littéral dans un `.cmd` dépend à la fois
 de l'encodage du fichier et du codepage actif à l'exécution — deux choses qui
 peuvent diverger en silence. Le script utilise donc le nom court 8.3
@@ -327,6 +342,12 @@ Contrairement au plan A, le Planificateur Windows ne tourne que **PC allumé**
 — compromis assumé du ROADMAP, documenté dans le script lui-même : les délais
 de politesse et le temps de parcours ne tiennent pas dans les 2 secondes de
 CPU d'une Edge Function.
+
+**Depuis le 2026-09-10, un rendez-vous manqué est rattrapé** dès que la session
+s'ouvre, et la batterie ne bloque plus rien — trois réglages de la tâche, sans
+une ligne de code. Ce qu'ils changent, ce qu'ils ne changent pas et ce que les
+deux sources scrapées pèsent réellement : voir **P30** dans « Problèmes
+ouverts ».
 
 **La reconnaissance a démenti trois affirmations de ce document.**
 
@@ -1107,7 +1128,7 @@ maquettes précèdent le plan d'implémentation.
 Règles de conception : [`design/GUIDELINES.md`](design/GUIDELINES.md),
 contraignant. Maquettes et statut de leurs données :
 [`design/maquettes/README.md`](design/maquettes/README.md).
-Canvas : <https://claude.ai/code/artifact/7991f43d-7655-4d13-839f-69fabe5d9516>
+Canvas : <https://claude.ai/code/artifact/6aad5c99-ca9d-49d3-ae81-333830aafc42>
 
 **Plan d'implémentation écrit le 2026-09-09**, dix tâches :
 [`superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](superpowers/plans/2026-09-09-tableau-de-bord-phase3.md).
@@ -1571,6 +1592,106 @@ périmé — est corrigé dans ce commit même, pas laissé en l'état ; P24 res
 seul point d'attention hérité de la phase 3, déjà visible dans
 « Problèmes ouverts, par priorité » ci-dessous.
 
+### La veille par onglets — maquette validée le 2026-09-09
+
+**Le défaut constaté à l'usage** : « Toute la veille » rend 1 272 lignes par
+pages de 50, donc la page défile ; et les offres décidées — postulées,
+relancées — restent mêlées aux 1 258 sans décision, sans qu'aucune colonne ne
+le dise.
+
+**Maquette** : `Main.dc.html` **mis à jour**, plus `VeilleRepliee.dc.html`,
+`OngletsSuivi.dc.html` et `ArbitragesOnglets.dc.html` dans
+[`design/maquettes/`](design/maquettes/) — republiés au **même** canvas que la
+phase 3, qui reste le seul. Chiffres comptés en base le 2026-09-09
+(1 258 sans décision, 6 postulées, 1 relancée, 7 écartées, 1 272 jugées).
+
+Deux ajouts à la maquette qui ne relèvent pas des onglets : le bouton
+**« Mes candidatures »** dans la barre d'application (il manquait — la maquette
+n'offrait aucun chemin vers l'écran de suivi, que le code avait donc inventé de
+son côté : c'est la maquette qui avait tort, §5.3 de `GUIDELINES.md`), et le
+bouton **« Replier »** sur la bande « Ce matin ».
+
+**Trois arbitrages tranchés**, options écartées gardées sur la seconde page du
+canvas :
+
+| Tranché | Retenu | Écarté, et ce qu'il coûtait |
+|---|---|---|
+| Découpage des onglets | **Un onglet par statut** — les six étapes, la sortie, et « Toutes » | Quatre onglets groupés : « postulée », « relancée » et « entretien » se confondraient dans « En cours », soit exactement la distinction demandée, et deux mots de vocabulaire que rien d'autre n'emploie. Une ligne dans le panneau de filtres : le panneau est replié par défaut, donc l'état courant et les comptes resteraient invisibles |
+| Ce qu'une page contient | ~~La page vaut ce qui tient — hauteur mesurée, taille de page déduite~~ **Revenu en arrière le 2026-09-10** : taille FIXE à dix lignes, la page défile normalement (voir « La taille de page mesurée a échoué en production » plus bas) | Taille fixe à 25 : le défilement revient à l'intérieur de la liste. « Charger plus » : la liste s'allonge sans fin, le défaut signalé en pire |
+| Bande « Ce matin » | **Repliable, état mémorisé** — repliée, elle rend ~330 px de défilement à la liste (la page reste fixée à dix lignes, revirement du 2026-09-10 : voir ci-dessous) | Ne rien faire : 126 pages sur l'onglet « À traiter » |
+
+**Trois règles que le dessin a imposées**, et qui gouvernent l'implémentation :
+
+- **« rien de masqué » ne se dit plus que sur l'onglet « Toutes ».** Sur « À
+  traiter », la ligne de compte devient « 1 258 sans décision, sur 1 272
+  jugées — les 14 décidées sont dans les autres onglets ». Un onglet qui filtre
+  et une phrase qui affirme le contraire, c'est le genre de mensonge que
+  GUIDELINES §3.3 interdit.
+- **Aucune colonne « relance due ».** Rien en base ne la calcule (voir le
+  statut des données des maquettes de phase 3) : la construire serait une
+  affordance qui annonce un fait qu'aucun code ne rend vrai. Même raison pour
+  la relance Katchme, dont `last_followup_at` est nul : elle s'affiche
+  « non datée », jamais une date inventée.
+- **Les comptes d'onglets viennent d'une vue de comptage**, jamais de sept
+  `GET /offers?statut=…&pageSize=1` dont seul le `total` serait lu. C'est
+  exactement le réflexe que CLAUDE.md proscrit sur ce schéma : `offers_dashboard`
+  est intégralement matérialisée avant qu'un filtre ne retienne quoi que ce
+  soit, donc un `pageSize=1` coûte le prix de la page complète.
+
+### Livrée le 2026-09-10 — ce qui a été mesuré
+
+**Onze commits, `verify` vert, dix tâches et quatre correctifs de revue.**
+
+| Mesure | Valeur |
+|---|---:|
+| `offers_dashboard_status_counts` (`explain analyze`, 3 appels, les deux derniers retenus) | **~60 ms** |
+| Requêtes au chargement du tableau de bord | **7** — remesuré le 2026-09-10 (Playwright, `networkidle`) : `/brief`, `/offers`, `/stats`, `/config`, `/work-mode-counts`, `/statut-counts`, `/robot-status`. La mesure « 6 » ci-dessus datait d'avant le commit qui ajoute la bande des robots (`/robot-status`) |
+| Lignes de liste par page | **10**, en dur |
+| Comptes en base au 2026-09-10 | 1 258 sans décision · 6 postulées · 1 relancée · 7 écartées · **1 272** au total |
+
+**Le responsive, éprouvé sur cinq gabarits** (Playwright, écran réel) : correct
+de **1 024 à 1 920 px**, à 700, 768 et 1 080 px de haut. Cassé à 820 px — le
+seuil de rupture est entre les deux. **Décidé le 2026-09-10 : hors périmètre.**
+Le tableau de bord se consulte sur le poste, en 1 440 ou 1 920 ; aucune requête
+média ne sera écrite. Le détail de ce qui casse est en P25 (k), pour le jour où
+la question se poserait.
+
+### Ce que ce chantier a appris, et qui vaut plus que la fonctionnalité
+
+**Quatre éléments dessinés dans la maquette n'avaient jamais atteint le plan.**
+Le séparateur vertical de la barre d'onglets (tâche 5), la barre repliée de
+52 px qui *rendait sa hauteur à la liste* (tâche 8), l'état vide d'un onglet et
+son bouton de retour (tâche 10), le badge « 10 par page » (revue de la tâche
+10). Trois ont été rattrapés par un implémenteur qui a comparé son brief à la
+maquette avant d'écrire — ce que le prompt lui demandait explicitement de
+faire. Le quatrième a failli être **supprimé comme un résidu mort** : la clé
+i18n existait sans appelant, et c'est la maquette qui a dit que le manque était
+à l'écran, pas dans le dictionnaire.
+
+**Un plan écrit à partir d'une maquette n'est pas la maquette.** C'est la
+justification empirique de `GUIDELINES.md` §5.
+
+**Un diagnostic de mise en page déduit du CSS n'est pas un diagnostic.**
+Voir P25 (j) : j'ai expliqué un chevauchement par l'ancrage des `<legend>`,
+sans mesurer. C'était plausible, cohérent, et faux — la cause réelle était la
+coque à hauteur nulle, trois composants plus haut.
+
+**La taille de page mesurée a échoué en production, pas en test.** La coque
+`height: 100%` ne résolvait sur aucune hauteur, `clientHeight` rendait 0, et la
+liste affichait **zéro ligne** alors que huit étaient chargées. Aucun test ne
+l'a vu : `jsdom` ne calcule aucune mise en page. C'est une capture d'écran qui
+l'a trouvé.
+
+**Deux points d'implémentation identifiés en dessinant** :
+
+- L'onglet « À traiter » ne peut pas passer par le filtre `statut` existant :
+  `listOffers` compose un `.in('candidature_statut', …)`, qui ne matche jamais
+  `null`. Il faut une valeur explicite (`aucune`) que le serveur traduit en
+  `.is(null)` — le même prédicat que `listBrief` utilise déjà.
+- `final_score` s'affiche `69.5` et `93.5` : `ScorePaire` rend le nombre brut,
+  donc avec un point décimal anglais. Hors périmètre de ce chantier, mais
+  visible sur la maquette.
+
 ---
 
 ## Ce que la mesure a établi sur Adzuna
@@ -1601,6 +1722,226 @@ concordent : Marseille est un marché Angular / Java.
 ---
 
 ## Problèmes ouverts, par priorité
+
+### P25 — L'écran livré ne suit pas la maquette, et rien ne le voyait
+
+**Signalé le 2026-09-09**, capture d'écran à l'appui, sur le tableau de bord en
+service. La phase 3 est passée avec `verify` vert, sept revues, et un écran qui
+ne ressemble pas à `Main.dc.html`. Ce n'est pas une négligence isolée : c'est
+exactement le domaine que le §4 de `GUIDELINES.md` annonce comme invisible aux
+tests — `jsdom` ne calcule aucune mise en page —, et que rien ne relisait.
+
+La règle qui manquait est désormais écrite : `GUIDELINES.md` §5, avec le point
+qui change tout — **un élément dessiné mais pas encore branché s'implémente
+désactivé**, jamais retiré. Retiré, l'écart cesse d'être visible ; désactivé, il
+se voit et se rebranche en une ligne.
+
+Les écarts constatés, à traiter en passe dédiée **après** le chantier des
+onglets :
+
+| # | Écart | Où |
+|---|---|---|
+| ~~a~~ | ~~Le bouton de **réglages** de la barre d'application n'existe pas~~ — **corrigé le 2026-09-10** : construit, posé `disabled`, `title`/`aria-label` en français | `MatinScreen`, barre d'application |
+| ~~b~~ | ~~L'**icône de document** de « Mon CV » manque~~ — **corrigé le 2026-09-10**, `path` repris verbatim de `Main.dc.html` | idem |
+| ~~c~~ | ~~Le libellé est « Importer mon CV » là où la maquette écrit « Mon CV »~~ — **corrigé le 2026-09-10**, nouvelle clé `app.monCv` (`profil.boutonImporter` reste le verbe d'action, distinct, de l'écran de profil) | idem |
+| ~~d~~ | ~~L'état des deux crons n'est pas affiché~~ — **corrigé le 2026-09-10** | `GET /robot-status`, `RobotStatusBand` |
+| ~~e~~ | ~~« Mes candidatures » n'a **pas d'icône**~~ — **corrigé le 2026-09-10**, icône pipeline (trois colonnes) ajoutée à la maquette puis reprise verbatim | idem |
+| ~~f~~ | ~~Le bouton **« Suivantes »** est collé à la carte du dessus~~ — **corrigé le 2026-09-10** : `margin-top` posé sur la bande (`MorningBand`), pas sur `Pagination` (partagé avec « Toute la veille »). 11px hors échelle de tokens : `--space-3` (12px) est le plus proche, écart de 1px assumé | `MorningBand` / `Pagination` |
+| ~~g~~ | ~~Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas~~ — **corrigé le 2026-09-10, en deux temps** : la remise à zéro des `<button>` n'avait ni `background` ni `border`, et la première passe a laissé le contour | `theme.css` — voir la cause ci-dessous |
+| ~~h~~ | ~~Le couple de scores ne porte pas les couleurs de la maquette (`77`/`68` en ambre là où la maquette met encre et gris)~~ — **corrigé le 2026-09-10** : `Score.module.css` `.fit` en `--color-text-muted` ; `--color-warning` reste réservé aux états (`theme.css`) | `Score` / `OfferCard` |
+| ~~i~~ | ~~Le badge « Texte coupé à 500 car. » paraît plein là où la maquette le veut **discontinu**~~ — **faux, retiré le 2026-09-10** : mesuré au navigateur, `border-style: dashed` — déjà conforme. Relevé à l'œil sur une capture d'écran, à une résolution où une bordure discontinue de 1px se lit comme pleine | `OfferCard` |
+| ~~j~~ | ~~La légende `MODE DE TRAVAIL` chevauche « Full remote »~~ — **retiré, ce n'était pas un défaut du panneau** | — |
+| k | **L'écran casse en dessous de ~1 024 px de large** | plusieurs composants, voir ci-dessous |
+
+**(j) est une erreur de ma part, et elle mérite d'être écrite plutôt
+qu'effacée.** J'avais diagnostiqué un chevauchement de `<legend>` **en lisant
+le CSS**, sans mesurer : un `<legend>` est ancré sur le bord du `fieldset`, ses
+marges verticales sont ignorées, donc l'explication était plausible. Mesurée au
+navigateur après le correctif de la coque, elle est **fausse** : l'écart entre
+le bas de chaque légende et le haut de sa première ligne vaut **8 px** sur les
+trois `fieldset`, à toutes les largeurs éprouvées.
+
+Ce que le propriétaire avait vu était un **symptôme de la coque à hauteur
+nulle** : `.panneau` était un enfant flex d'un conteneur sans hauteur, donc sa
+boîte se peignait sur quelques pixels pendant que son contenu débordait
+dessous. La cause et le remède étaient ailleurs. **Leçon : un diagnostic de
+mise en page déduit du CSS n'est pas un diagnostic.** C'est exactement ce que
+§5.4 impose de mesurer à l'écran.
+
+**(k) mesuré le 2026-09-10**, cinq gabarits, `GET`/`Playwright`, écran réel :
+
+| Largeur × hauteur | Verdict |
+|---|---|
+| 1 920 × 1 080 | correct |
+| 1 440 × 700 | correct — la page défile, rien n'est coupé |
+| 1 366 × 768 | correct |
+| 1 024 × 768 | correct |
+| 820 × 1 180 | **cassé** |
+
+Aucun débordement horizontal du document à aucune largeur, aucun
+chevauchement de légende, et la page défile partout où elle le doit. Ce qui
+casse à 820 px, précisément :
+
+- **le titre de la liste est écrasé à quelques caractères** (« Dév… », « Seni… »)
+  parce que les badges de faits sont `flex: none` et ne cèdent jamais : toute
+  la perte de largeur est absorbée par la seule colonne qui porte l'information
+  principale ;
+- **les badges de confiance des trois cartes sont rognés** au bord droit ;
+- **la barre d'onglets déborde** : « Toutes » est coupé ;
+- **une ligne se chevauche** — l'employeur et le badge de rémunération se
+  superposent.
+
+Rien de tout cela n'existe à 1 024 px. Le seuil de rupture est donc entre les
+deux, et **aucune requête média n'est déclarée nulle part dans `dashboard/`** :
+l'écran n'a jamais été pensé sous la largeur d'un portable.
+
+**Deux causes déjà trouvées dans le code**, et la première explique bien plus
+que la ligne qu'elle occupe :
+
+- **(g) le fond gris du titre est le fond de bouton du navigateur.** La remise
+  à zéro globale de `dashboard/src/ui/theme.css:142` pose `font`, `color` et
+  `cursor` sur `button` — **mais pas `background`**. Tout `<button>` qui ne
+  déclare pas le sien hérite donc du `buttonface` de Chromium, et
+  `OfferCard.module.css` `.titreLien` n'en déclare pas. La maquette, elle,
+  écrit `background: none` dans sa remise à zéro. **Un seul mot manque, et il
+  touche tous les boutons non stylés de l'application** — c'est le premier
+  endroit à corriger, avant de compter les occurrences.
+- **(f) `Pagination.module.css` `.pagination` n'a aucune marge haute**, là où la
+  maquette pose `margin-top: 11px` entre la grille de cartes et la ligne de
+  pagination. `MorningBand` rend la grille puis `<Pagination>` sans rien entre
+  les deux.
+
+Les points **d** et **h** restent à **remesurer sur le code** avant correction :
+ils sont lus sur une capture, et une capture ne dit pas si la couleur vient
+d'une règle délibérée. Les autres sont directement constatables.
+
+**P25 est clos.** Les neuf entrées : (a) (b) (c) (e) (f) (h) corrigées en
+passe 1, (g) en deux temps — la remise à zéro des `<button>` n'avait ni
+`background` ni `border`, et la première passe a laissé le contour —, (d) par
+`GET /robot-status` et ses quatre états, (i) et (j) **retirées comme fausses**.
+(k) documenté et écarté du périmètre.
+
+**Deux des neuf « écarts » n'en étaient pas**, et c'est le chiffre à retenir :
+(j) diagnostiquée en lisant le CSS sans mesurer, (i) relevée à l'œil sur une
+capture où une bordure discontinue de 1 px se lit comme pleine. Un écart de
+mise en page ne se constate ni dans un éditeur ni sur une image redimensionnée
+— il se mesure dans un navigateur, avec `getComputedStyle` et
+`getBoundingClientRect`.
+
+**Un neuvième défaut a été trouvé pendant la passe, hors liste** : la barre
+d'application portait `align-items: baseline` là où la maquette a **deux
+niveaux** imbriqués. Mesuré : le titre avait **0 px** au-dessus de lui et 34 en
+dessous, dans une barre de 56. Après correctif, 17 et 18. Il n'était dans
+aucune liste parce que personne ne l'avait mesuré — c'est le propriétaire du
+produit qui l'a vu à l'œil, sur une capture.
+
+**Ce qui empêchera la récidive** : la relecture du §5.4 — l'écran réel à côté
+de l'artboard, à la même largeur — à la fin de chaque chantier d'interface. Pas
+un test : `jsdom` ne verra jamais un chevauchement.
+
+**Passe 1, 2026-09-10** : les six écarts mesurés au navigateur — a, b, c, e, f,
+h — sont corrigés (voir le tableau plus haut). **i** s'est révélé faux à la
+mesure et est retiré. **d**, **g** et **k** restent ouverts : **d** demande un
+nouveau point d'API (`collection_runs`), **g** et **k** n'étaient pas dans le
+périmètre de cette passe. Détail des corrections, valeurs de maquette et
+mesures avant/après : `.superpowers/sdd/p25-passe1-report.md`.
+
+### ~~P-perf-1 — Sept vues restaient lisibles par la clé `anon`~~ *(résolu le 2026-09-09)*
+
+Trouvé le 2026-09-09 en passe de performance, en jouant la sonde
+`security_invoker` que CLAUDE.md prescrit. Le correctif I1 de la revue finale
+(migration `20260910020000`) n'a couvert que les **quatre** vues du tableau de
+bord. Sept autres n'ont aucune option, et `has_table_privilege('anon', …,
+'select')` rend **vrai** sur chacune :
+
+`offer_dedup_keys`, `offer_duplicate_groups`, `offer_lexical_score`,
+`offers_ai_candidates`, `offers_hidden_duplicates`, `offers_ranked`,
+`offers_shortlist`.
+
+C'est le même trou que I1, à la même gravité : `offers_ranked` et
+`offers_shortlist` projettent tout le corpus — titre, entreprise, description,
+URL, score. La clé `anon` est publique par conception ; RLS actif sans policy
+ne protège pas une vue qui s'exécute avec les droits de son propriétaire.
+
+**Chiffré avant de corriger**, par PostgREST avec la clé `anon` et
+`Prefer: count=exact` — des lignes réellement servies sur Internet, pas une
+lecture de catalogue : `offers_ranked` **4 511**, `offer_dedup_keys` **4 341**,
+`offer_duplicate_groups` **4 341**, `offer_lexical_score` **3 367**,
+`offers_ai_candidates` **1 392**, `offers_hidden_duplicates` **233**,
+`offers_shortlist` **103**. `offers_dashboard`, déjà corrigée par I1, rendait
+**0** — la preuve que le correctif fonctionne et que seul son périmètre était
+en cause.
+
+**Corrigé** par la migration `20260910040000`. Après : les **onze** vues
+rendent 0 à `anon`. Vérifié dans l'autre sens aussi — `service_role`
+(`GET /stats`, `/brief`, `/offers`) et le rôle d'administration
+(`db query --linked`) lisent toujours tout, ce qui était attendu : `service_role`
+contourne le RLS de toute façon, donc ni les scrapers, ni les trois crons, ni
+`api-dashboard` n'ont rien senti.
+
+**Ce que cet épisode enseigne, et qui vaut plus que le correctif** : I1 avait
+cherché le trou *là où le tableau de bord regardait*, pas là où il était. Une
+vue nouvelle doit porter `security_invoker = on` **dès sa création**, jamais
+ajouté après coup par une migration de rattrapage.
+
+### ~~P-perf-2 — Le tableau de bord relançait tous ses appels à chaque rendu~~ *(résolu le 2026-09-09)*
+
+**Symptôme** : les quatre colonnes du suivi affichaient « Le chargement a
+échoué », et l'écran mettait plus de dix secondes quand il aboutissait.
+Revenir à la veille rechargeait tout une seconde fois.
+
+**Cause, mesurée au navigateur** : `App.tsx` appelait `construireClient()` dans
+le corps du composant. Le client changeait donc d'identité à chaque rendu, et
+comme il est la dépendance de tous les `useCallback` de `screens/*/hooks.ts`,
+chaque `setState` d'`App` — donc chaque ouverture ou fermeture d'overlay —
+relançait l'intégralité des appels réseau de **tous** les écrans montés,
+l'écran du matin compris alors qu'il est caché sous l'overlay. `React.
+StrictMode` doublait le tout en développement.
+
+| | Avant | Après |
+|---|---:|---:|
+| Requêtes au chargement | 16 | **8** |
+| Requêtes à l'ouverture du suivi | 18 | **5** |
+| Requêtes au retour à la veille | 8 | **0** |
+| La plus lente, sous contention | ~16 s | **~1,3 s** |
+
+**Correctifs** : `useMemo(() => construireClient(), [])` dans `App.tsx` ; et,
+dans `createDashboardClient`, le partage des lectures **en vol** — deux
+appelants qui demandent la même chose au même moment font un seul aller-retour.
+Ce n'est pas un cache (l'entrée disparaît dès la réponse) et toute écriture
+fait avancer une époque, pour qu'un rechargement d'après-décision ne se greffe
+jamais sur une lecture partie avant l'écriture. Cinq tests couvrent ces cinq
+propriétés (`data/client.test.ts`).
+
+**Second poste, en base** : migration `20260910030000`. `display_key` devient
+une colonne générée stockée sur `offers`, indexée, et `offer_display_groups`
+une simple projection. La regexp était évaluée sur les 4 511 offres **trois
+fois** par requête du tableau de bord. Empreinte des regroupements identique de
+part et d'autre (`1f5a5eac2529377e1b23c411d033e280`, 4 511 lignes, 4 104
+groupes). Mesures avant/après : tableau de CLAUDE.md.
+
+**Troisième poste** : le panneau de filtres chiffrait les quatre valeurs de
+`work_mode` par quatre `GET /offers?workMode=…&pageSize=1` dont seul le
+`total` était lu — quatre balayages du corpus pour quatre nombres, la moitié
+des requêtes restantes. Le coût d'une lecture ne dépendant pas de `pageSize`
+(voir CLAUDE.md), un `pageSize=1` y coûtait le prix fort. Remplacé par une vue
+de comptage groupée (`offers_dashboard_work_mode_counts`, migration
+`20260910050000`) et une route `GET /work-mode-counts` — `api-dashboard`
+redéployée en version 8. Contrôle : la somme des quatre nombres vaut le total
+d'`offers_dashboard` (861 + 173 + 150 + 88 = 1 272), et l'écran affiche les
+mêmes quatre chiffres qu'avant.
+
+**Bilan de bout en bout, mesuré au navigateur** : le chargement passe de 16 à
+**5** requêtes et de ~15 s à **~1,5 s** ; l'ouverture du suivi de 18 à 5 et de
+~16 s à **~1,3 s** ; le retour à la veille de 8 à **0**.
+
+**Ce qui reste, et n'a pas été fait** : `/stats` enchaîne quatre comptages
+séquentiels, dont un balayage complet d'`offers_dashboard` pour le compteur
+anti-perte — c'est la requête la plus lente qui subsiste (~0,80 s). Une vue
+d'agrégat unique la ramènerait probablement sous 0,2 s. Pas entrepris : le
+gain absolu est faible depuis que la contention a disparu, et `getStats`
+mélange des comptages SQL et un calcul de série en TypeScript qu'il faudrait
+démêler d'abord.
 
 ### Ce que la revue finale de la phase 3 a trouvé — 2026-09-09
 
@@ -1680,6 +2021,287 @@ qu'ils parlent de la même chose.
 
 ---
 
+### P26 — `StatusTabs` porte `role="tablist"`/`role="tab"` sans le reste du motif ARIA
+
+`StatusTabs.tsx` pose `role="tablist"` sur le conteneur et `role="tab"` sur
+chaque bouton, avec `aria-selected`, mais rien du reste du motif WAI-ARIA
+« tabs » : aucun `role="tabpanel"` sur la zone qu'un onglet gouverne, aucun
+`aria-controls` du tab vers ce panneau, et aucune navigation par flèches
+(gauche/droite) entre onglets. **Scénario** : un utilisateur au clavier ou au
+lecteur d'écran qui active le mode navigation par composant (`Tab` puis
+flèches, le motif standard) trouve huit boutons ordinaires — `Tab` avance d'un
+bouton à l'autre au lieu que les flèches le fassent, et rien n'annonce quelle
+zone de la page l'onglet actif gouverne. Fonctionnel à la souris et au
+`Tab`/`Entrée` seuls, dégradé pour qui attend le motif complet. Relevé en
+revue finale (M4), pas corrigé : hors périmètre de cette passe.
+
+### P27 — Deux arithmétiques de date coexistent, et peuvent se contredire sur la même offre
+
+`formatPublication` (`data/format.ts`) calcule `(maintenant − published_at) /
+86 400 000` — une différence d'instants en millisecondes. `joursDepuisParis`
+(`data/parisDate.ts`) compare des **clés de jour calendaire** en heure de
+Paris (`YYYY-MM-DD`, comme `parisDateKey` côté serveur — voir CLAUDE.md sur la
+série de candidatures). Les deux répondent à « il y a combien de jours ? »,
+mais pas à la même question : l'un compte des heures écoulées, l'autre des
+minuits franchis.
+
+**Scénario mesuré en tête** : une candidature envoyée hier à 23 h 30 heure de
+Paris, écran rouvert aujourd'hui à 9 h — 9 h 30 se sont écoulées, donc
+`formatPublication` répond « aujourd'hui » (moins de 24 h), tandis que
+`joursDepuisParis` répond « hier » (un minuit a été franchi). La même
+candidature, au même instant, affiche deux réponses contradictoires selon la
+colonne qui la montre.
+
+**Origine** : `formatPublication` est hérité de `published_at` (phase 3,
+avant l'introduction de la notion de « jour calendaire parisien » par la
+tâche 6 du chantier suivi). La branche `veille-par-onglets` étend l'usage de
+dates de candidature à des composants qui consomment l'une ou l'autre
+fonction selon l'endroit, sans qu'aucune règle n'ait tranché laquelle est
+correcte pour un contexte donné. Relevé en revue finale (M5), pas corrigé :
+unifier les deux demande de choisir laquelle des deux sémantiques est la
+bonne pour chaque appelant, une décision de produit plutôt qu'un correctif
+mécanique.
+
+### P28 — Au changement d'onglet, la liste garde un instant les lignes de l'onglet précédent
+
+`useAsync` (voir son propre commentaire) choisit délibérément de garder les
+données précédentes affichées pendant qu'un rechargement est en vol, pour
+éviter un clignotement à chaque page ou filtre. Ce choix s'applique aussi au
+changement d'onglet de statut : les **en-têtes** (titre de colonne, onglet actif)
+basculent immédiatement, mais les **lignes** restent celles de l'ancien onglet
+jusqu'à ce que `GET /offers` réponde sous le nouveau filtre.
+
+**Scénario mesuré** : cliquer « Postulées » depuis « À traiter » affiche,
+pendant ~0,4 s, des lignes sans décision sous un en-tête « Postulées » — une
+incohérence transitoire entre le titre de la section et son contenu. Relevé
+en revue finale (M8). **Compromis assumé, pas corrigé** : la seule
+alternative (repasser par l'état `chargement` à chaque changement d'onglet)
+réintroduit le clignotement que `useAsync` a été écrit pour éliminer, un
+défaut jugé pire par la phase 3.
+
+### P29 — Deux hypothèses de mise en page à mesurer, pas encore vérifiées
+
+Relevées en revue finale, formulées comme des hypothèses parce qu'aucune des
+deux n'a été mesurée au navigateur (voir §5.4 de `GUIDELINES.md` — un
+diagnostic de mise en page déduit du code n'est pas un diagnostic, la leçon de
+P25 (j)) :
+
+- **La sixième colonne de la liste (date) fait 58 px, et `.publiee` (la
+  cellule qui y affiche la date de publication) ne porte ni `overflow` ni
+  ellipse.** Depuis la tâche 4 (colonne de date qui suit l'onglet), cette
+  cellule peut désormais afficher « non datée » (`joursPublication`/absence de
+  date) plutôt qu'un nombre de jours court (« 9 j ») — un texte plus long qui
+  pourrait déborder de 58 px sans qu'aucune règle ne l'en empêche.
+- **`html, body, #root { height: 100% }` (`theme.css:109-113`) pourrait
+  survivre inutilement à l'abandon de la coque à hauteur fixe** (revue du
+  2026-09-10, voir le commentaire de `LIST_PAGE_SIZE` dans `MatinScreen.tsx` :
+  « la page défile désormais normalement »). Si plus aucun composant ne
+  dépend d'une hauteur à 100 % pour se dimensionner, cette règle est un
+  résidu inoffensif mais mort ; si un composant en dépend encore, la retirer
+  casserait sa mise en page. Les deux sont possibles sans une mesure au
+  navigateur (`getComputedStyle`, `clientHeight`).
+
+Ni corrigées ni réfutées dans cette passe : à mesurer avant d'agir dans un
+sens ou dans l'autre.
+
+### ~~P30 — La tâche Windows ne rattrapait jamais un rendez-vous manqué~~ *(résolu le 2026-09-10)*
+
+**Signalé le 2026-09-10** depuis la bande des robots : « Collecte : pas encore
+aujourd'hui · dernière hier 8 h 30 ». La bande disait vrai — la capture datait
+d'avant 8 h, et `pas_encore` est l'état nominal à cette heure-là. Mais la
+question posée derrière (« mon PC doit-il être allumé ? ») a fait sortir un
+vrai défaut, invisible dans l'interface.
+
+**Les deux moitiés du dispositif ne dépendent pas des mêmes choses**, et c'est
+le fait à retenir :
+
+| Robot | Déclencheur | PC éteint ? |
+|---|---|---|
+| France Travail (8 h Paris), Adzuna (8 h 30), jugement (9 h) | `pg_cron`, chez Supabase | **tourne quand même** |
+| Free-Work, Collective.work (7 h 15) | Planificateur Windows | **ne tourne pas** |
+
+Ce n'était pas une surprise — le plan B l'assume plus haut dans ce document.
+Ce qui l'était : **une exécution manquée n'était jamais rattrapée**. Constaté
+sur la définition de la tâche « fast-travail scrapers », telle que
+`schtasks /Query /XML` la rendait :
+
+- pas de `StartWhenAvailable` → le rendez-vous du 10/09 07:15 était perdu, la
+  prochaine tentative annoncée au **11/09 07:15**. Un PC éteint le matin et
+  rallumé à 9 h perdait la journée entière ;
+- `DisallowStartIfOnBatteries` **et** `StopIfGoingOnBatteries` à `true` → rien
+  ne part sur batterie, et débrancher pendant la collecte l'interrompt. Sur un
+  portable, c'est un second mode de panne indépendant du premier.
+
+**Ce que ça coûtait, mesuré et non supposé** — sur les offres jugées à cette
+date, par source, et parmi elles celles notées 70 ou plus :
+
+| Source | Offres jugées | Notées ≥ 70 |
+|---|---:|---:|
+| adzuna | 673 | 13 |
+| france_travail | 521 | 2 |
+| collective | 217 | 2 |
+| free_work | 45 | 3 |
+
+Les deux sources scrapées pèsent **5 des 20 offres du haut de panier**, pour
+un sixième du corpus jugé. Le rendement par offre y est nettement supérieur à
+celui des deux API : les perdre en silence n'était pas un détail.
+
+**Correctif**, sans une ligne de code — trois réglages sur la tâche
+(`Set-ScheduledTask`) : `StartWhenAvailable = true`,
+`DisallowStartIfOnBatteries = false`, `StopIfGoingOnBatteries = false`. Un
+démarrage manqué est désormais rattrapé dès que la session s'ouvre.
+
+Rattrapage du 10/09 lancé à la main (`schtasks /Run`), le nouveau réglage ne
+valant que pour les rendez-vous à venir : `free_work` 85 nouvelles / 47 mises
+à jour, `collective` 373 / 497, les deux en `success`. Les quatre sources ont
+donc tourné ce jour-là.
+
+**L'accroc qui reste, et qui n'est pas corrigé** : `score-daily` passe à 9 h
+Paris. Une collecte rattrapée l'après-midi n'est donc jugée que **le
+lendemain**. C'est acceptable tant que le rattrapage est rare ; si les
+matinées PC éteint deviennent la règle, la réponse est de décaler le cron de
+jugement, pas d'avancer le rattrapage — arbitrage laissé ouvert.
+
+**Ce qui n'a pas de garde-fou** : rien ne surveille la tâche Windows
+elle-même. La bande des robots dit « partielle » quand deux sources sur
+quatre ont tourné, mais elle ne distingue pas « pas encore » de « ne tournera
+pas aujourd'hui ». La sonde reste manuelle :
+
+```bash
+schtasks /Query /TN "fast-travail scrapers" /V /FO LIST
+```
+
+### ~~P31 — Le jugement perdait ~10 % des offres en silence~~ *(résolu le 2026-09-10)*
+
+**Trouvé le 2026-09-10**, en exerçant le second passage de jugement
+(`20260910070000`). Le résumé rendu par la fonction :
+
+```
+{"candidates":83,"scored":76,"failed":7,"writeFailures":0}
+```
+
+La sonde de `CLAUDE.md` — celle qui « doit rendre 0 ligne » — en rend **18** :
+13 le 2026-09-10, 5 le 2026-09-09. Ce n'est donc pas un accident de ce
+passage-là, c'est un régime permanent que rien ne signalait.
+
+```sql
+select s.offer_id, o.title, s.error, s.scored_at
+from offer_ai_scores s join offers o on o.id = s.offer_id
+where s.error is not null order by s.scored_at desc;
+```
+
+**Pourquoi personne ne le voit** : une offre dont le jugement échoue écrit sa
+ligne dans `offer_ai_scores` avec `fit_score` nul. C'est **voulu** — sans ça
+elle reviendrait indéfiniment dans la file et serait re-payée. Mais la
+conséquence est qu'elle sort d'`offers_ai_candidates` **pour toujours** : elle
+ne sera jamais rejugée, `offers_scored` l'exclut, et aucune vue ne la signale.
+Elle disparaît, simplement.
+
+**Ce que P16 avait conclu, et pourquoi ça ne s'applique pas ici.** P16 avait
+mesuré 75 échecs sur 1 269 appels (5,9 %) et diagnostiqué un plafond de sortie
+trop bas : `claude-sonnet-5` émet un bloc `thinking` AVANT le bloc `text`, les
+deux puisent dans le même budget, donc le JSON s'arrêtait au milieu. Correctif
+appliqué : `MAX_TOKENS` porté de 1024 à 8192, plus un garde-fou explicite sur
+`stop_reason === 'max_tokens'` dans `claude.ts`.
+
+Ce diagnostic ne tient pas pour les échecs du 2026-09-10, et deux faits le
+disent :
+
+1. **Le garde-fou n'a pas déclenché.** Aucune erreur ne porte « réponse
+   tronquée : le plafond de max_tokens a été atteint ». Toutes portent
+   « sortie structurée illisible » ou « réponse Claude sans bloc de texte ».
+   Donc `stop_reason` n'était PAS `max_tokens`.
+2. **Les coupures sont bien trop précoces.** Les positions rapportées par
+   `JSON.parse` vont de 93 à 605 caractères, soit ~25 à ~150 tokens de sortie
+   utile. Atteindre un plafond de 8192 à 150 tokens de texte est impossible.
+
+**L'hypothèse formulée, puis RÉFUTÉE par la mesure.** La documentation de
+l'API décrit `stop_reason: "refusal"` : un HTTP 200 où un classificateur de
+sûreté décline la requête, sous **deux** formes qui se superposaient exactement
+aux deux familles d'erreur observées — refus avant sortie → `content` vide → « réponse
+Claude sans bloc de texte » (4 cas) ; refus en cours de génération → texte
+partiel → « Unterminated string in JSON » (14 cas). C'était net, et c'était
+faux.
+
+**L'épreuve qui a tranché**, et qui ne coûtait que 18 centimes : les 18 lignes
+d'erreur ont été supprimées, remettant les offres dans la file **telles
+quelles** — pas un octet de leur texte n'a changé, le cache de prompt a même
+resservi (`cacheReadTokens: 60480`). Résultat :
+
+```
+{"candidates":18,"scored":18,"failed":0,"failedPermanent":0,"failedRetryable":0}
+```
+
+**Dix-huit sur dix-huit, du premier coup.** Un refus est déterministe par
+nature : rejouer la même entrée se ferait refuser pareil. Ces échecs ne se sont
+pas reproduits, donc ce n'étaient pas des refus — c'est un **aléa**, dont la
+mécanique exacte reste inconnue et le restera jusqu'à ce que
+l'instrumentation en capture un.
+
+**Ce que cette réfutation change, et qui est le vrai correctif.** Si l'échec
+n'est pas attribuable à l'offre, le classer « permanent » est une erreur — et
+une erreur chère : elle perdait 18 offres en deux jours. `isRetryableFailure`
+classait tout HTTP 200 illisible comme permanent, au motif raisonnable qu'une
+réponse reçue mais incompréhensible venait de l'offre. La mesure dit le
+contraire, et l'arbitrage que le fichier énonçait déjà tranche alors tout seul :
+
+> se tromper dans un sens perd une offre définitivement ; se tromper dans
+> l'autre coûte un centime et un tour de plus.
+
+#### Ce qui a été fait le 2026-09-10
+
+**L'instrumentation, livrée.** `claude.ts` accroche désormais un suffixe de
+diagnostic — `[stop_reason=…, categorie=…, explication=…]` — à **tout** échec
+survenu sur un HTTP 200, et teste `stop_reason === 'refusal'` **avant** de
+chercher un bloc de texte, exactement comme le test de `max_tokens` posé par
+P16. Sans cette antériorité, un refus avant sortie continue de se déguiser en
+« sans bloc de texte ». Cinq tests figent la règle, dont un qui ancre qu'un
+refus reste **permanent**. `score-offers` redéployée.
+
+**Les 18 offres, récupérées.** Lignes d'erreur sauvegardées, puis supprimées,
+puis un passage : les 18 jugées sans erreur. La sonde de `CLAUDE.md` rend
+désormais **0**, et le corpus est passé de 1 467 à **1 550 jugements valides**.
+
+**La reclassification, livrée** — c'est le correctif de fond :
+
+| Cas | Avant | Après |
+|---|---|---|
+| HTTP 200 illisible, cause inconnue | permanent → **offre perdue** | **rejouable** → rien n'est écrit, l'offre repasse |
+| HTTP 200, `stop_reason = refusal` | permanent | permanent *(inchangé, et c'est juste)* |
+| 4xx hors 429 | permanent | permanent |
+| 429, 5xx, statut 0, exception non-HTTP | rejouable | rejouable |
+
+Le refus ne se reconnaît **pas au statut** — refus et troncature portent tous
+deux 200. D'où un drapeau `permanent` porté par `ClaudeApiError`, posé par
+`callClaudeStructured` sur `stop_reason === 'refusal'` et sur rien d'autre.
+Le porter dans le **type** plutôt que de le déduire du message évite de faire
+dépendre une décision de facturation d'une comparaison de chaînes.
+
+`verify` vert (385 tests Deno, 341 dashboard), `score-offers` redéployée en
+version 6.
+
+**Le risque qu'on a accepté en échange, et où le surveiller.** Une offre
+durablement injugeable sera désormais rejouée à chaque passage — ~2 centimes
+par jour et une place dans la file. C'est le côté sûr de l'arbitrage, mais il
+n'est **pas** borné automatiquement sur le chemin du cron : le fusible « lot
+entier en échec » vit dans `run-backfill`, pas dans `runScoring`. Le signal
+existe (`failedRetryable` dans le résumé, et un `warn` par offre), mais il faut
+aller le lire :
+
+```sql
+select r.status_code, r.content from net._http_response r
+order by r.created desc limit 5;
+```
+
+Si `failedRetryable` devient durablement non nul, c'est le moment de poser le
+compteur de tentatives — écarté aujourd'hui parce qu'il traite un risque jamais
+observé.
+
+**Ce qui reste ouvert, et qui a laissé le défaut courir deux jours** : aucune
+vue ne montre les offres dont le jugement a échoué, et le tableau de bord n'en
+dit rien. La seule façon de le savoir reste la sonde SQL de `CLAUDE.md`, qu'il
+faut penser à poser. La cause première de la troncature reste elle aussi
+inconnue — mais elle ne coûte plus d'offres, seulement un appel de plus.
 
 ### P1 — Le rayon local ne peut pas être ajusté finement
 

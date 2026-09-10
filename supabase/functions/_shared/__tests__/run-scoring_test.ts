@@ -186,6 +186,12 @@ Deno.test('score chaque candidat et cumule l usage', async () => {
 });
 
 Deno.test('un echec PERMANENT est compte et porte son erreur, sans arreter le lot', async () => {
+  // L'exemple d'echec permanent etait « sortie structuree illisible » sur un
+  // 200. Il a change le 2026-09-10 : cette classe est passee REJOUABLE, la
+  // mesure ayant montre que 18 offres sur 18 se jugeaient sans erreur au
+  // deuxieme essai, texte inchange (P31 dans ETAT.md). Le refus prend sa
+  // place — c'est desormais le seul echec permanent qui porte un 200, et il
+  // se signale par le drapeau, pas par le statut.
   const { db, rec } = fakeDb([candidate('a'), candidate('b')]);
   let appels = 0;
   const summary = await runScoring({
@@ -197,7 +203,7 @@ Deno.test('un echec PERMANENT est compte et porte son erreur, sans arreter le lo
     callClaude: () => {
       appels += 1;
       return appels === 1
-        ? Promise.reject(new ClaudeApiError('sortie structuree illisible', 200))
+        ? Promise.reject(new ClaudeApiError('refus du modele', 200, true))
         : Promise.resolve(judgement(70));
     },
   });

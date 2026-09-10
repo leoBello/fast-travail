@@ -20,6 +20,12 @@ import styles from './Absence.module.css';
  * aurait été faux sur 244 offres. C'est pour cette seule raison que ces deux
  * natures ont deux rendus distincts, et non parce que chaque nature a besoin
  * du sien.
+ *
+ * `non-datee` (tâche 9) est une NEUVIÈME nature, qui ne recouvre aucune des
+ * huit précédentes : celles-ci qualifient ce qu'une annonce dit ou tait,
+ * `non-datee` qualifie ce que le SUIVI d'une candidature a enregistré — une
+ * date d'étape absente n'a ni source ni modèle derrière elle, elle n'a
+ * simplement pas été notée quand le statut a été posé (GUIDELINES §3.1).
  */
 export type AbsenceNature =
   /** L'annonce existe, le champ non — ex. employeur absent de l'annonce. */
@@ -37,7 +43,9 @@ export type AbsenceNature =
   /** Collectée, jamais soumise à l'IA : pas « mal notée ». */
   | 'hors-perimetre'
   /** L'appel au modèle a échoué (P16). */
-  | 'echec-jugement';
+  | 'echec-jugement'
+  /** L'étape existe, sa date non — un statut posé sans elle (tâche 9). */
+  | 'non-datee';
 
 interface Props {
   nature: AbsenceNature;
@@ -58,10 +66,13 @@ export function Absence({ nature, children }: Props) {
   switch (nature) {
     case 'non-publiee':
     case 'non-precisee':
+    case 'non-datee':
       // Composé sur `Absent` (`Card.tsx`), pas réimplémenté : c'est déjà le
       // rendu du kit pour « une valeur manquante ordinaire, pas un fait à
       // signaler » — un second style italique/faint à côté aurait été un
-      // dialecte (GUIDELINES §1).
+      // dialecte (GUIDELINES §1). `non-datee` porte la même forme que
+      // `non-precisee` : la distinction est dans le MOT affiché par
+      // l'appelant, pas dans le rendu (tâche 9).
       return (
         <span data-nature={nature}>
           <Absent>{children}</Absent>

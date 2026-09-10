@@ -97,7 +97,9 @@ export interface OffersListFilters {
   sort: SortField;
   page: number;
   pageSize: number;
-  statut?: ApplicationStatus[];
+  /** Accepte `STATUT_UNDECIDED` en plus des sept statuts : `in` ne matche
+   * jamais `null`, et l'onglet « À traiter » porte 1 258 offres sur 1 272. */
+  statut?: StatutFilter[];
   workMode?: WorkModeFilter[];
   engagement?: Engagement[];
   source?: Source[];
@@ -128,7 +130,25 @@ export async function listOffers(db: DbClient, filters: OffersListFilters): Prom
   let query = db.from('offers_dashboard').select('*', { count: 'exact' });
 
   if (filters.statut !== undefined && filters.statut.length > 0) {
-    query = query.in('candidature_statut', filters.statut);
+    // Même composition que `workMode` plus bas, et pour la même raison :
+    // `in` ne matche JAMAIS `null`. L'onglet « À traiter » envoie deux
+    // valeurs — `aucune` (jamais ouverte) et `a_traiter` (ouverte sans
+    // décision, posé par `openOffer`) — qui doivent se composer en OU. Deux
+    // appels PostgREST successifs se combineraient en ET et rendraient une
+    // liste vide, sans la moindre erreur.
+    const contientSansDecision = filters.statut.includes(STATUT_UNDECIDED);
+    const statutsConnus = filters.statut.filter(
+      (v): v is ApplicationStatus => v !== STATUT_UNDECIDED,
+    );
+    if (contientSansDecision && statutsConnus.length > 0) {
+      query = query.or(
+        `candidature_statut.is.null,candidature_statut.in.(${statutsConnus.join(',')})`,
+      );
+    } else if (contientSansDecision) {
+      query = query.is('candidature_statut', null);
+    } else {
+      query = query.in('candidature_statut', statutsConnus);
+    }
   }
   if (filters.engagement !== undefined && filters.engagement.length > 0) {
     query = query.in('engagement', filters.engagement);
@@ -168,6 +188,87 @@ export async function listOffers(db: DbClient, filters: OffersListFilters): Prom
     page: filters.page,
     pageSize: filters.pageSize,
   };
+}
+
+/** Les quatre valeurs de `work_mode` chiffrées : les trois connues, plus
+ * « non précisé » que GUIDELINES §3.2 interdit de masquer. Toujours les
+ * QUATRE clés, y compris à zéro. */
+export type WorkModeCounts = Record<WorkModeFilter, number>;
+
+/**
+ * `GET /work-mode-counts` : un seul balayage pour les quatre nombres.
+ *
+ * Remplace quatre appels `GET /offers?workMode=…&pageSize=1` dont seul le
+ * `total` était lu. Le gain n'est pas de trois requêtes HTTP mais de trois
+ * balayages du corpus : le coût d'une lecture d'`offers_dashboard` ne dépend
+ * PAS de `pageSize` — ni le `distinct on` ni les fonctions de fenêtrage ne
+ * laissent descendre un filtre, donc la vue est intégralement matérialisée
+ * avant que `work_mode` ne retienne quoi que ce soit (mesuré : `pageSize=1`
+ * coûtait autant que la page complète).
+ *
+ * La vue ne rend que les valeurs PRÉSENTES ; les absentes sont complétées à
+ * zéro ici, jamais laissées manquantes. Un mode de travail dont aucune offre
+ * ne relève doit s'afficher « 0 » dans le panneau, pas disparaître — c'est la
+ * même règle qu'ailleurs dans ce tableau : un vide se nomme.
+ */
+export async function getWorkModeCounts(db: DbClient): Promise<WorkModeCounts> {
+  const { data, error } = await db
+    .from('offers_dashboard_work_mode_counts')
+    .select('work_mode, total');
+  if (error) throw new Error(`comptage par mode de travail : ${error.message}`);
+
+  const counts = Object.fromEntries(
+    [...WORK_MODES, WORK_MODE_UNSPECIFIED].map((mode) => [mode, 0]),
+  ) as WorkModeCounts;
+  for (const row of (data ?? []) as { work_mode: string; total: number | string }[]) {
+    // Une valeur que la vue rendrait sans que le code la connaisse est
+    // ignorée plutôt qu'ajoutée : le contrat de sortie est fermé sur les
+    // quatre clés, et une cinquième ferait mentir le type sans que rien ne le
+    // signale.
+    if (row.work_mode in counts) counts[row.work_mode as WorkModeFilter] = Number(row.total);
+  }
+  return counts;
+}
+
+/**
+ * La valeur de filtre « aucune décision » — une offre sans ligne
+ * `offer_applications`, donc `candidature_statut` nul.
+ *
+ * Miroir EXACT de `WORK_MODE_UNSPECIFIED` : le même problème (une colonne
+ * nullable qu'un `in` ne matche jamais) appelle la même réponse, et deux
+ * conventions différentes pour la même chose seraient un dialecte de plus.
+ * N'entre en collision avec aucune valeur d'`APPLICATION_STATUSES`.
+ */
+export const STATUT_UNDECIDED = 'aucune';
+export type StatutFilter = ApplicationStatus | typeof STATUT_UNDECIDED;
+
+/** Les huit valeurs de statut chiffrées : les sept étapes, plus « aucune
+ * décision ». TOUJOURS les huit clefs, y compris à zéro — un onglet à zéro
+ * se lit « 0 », il ne disparaît pas (GUIDELINES §3.3). */
+export type StatutCounts = Record<StatutFilter, number>;
+
+/**
+ * `GET /statut-counts` : un seul balayage pour les huit nombres.
+ *
+ * Voir la migration `20260910060000` pour le pourquoi : sept
+ * `GET /offers?statut=…&pageSize=1` coûteraient sept balayages du corpus,
+ * le coût d'une lecture d'`offers_dashboard` ne dépendant pas de `pageSize`.
+ */
+export async function getStatutCounts(db: DbClient): Promise<StatutCounts> {
+  const { data, error } = await db.from('offers_dashboard_status_counts').select('statut, total');
+  if (error) throw new Error(`comptage par statut : ${error.message}`);
+
+  const counts = Object.fromEntries(
+    [...APPLICATION_STATUSES, STATUT_UNDECIDED].map((statut) => [statut, 0]),
+  ) as StatutCounts;
+  for (const row of (data ?? []) as { statut: string; total: number | string }[]) {
+    // Une valeur que la vue rendrait sans que le code la connaisse est
+    // ignorée plutôt qu'ajoutée : le contrat de sortie est fermé sur les huit
+    // clefs, et une neuvième ferait mentir le type sans que rien ne le
+    // signale. Même règle que `getWorkModeCounts`.
+    if (row.statut in counts) counts[row.statut as StatutFilter] = Number(row.total);
+  }
+  return counts;
 }
 
 export interface Pagination {
@@ -919,4 +1020,261 @@ export async function importCandidateProfile(
   const staleProfileOfferCount = await countStaleProfileOffers(db, profile.profileVersion);
 
   return { profile, staleProfileOfferCount };
+}
+
+// ----------------------------------------------------------------------------
+// GET /robot-status — l'état des deux robots (ETAT.md P25, point d)
+// ----------------------------------------------------------------------------
+
+/** Miroir des colonnes lues sur `collection_runs` — jamais la ligne entière :
+ * `getRobotStatus` n'a besoin d'aucun compte d'offres ni message d'erreur ici
+ * (`offers_new`/`error` restent l'affaire de `collection_runs` lui-même). */
+export interface CollectionRunFact {
+  source: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+}
+
+/** Miroir des colonnes lues sur `offer_ai_scores` pour ce seul usage. */
+export interface AiScoreFact {
+  scored_at: string;
+  error: string | null;
+}
+
+/**
+ * Les quatre états validés par la maquette (`Etats.dc.html`, « L'état des
+ * deux robots, quatre cas »). `at` est un horodatage BRUT (ISO) — jamais mis
+ * en forme ici : « 8 h 30 », « hier » sont du texte, donc du ressort de la
+ * SPA (GUIDELINES §3.8, `t()`), pas de ce module runtime-neutre.
+ *
+ * `en_echec` porte `at` EN PLUS de `derniereReussite` : la maquette montre
+ * l'heure de la TENTATIVE du jour (échouée), séparément de la dernière fois
+ * où une collecte a réussi — deux faits différents, jamais confondus.
+ */
+export type CollecteStatus =
+  | { etat: 'nominal'; at: string }
+  | { etat: 'partielle'; at: string; sourcesIncompletes: number; sourcesTotal: number }
+  | { etat: 'en_echec'; at: string; derniereReussite: string | null }
+  | { etat: 'pas_encore'; derniere: string | null };
+
+/** Le jugement n'a que deux états observables : il a tourné aujourd'hui (avec
+ * un compte de succès et l'heure de la dernière écriture), ou pas — jamais de
+ * notion de « partiel » ou « en échec » ici, `offer_ai_scores` n'écrivant
+ * jamais d'échec bloquant pour tout le lot (une offre en erreur écrit sa
+ * propre ligne, voir P16 dans ETAT.md et `error is not null` plus bas). */
+/** `count` (jugements réussis d'aujourd'hui) est PLAFONNÉ par
+ * `ROBOT_STATUS_SCORES_LIMIT` (`getRobotStatus` ci-dessous), en silence : un
+ * rejugement complet (4 511 offres, un changement de `PROMPT_VERSION` ou de
+ * `profile_version`, voir CLAUDE.md) écrirait plus de lignes dans la fenêtre
+ * lue que la limite n'en rapatrie, et ce nombre sous-compterait sans qu'aucun
+ * signal ne le dise. Choix assumé plutôt qu'un `count(*)` en base (revue
+ * finale, M6) : construire la borne de journée parisienne côté SQL
+ * ajouterait un calcul de fuseau horaire (DST) à un indicateur mineur, pour
+ * un cas qui ne survient qu'un jour de rejugement complet — documenté ici,
+ * au plus près du chiffre qu'il affecte, plutôt que corrigé. */
+export type JugementStatus = { etat: 'fait'; at: string; count: number } | { etat: 'pas_encore' };
+
+export interface RobotStatusResult {
+  collecte: CollecteStatus;
+  jugement: JugementStatus;
+}
+
+/** Le plus tardif de `finished_at` (ou `started_at` si non terminé) parmi des
+ * runs déjà connus non vides — jamais appelé sur un tableau vide. */
+function mostRecentCompletion(runs: readonly CollectionRunFact[]): string {
+  let best = runs[0].finished_at ?? runs[0].started_at;
+  for (const run of runs) {
+    const at = run.finished_at ?? run.started_at;
+    if (Date.parse(at) > Date.parse(best)) best = at;
+  }
+  return best;
+}
+
+/** Le plus tardif de `finished_at`/`started_at`, une source par clé, parmi
+ * les dernières lignes connues de CHAQUE source active — `null` si aucune
+ * source active n'a la moindre ligne. */
+function mostRecentAmong(
+  activeSources: readonly string[],
+  latestBySource: ReadonlyMap<string, CollectionRunFact>,
+): string | null {
+  let best: string | null = null;
+  for (const source of activeSources) {
+    const run = latestBySource.get(source);
+    if (!run) continue;
+    const at = run.finished_at ?? run.started_at;
+    if (best === null || Date.parse(at) > Date.parse(best)) best = at;
+  }
+  return best;
+}
+
+/** La dernière réussite, toutes sources actives confondues, parmi TOUTES les
+ * lignes connues (pas seulement celles d'aujourd'hui) — `null` si aucune
+ * réussite n'apparaît dans la fenêtre lue par `getRobotStatus`. */
+function mostRecentSuccess(runs: readonly CollectionRunFact[]): string | null {
+  let best: string | null = null;
+  for (const run of runs) {
+    if (run.status !== 'success') continue;
+    const at = run.finished_at ?? run.started_at;
+    if (best === null || Date.parse(at) > Date.parse(best)) best = at;
+  }
+  return best;
+}
+
+/**
+ * Détermine l'état de la collecte à partir des faits mesurés — fonction PURE,
+ * testable sans base (même principe que `computeStreak` plus haut).
+ *
+ * Priorité, dans cet ordre :
+ * 1. **`pas_encore`** — aucune source active n'a le moindre run aujourd'hui
+ *    (heure de Paris, `todayKey`). C'est le cas le plus fréquent (ETAT.md
+ *    P25 d) : les crons partent à 8 h/8 h 30 à Paris, le Planificateur
+ *    Windows plus tard encore, et rien n'a de sens à affirmer avant.
+ * 2. **`en_echec`** — au moins une source a tourné aujourd'hui, mais AUCUNE
+ *    n'a réussi (`status = 'success'`) : la collecte du jour, dans son
+ *    ensemble, n'a rien produit de fiable.
+ * 3. **`nominal`** — TOUTES les sources actives ont réussi aujourd'hui.
+ * 4. **`partielle`** — le reste : au moins une réussite aujourd'hui, mais pas
+ *    toutes les sources actives à `success` (qu'une source ait échoué, soit
+ *    encore `partial`, soit n'ait simplement pas encore tourné aujourd'hui —
+ *    les trois comptent comme « incomplète », la maquette ne distinguant pas
+ *    la cause dans la bande elle-même).
+ */
+export function computeCollecteStatus(
+  activeSources: readonly string[],
+  runs: readonly CollectionRunFact[],
+  todayKey: string,
+): CollecteStatus {
+  // Comparaison explicite par `started_at`, jamais « le premier rencontré » :
+  // `getRobotStatus` interroge bien `order('started_at', {ascending: false})`,
+  // mais faire dépendre la justesse de cette fonction PURE d'un tri fait par
+  // l'appelant serait un couplage à distance fragile — une reprise manuelle
+  // après un échec du matin doit rester la plus récente quel que soit l'ordre
+  // dans lequel les lignes arrivent ici.
+  const latestBySource = new Map<string, CollectionRunFact>();
+  const todayBySource = new Map<string, CollectionRunFact>();
+  for (const run of runs) {
+    const currentLatest = latestBySource.get(run.source);
+    if (!currentLatest || Date.parse(run.started_at) > Date.parse(currentLatest.started_at)) {
+      latestBySource.set(run.source, run);
+    }
+    if (parisDateKey(new Date(run.started_at)) === todayKey) {
+      const currentToday = todayBySource.get(run.source);
+      if (!currentToday || Date.parse(run.started_at) > Date.parse(currentToday.started_at)) {
+        todayBySource.set(run.source, run);
+      }
+    }
+  }
+
+  if (todayBySource.size === 0) {
+    return { etat: 'pas_encore', derniere: mostRecentAmong(activeSources, latestBySource) };
+  }
+
+  const ranToday = [...todayBySource.values()];
+  const successToday = ranToday.filter((r) => r.status === 'success');
+
+  if (successToday.length === 0) {
+    return {
+      etat: 'en_echec',
+      at: mostRecentCompletion(ranToday),
+      derniereReussite: mostRecentSuccess(runs),
+    };
+  }
+
+  if (successToday.length === activeSources.length) {
+    return { etat: 'nominal', at: mostRecentCompletion(ranToday) };
+  }
+
+  return {
+    etat: 'partielle',
+    at: mostRecentCompletion(ranToday),
+    sourcesIncompletes: activeSources.length - successToday.length,
+    sourcesTotal: activeSources.length,
+  };
+}
+
+/**
+ * Détermine l'état du jugement — fonction PURE, même principe que
+ * `computeCollecteStatus`. Le compte affiché ne porte que les offres
+ * RÉELLEMENT jugées aujourd'hui (`error is null`, voir CLAUDE.md et P16
+ * dans ETAT.md) : une ligne en erreur ne doit jamais gonfler ce nombre,
+ * même si elle date bien d'aujourd'hui — écrire une ligne d'erreur n'est pas
+ * juger une offre.
+ */
+export function computeJugementStatus(
+  scores: readonly AiScoreFact[],
+  todayKey: string,
+): JugementStatus {
+  const today = scores.filter((s) => parisDateKey(new Date(s.scored_at)) === todayKey);
+  if (today.length === 0) return { etat: 'pas_encore' };
+
+  let at = today[0].scored_at;
+  let count = 0;
+  for (const score of today) {
+    if (Date.parse(score.scored_at) > Date.parse(at)) at = score.scored_at;
+    if (score.error === null) count += 1;
+  }
+  return { etat: 'fait', at, count };
+}
+
+/** Marge large sur un cycle quotidien (collecte + jugement une fois par
+ * jour) : couvre la fenêtre « aujourd'hui, heure de Paris » quel que soit le
+ * moment où cette route est appelée, sans jamais balayer les 1 269+ lignes
+ * historiques d'`offer_ai_scores` pour ne retenir que celles du jour. */
+const ROBOT_STATUS_SCORE_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** Large mais borné : `collection_runs` ne porte qu'une quinzaine de lignes
+ * par jour (~13 mesuré au 2026-09-10, quatre sources) — cette limite couvre
+ * environ 75 jours avant de tronquer quoi que ce soit (corrigé en revue
+ * finale, M6 : la précédente affirmait « des années »), y compris la
+ * recherche de la dernière réussite CONNUE, qui peut remonter à avant
+ * aujourd'hui. */
+const ROBOT_STATUS_RUNS_LIMIT = 1000;
+const ROBOT_STATUS_SCORES_LIMIT = 2000;
+
+/**
+ * `GET /robot-status` : l'état des deux robots (collecte, jugement) pour la
+ * bande compacte de la barre d'application (`Main.dc.html`, `Etats.dc.html`).
+ *
+ * Le total de sources n'est JAMAIS codé en dur : il vient de `sources` (les
+ * lignes `enabled`), pour qu'un cinquième collecteur un jour ne fasse pas
+ * mentir la bande (ETAT.md P25 d).
+ */
+export async function getRobotStatus(
+  db: DbClient,
+  now: Date = new Date(),
+): Promise<RobotStatusResult> {
+  const todayKey = parisDateKey(now);
+
+  const { data: sourceRows, error: sourceError } = await db
+    .from('sources')
+    .select('key')
+    .eq('enabled', true);
+  if (sourceError) throw new Error(`lecture des sources actives : ${sourceError.message}`);
+  const activeSources = ((sourceRows ?? []) as { key: string }[]).map((row) => row.key);
+
+  let runs: CollectionRunFact[] = [];
+  if (activeSources.length > 0) {
+    const { data: runRows, error: runError } = await db
+      .from('collection_runs')
+      .select('source, status, started_at, finished_at')
+      .in('source', activeSources)
+      .order('started_at', { ascending: false })
+      .limit(ROBOT_STATUS_RUNS_LIMIT);
+    if (runError) throw new Error(`lecture des collectes du jour : ${runError.message}`);
+    runs = (runRows ?? []) as CollectionRunFact[];
+  }
+  const collecte = computeCollecteStatus(activeSources, runs, todayKey);
+
+  const lookback = new Date(now.getTime() - ROBOT_STATUS_SCORE_LOOKBACK_MS).toISOString();
+  const { data: scoreRows, error: scoreError } = await db
+    .from('offer_ai_scores')
+    .select('scored_at, error')
+    .gte('scored_at', lookback)
+    .order('scored_at', { ascending: false })
+    .limit(ROBOT_STATUS_SCORES_LIMIT);
+  if (scoreError) throw new Error(`lecture des jugements du jour : ${scoreError.message}`);
+  const jugement = computeJugementStatus((scoreRows ?? []) as AiScoreFact[], todayKey);
+
+  return { collecte, jugement };
 }

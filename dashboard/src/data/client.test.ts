@@ -1,11 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  createDashboardClient,
-  DashboardApiError,
-  countByWorkMode,
-  dashboardClientFromEnv,
-} from './client';
-import type { DashboardClient } from './client';
+import { createDashboardClient, DashboardApiError, dashboardClientFromEnv } from './client';
 
 const CONFIG = {
   baseUrl: 'https://exemple.supabase.co/functions/v1/api-dashboard',
@@ -116,17 +110,143 @@ describe('createDashboardClient', () => {
     expect(appels[1]?.method).toBe('PATCH');
     expect(appels[1]?.body).toBe(JSON.stringify({ status: 'ecartee' }));
   });
+
+  it('getStatutCounts appelle GET /statut-counts', async () => {
+    let url = '';
+    const client = createDashboardClient({
+      ...CONFIG,
+      fetchImpl: fakeFetch((u) => {
+        url = u;
+        return jsonResponse(200, {
+          aucune: 1258,
+          a_traiter: 0,
+          retenue: 0,
+          postulee: 6,
+          relancee: 1,
+          entretien: 0,
+          terminee: 0,
+          ecartee: 7,
+        });
+      }),
+    });
+    const counts = await client.getStatutCounts();
+    expect(url.endsWith('/statut-counts')).toBe(true);
+    expect(counts.aucune).toBe(1258);
+    expect(counts.postulee).toBe(6);
+  });
+
+  it('listOffers pose statut une fois par valeur (?statut=aucune&statut=a_traiter)', async () => {
+    let url = '';
+    const client = createDashboardClient({
+      ...CONFIG,
+      fetchImpl: fakeFetch((u) => {
+        url = u;
+        return jsonResponse(200, { rows: [], total: 0, page: 1, pageSize: 8 });
+      }),
+    });
+    await client.listOffers({ statut: ['aucune', 'a_traiter'] });
+    expect(url).toContain('statut=aucune');
+    expect(url).toContain('statut=a_traiter');
+  });
 });
 
-describe('countByWorkMode', () => {
-  it("lit `total`, ne rend aucune ligne : le panneau de filtres n'a besoin que du chiffre", async () => {
-    const listOffers = vi.fn().mockResolvedValue({ rows: [], total: 863, page: 1, pageSize: 1 });
-    const client = { listOffers } as unknown as DashboardClient;
+describe('partage des lectures en vol', () => {
+  /** Un `fetch` que le test fait retomber quand il veut : c'est la seule
+   * façon d'observer la fenêtre « en vol », qui se referme dès la réponse. */
+  function fetchRetenu() {
+    const appels: string[] = [];
+    const resolveurs: ((r: Response) => void)[] = [];
+    const fetchImpl = vi.fn((input: string | URL | Request) => {
+      appels.push(String(input));
+      return new Promise<Response>((resolve) => resolveurs.push(resolve));
+    }) as unknown as typeof fetch;
+    return { appels, resolveurs, fetchImpl };
+  }
 
-    const total = await countByWorkMode(client, 'non_precise');
+  it('deux lectures identiques lancées en parallèle ne font QU’UN aller-retour', async () => {
+    const { appels, resolveurs, fetchImpl } = fetchRetenu();
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
 
-    expect(total).toBe(863);
-    expect(listOffers).toHaveBeenCalledWith({ workMode: ['non_precise'], pageSize: 1 });
+    const a = client.getStats();
+    const b = client.getStats();
+    expect(appels).toHaveLength(1);
+
+    resolveurs[0](jsonResponse(200, { neverOpened: 7 }));
+    expect(await a).toEqual({ neverOpened: 7 });
+    expect(await b).toEqual({ neverOpened: 7 });
+  });
+
+  it('deux lectures DIFFÉRENTES restent deux requêtes', async () => {
+    const { appels, resolveurs, fetchImpl } = fetchRetenu();
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    void client.listOffers({ statut: ['retenue'] });
+    void client.listOffers({ statut: ['postulee'] });
+
+    expect(appels).toHaveLength(2);
+    resolveurs.forEach((r) => r(jsonResponse(200, { rows: [], total: 0 })));
+  });
+
+  it("ce n'est pas un cache : une lecture retombée ne sert plus personne", async () => {
+    const { appels, resolveurs, fetchImpl } = fetchRetenu();
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    const premiere = client.getStats();
+    resolveurs[0](jsonResponse(200, { neverOpened: 1 }));
+    await premiere;
+
+    void client.getStats();
+    expect(appels).toHaveLength(2);
+  });
+
+  it('une lecture en échec ne reste pas collée : la suivante repart', async () => {
+    const { appels, resolveurs, fetchImpl } = fetchRetenu();
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    const premiere = client.getStats();
+    resolveurs[0](jsonResponse(500, { error: 'panne' }));
+    await expect(premiere).rejects.toBeInstanceOf(DashboardApiError);
+
+    void client.getStats();
+    expect(appels).toHaveLength(2);
+  });
+
+  it('une ÉCRITURE périme les lectures en vol : le rechargement qui suit ne les rejoint pas', async () => {
+    const { appels, resolveurs, fetchImpl } = fetchRetenu();
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    // Une lecture partie AVANT l'écriture — elle ne peut pas voir ce que
+    // l'écriture va poser.
+    void client.listBrief();
+    expect(appels).toHaveLength(1);
+
+    void client.patchApplication('x', { status: 'retenue' });
+    expect(appels).toHaveLength(2);
+
+    // Le rechargement d'après-écriture doit être un VRAI aller-retour, pas un
+    // greffage sur la lecture périmée.
+    void client.listBrief();
+    expect(appels).toHaveLength(3);
+
+    resolveurs.forEach((r) => r(jsonResponse(200, { rows: [], total: 0 })));
+  });
+});
+
+describe('getWorkModeCounts', () => {
+  it('chiffre les quatre modes en UN appel, là où le panneau en faisait quatre', async () => {
+    let capturedUrl = '';
+    const fetchImpl = fakeFetch((url) => {
+      capturedUrl = url;
+      return jsonResponse(200, { full_remote: 173, hybride: 150, sur_site: 88, non_precise: 861 });
+    });
+    const client = createDashboardClient({ ...CONFIG, fetchImpl });
+
+    const counts = await client.getWorkModeCounts();
+
+    expect(capturedUrl).toBe(
+      'https://exemple.supabase.co/functions/v1/api-dashboard/work-mode-counts',
+    );
+    expect(counts).toEqual({ full_remote: 173, hybride: 150, sur_site: 88, non_precise: 861 });
   });
 });
 

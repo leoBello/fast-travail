@@ -11,7 +11,10 @@ import {
   ENGAGEMENTS,
   getConfig,
   getOfferDetail,
+  getRobotStatus,
   getStats,
+  getStatutCounts,
+  getWorkModeCounts,
   importCandidateProfile,
   listBrief,
   listOffers,
@@ -22,6 +25,8 @@ import {
   SORT_FIELDS,
   type SortField,
   SOURCES,
+  STATUT_UNDECIDED,
+  type StatutFilter,
   ValidationError,
   WORK_MODE_UNSPECIFIED,
   WORK_MODES,
@@ -172,10 +177,30 @@ function parseWorkModeParamMulti(params: URLSearchParams): WorkModeFilter[] | un
   return raw as WorkModeFilter[];
 }
 
+/** Version « plusieurs valeurs » de `statut`, élargie à `STATUT_UNDECIDED` —
+ * c'est cette valeur qui rend l'onglet « À traiter » possible (`in` ne
+ * matche jamais `null`). Même forme que `parseWorkModeParamMulti`. */
+function parseStatutParamMulti(params: URLSearchParams): StatutFilter[] | undefined {
+  const raw = params.getAll('statut');
+  if (raw.length === 0) return undefined;
+  for (const value of raw) {
+    if (
+      value !== STATUT_UNDECIDED && !(APPLICATION_STATUSES as readonly string[]).includes(value)
+    ) {
+      throw new ValidationError(
+        `paramètre "statut" invalide : "${value}" — attendu parmi ${
+          APPLICATION_STATUSES.join(', ')
+        }, ${STATUT_UNDECIDED}`,
+      );
+    }
+  }
+  return raw as StatutFilter[];
+}
+
 function parseOffersListFilters(params: URLSearchParams) {
   const { page, pageSize } = parsePagination(params);
   const sort: SortField = requireEnumParam(params, 'sort', SORT_FIELDS) ?? 'final_score';
-  const statut = requireEnumParamMulti(params, 'statut', APPLICATION_STATUSES);
+  const statut = parseStatutParamMulti(params);
   const engagement = requireEnumParamMulti(params, 'engagement', ENGAGEMENTS);
   const source = requireEnumParamMulti(params, 'source', SOURCES);
   const workMode = parseWorkModeParamMulti(params);
@@ -333,8 +358,20 @@ export async function routeDashboardRequest(
       return Response.json(await getStats(db));
     }
 
+    if (req.method === 'GET' && path === '/work-mode-counts') {
+      return Response.json(await getWorkModeCounts(db));
+    }
+
+    if (req.method === 'GET' && path === '/statut-counts') {
+      return Response.json(await getStatutCounts(db));
+    }
+
     if (req.method === 'GET' && path === '/config') {
       return Response.json(await getConfig(db));
+    }
+
+    if (req.method === 'GET' && path === '/robot-status') {
+      return Response.json(await getRobotStatus(db));
     }
 
     if (req.method === 'POST' && path === '/candidate-profile') {

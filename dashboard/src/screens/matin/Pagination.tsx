@@ -1,5 +1,14 @@
 import { t } from '../../i18n/i18n';
+import { numerosDePage } from './paginationLogic';
+import type { PaginationNumerotee } from './paginationLogic';
+import { Badge } from '../../ui/kit/Badge';
 import styles from './Pagination.module.css';
+
+// `numerosDePage` est une fonction pure : elle vit dans `paginationLogic.ts`,
+// pas ici, et n'est pas réexportée (`react-refresh/only-export-components`,
+// voir le commentaire de ce fichier). Seul le type traverse, ce que
+// `allowConstantExport` autorise.
+export type { PaginationNumerotee } from './paginationLogic';
 
 interface Props {
   debut: number;
@@ -9,6 +18,7 @@ interface Props {
   onPrecedent: () => void;
   suivantDisponible: boolean;
   precedentDisponible: boolean;
+  numerotation?: PaginationNumerotee;
 }
 
 /**
@@ -29,37 +39,87 @@ export function Pagination({
   onPrecedent,
   suivantDisponible,
   precedentDisponible,
+  numerotation,
 }: Props) {
+  const boutonPrecedent = precedentDisponible ? (
+    <button type="button" className={styles.bouton} onClick={onPrecedent}>
+      {t('matin.precedentes')}
+    </button>
+  ) : null;
+
+  const boutonSuivant = (
+    <button
+      type="button"
+      className={styles.bouton}
+      onClick={onSuivant}
+      disabled={!suivantDisponible}
+    >
+      {t('matin.suivantes')}
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
+  );
+
   return (
     <div className={styles.pagination}>
       <span className={styles.compte}>{t('matin.pagination', debut, fin, total)}</span>
+      {numerotation === undefined ? null : (
+        // Badge de `Main.dc.html` (« 10 par page ») : seulement la liste
+        // paginée le porte, jamais la bande « Ce matin », qui ne le dessine
+        // pas. `pageSize` vient de `numerotation`, pas de `fin - debut + 1`,
+        // faux sur une dernière page incomplète.
+        <Badge ton="neutre" taille="compacte" discontinu>
+          {t('matin.parPage', numerotation.pageSize)}
+        </Badge>
+      )}
       <div className={styles.spacer} />
-      {precedentDisponible ? (
-        <button type="button" className={styles.bouton} onClick={onPrecedent}>
-          {t('matin.precedentes')}
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className={styles.bouton}
-        onClick={onSuivant}
-        disabled={!suivantDisponible}
-      >
-        {t('matin.suivantes')}
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="m9 18 6-6-6-6" />
-        </svg>
-      </button>
+      {numerotation === undefined ? (
+        // Bande « Ce matin », sans numérotation : Précédentes/Suivantes
+        // restent enfants directs de `.pagination`, structure et
+        // espacement inchangés — voir Pagination.test.tsx.
+        <>
+          {boutonPrecedent}
+          {boutonSuivant}
+        </>
+      ) : (
+        // Groupe imbriqué distinct, comme dans Main.dc.html : son propre
+        // `gap` (4px) porte l'espacement entre boutons de navigation,
+        // séparé du `gap` du conteneur externe.
+        <div className={styles.navGroup}>
+          {boutonPrecedent}
+          {numerosDePage(numerotation.page, numerotation.pageCount).map((entree, index) =>
+            entree === 'ellipse' ? (
+              <span key={`ellipse-${index}`} className={styles.ellipse} aria-hidden="true">
+                {t('matin.ellipsePages')}
+              </span>
+            ) : (
+              <button
+                key={entree}
+                type="button"
+                className={styles.numero}
+                data-actif={entree === numerotation.page ? 'oui' : undefined}
+                aria-current={entree === numerotation.page ? 'page' : undefined}
+                aria-label={t('matin.pageNumero', entree)}
+                onClick={() => numerotation.onPageChange(entree)}
+              >
+                {entree}
+              </button>
+            ),
+          )}
+          {boutonSuivant}
+        </div>
+      )}
     </div>
   );
 }

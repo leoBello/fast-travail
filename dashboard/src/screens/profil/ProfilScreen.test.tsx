@@ -26,6 +26,23 @@ function clientFactice(overrides: Partial<DashboardClient> = {}): DashboardClien
       staleProfileOfferCount: 0,
     }),
     importCandidateProfile: vi.fn(),
+    getWorkModeCounts: vi
+      .fn()
+      .mockResolvedValue({ full_remote: 173, hybride: 150, sur_site: 88, non_precise: 861 }),
+    getStatutCounts: vi.fn().mockResolvedValue({
+      aucune: 1258,
+      a_traiter: 0,
+      retenue: 0,
+      postulee: 6,
+      relancee: 1,
+      entretien: 0,
+      terminee: 0,
+      ecartee: 7,
+    }),
+    getRobotStatus: vi.fn().mockResolvedValue({
+      collecte: { etat: 'pas_encore', derniere: null },
+      jugement: { etat: 'pas_encore' },
+    }),
     ...overrides,
   };
 }

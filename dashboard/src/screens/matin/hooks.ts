@@ -1,15 +1,17 @@
 import { useCallback } from 'react';
 import type { DashboardClient } from '../../data/client';
-import { countByWorkMode } from '../../data/client';
-import { WORK_MODE_UNSPECIFIED, WORK_MODES } from '../../data/types';
 import type {
   ConfigResult,
   Engagement,
   OfferDashboardRow,
   PageResult,
+  RobotStatusResult,
   SortField,
   Source,
   StatsResult,
+  StatutCounts,
+  StatutFilter,
+  WorkModeCounts,
   WorkModeFilter,
 } from '../../data/types';
 import type { AsyncState } from './useAsync';
@@ -33,6 +35,7 @@ export interface OffersListParams {
   sort: SortField;
   page: number;
   pageSize: number;
+  statut?: StatutFilter[];
   workMode?: WorkModeFilter[];
   engagement?: Engagement[];
   source?: Source[];
@@ -45,10 +48,11 @@ export function useOffersList(
   client: DashboardClient,
   params: OffersListParams,
 ): [AsyncState<PageResult<OfferDashboardRow>>, () => void] {
-  const { sort, page, pageSize, workMode, engagement, source, agenticAi } = params;
+  const { sort, page, pageSize, statut, workMode, engagement, source, agenticAi } = params;
   const fn = useCallback(
-    () => client.listOffers({ sort, page, pageSize, workMode, engagement, source, agenticAi }),
-    [client, sort, page, pageSize, workMode, engagement, source, agenticAi],
+    () =>
+      client.listOffers({ sort, page, pageSize, statut, workMode, engagement, source, agenticAi }),
+    [client, sort, page, pageSize, statut, workMode, engagement, source, agenticAi],
   );
   return useAsync(fn);
 }
@@ -60,17 +64,35 @@ export function useStats(client: DashboardClient): [AsyncState<StatsResult>, () 
 
 /** Les quatre valeurs de `work_mode` (les trois connues, plus « non précisé »),
  * chacune chiffrée — jamais un filtre qui masquerait silencieusement les
- * 68 % d'offres sans mode de travail connu (GUIDELINES §3.2). */
-export type WorkModeCounts = Record<WorkModeFilter, number>;
-
+ * 68 % d'offres sans mode de travail connu (GUIDELINES §3.2).
+ *
+ * **UN appel, pas quatre.** La version précédente lançait quatre
+ * `listOffers({ workMode: [v], pageSize: 1 })` en parallèle pour n'en lire
+ * que le `total`. Le coût d'une lecture d'`offers_dashboard` ne dépendant pas
+ * de `pageSize` (ni le `distinct on` ni les fonctions de fenêtrage ne
+ * laissent descendre un filtre), c'étaient quatre balayages du corpus pour
+ * quatre nombres — la moitié des requêtes du chargement. Le comptage se fait
+ * désormais en base, par un `group by` : `GET /work-mode-counts`, migration
+ * `20260910050000`. */
 export function useWorkModeCounts(
   client: DashboardClient,
 ): [AsyncState<WorkModeCounts>, () => void] {
-  const fn = useCallback(async () => {
-    const valeurs: WorkModeFilter[] = [...WORK_MODES, WORK_MODE_UNSPECIFIED];
-    const comptes = await Promise.all(valeurs.map((v) => countByWorkMode(client, v)));
-    return Object.fromEntries(valeurs.map((v, i) => [v, comptes[i]])) as WorkModeCounts;
-  }, [client]);
+  const fn = useCallback(() => client.getWorkModeCounts(), [client]);
+  return useAsync(fn);
+}
+
+/** Les huit valeurs de statut chiffrées, pour les onglets de « Toute la
+ * veille ». UN appel, pas sept : le coût d'une lecture d'`offers_dashboard`
+ * ne dépend pas de `pageSize`, donc sept `pageSize=1` seraient sept
+ * balayages du corpus (migration `20260910060000`).
+ *
+ * **Ces comptes sont GLOBAUX**, jamais restreints par le panneau de filtres.
+ * C'est délibéré : un compte d'onglet répond à « combien y en a-t-il », pas
+ * à « combien en verrais-je avec mes filtres actuels ». Quand un filtre est
+ * actif, c'est la ligne de compte de la liste qui le dit (`OfferList`), pas
+ * l'onglet qui change de nombre sous les doigts. */
+export function useStatutCounts(client: DashboardClient): [AsyncState<StatutCounts>, () => void] {
+  const fn = useCallback(() => client.getStatutCounts(), [client]);
   return useAsync(fn);
 }
 
@@ -84,5 +106,20 @@ export function useWorkModeCounts(
  */
 export function useConfig(client: DashboardClient): [AsyncState<ConfigResult>, () => void] {
   const fn = useCallback(() => client.getConfig(), [client]);
+  return useAsync(fn);
+}
+
+/**
+ * `GET /robot-status` : l'état des deux robots, pour la bande de la barre
+ * d'application (`Etats.dc.html`, « L'état des deux robots, quatre cas »).
+ *
+ * Appel indépendant, comme `useStats` et `useConfig` : chaque écran reste la
+ * seule couche de LUI-MÊME qui appelle le réseau. Tant qu'il n'a pas répondu,
+ * la bande n'affirme rien — ni coche, ni heure, ni zéro (GUIDELINES §3.3).
+ */
+export function useRobotStatus(
+  client: DashboardClient,
+): [AsyncState<RobotStatusResult>, () => void] {
+  const fn = useCallback(() => client.getRobotStatus(), [client]);
   return useAsync(fn);
 }
