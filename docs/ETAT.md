@@ -1107,7 +1107,7 @@ maquettes précèdent le plan d'implémentation.
 Règles de conception : [`design/GUIDELINES.md`](design/GUIDELINES.md),
 contraignant. Maquettes et statut de leurs données :
 [`design/maquettes/README.md`](design/maquettes/README.md).
-Canvas : <https://claude.ai/code/artifact/32ae0eff-96a6-4698-a945-f7b6c7f07e64>
+Canvas : <https://claude.ai/code/artifact/fdde10d6-b696-4774-b2ba-db53d8262485>
 
 **Plan d'implémentation écrit le 2026-09-09**, dix tâches :
 [`superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](superpowers/plans/2026-09-09-tableau-de-bord-phase3.md).
