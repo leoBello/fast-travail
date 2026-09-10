@@ -302,9 +302,24 @@ Collective, deux `robots.txt` — sont commitées sous `supabase/functions/_scra
 
 **Planification quotidienne** : `scripts/scrape-daily.cmd` lance les deux
 scrapers en `--mode delta --trigger cron`, déclaré au Planificateur Windows
-sous le nom « fast-travail scrapers », tous les jours à 07 h 15 — après
-`ft-daily` (6 h UTC) et `adzuna-daily` (6 h 30 UTC), pour une sélection
-complète en une fois. Piège vérifié avant commit : le nom d'utilisateur
+sous le nom « fast-travail scrapers », tous les jours à 07 h 15.
+
+**Correction du 2026-09-10 — cette phrase disait « après `ft-daily` (6 h UTC)
+et `adzuna-daily` (6 h 30 UTC) », et c'était faux.** Le Planificateur Windows
+raisonne en heure **locale**, `pg_cron` en **UTC** (`cron.timezone` vaut `GMT`,
+vérifié) : 07 h 15 Paris = 05 h 15 UTC, donc les scrapers passent **avant** les
+deux API, pas après. Mesuré sur les horodatages du 2026-09-09, heure de Paris :
+07:15 `free_work`, 07:20 `collective`, 08:00 `france_travail`, 08:30 `adzuna`.
+L'intention — tout collecter avant de juger — était donc respectée par accident,
+pas par la raison invoquée. L'ordre réel, en été :
+
+| Heure Paris | Ce qui tourne | Par quoi |
+|---|---|---|
+| 07:15 | Free-Work, Collective.work | Planificateur Windows (PC allumé) |
+| 08:00 | France Travail | `pg_cron` |
+| 08:30 | Adzuna | `pg_cron` |
+| 09:00 | Jugement IA | `pg_cron` |
+| 14:00 | Jugement IA, second passage | `pg_cron` *(depuis `20260910070000`)* | Piège vérifié avant commit : le nom d'utilisateur
 (`Léo`) porte un accent, et un accent littéral dans un `.cmd` dépend à la fois
 de l'encodage du fichier et du codepage actif à l'exécution — deux choses qui
 peuvent diverger en silence. Le script utilise donc le nom court 8.3
@@ -327,6 +342,12 @@ Contrairement au plan A, le Planificateur Windows ne tourne que **PC allumé**
 — compromis assumé du ROADMAP, documenté dans le script lui-même : les délais
 de politesse et le temps de parcours ne tiennent pas dans les 2 secondes de
 CPU d'une Edge Function.
+
+**Depuis le 2026-09-10, un rendez-vous manqué est rattrapé** dès que la session
+s'ouvre, et la batterie ne bloque plus rien — trois réglages de la tâche, sans
+une ligne de code. Ce qu'ils changent, ce qu'ils ne changent pas et ce que les
+deux sources scrapées pèsent réellement : voir **P30** dans « Problèmes
+ouverts ».
 
 **La reconnaissance a démenti trois affirmations de ce document.**
 
@@ -1107,7 +1128,7 @@ maquettes précèdent le plan d'implémentation.
 Règles de conception : [`design/GUIDELINES.md`](design/GUIDELINES.md),
 contraignant. Maquettes et statut de leurs données :
 [`design/maquettes/README.md`](design/maquettes/README.md).
-Canvas : <https://claude.ai/code/artifact/fdde10d6-b696-4774-b2ba-db53d8262485>
+Canvas : <https://claude.ai/code/artifact/6aad5c99-ca9d-49d3-ae81-333830aafc42>
 
 **Plan d'implémentation écrit le 2026-09-09**, dix tâches :
 [`superpowers/plans/2026-09-09-tableau-de-bord-phase3.md`](superpowers/plans/2026-09-09-tableau-de-bord-phase3.md).
@@ -2082,6 +2103,174 @@ P25 (j)) :
 
 Ni corrigées ni réfutées dans cette passe : à mesurer avant d'agir dans un
 sens ou dans l'autre.
+
+### ~~P30 — La tâche Windows ne rattrapait jamais un rendez-vous manqué~~ *(résolu le 2026-09-10)*
+
+**Signalé le 2026-09-10** depuis la bande des robots : « Collecte : pas encore
+aujourd'hui · dernière hier 8 h 30 ». La bande disait vrai — la capture datait
+d'avant 8 h, et `pas_encore` est l'état nominal à cette heure-là. Mais la
+question posée derrière (« mon PC doit-il être allumé ? ») a fait sortir un
+vrai défaut, invisible dans l'interface.
+
+**Les deux moitiés du dispositif ne dépendent pas des mêmes choses**, et c'est
+le fait à retenir :
+
+| Robot | Déclencheur | PC éteint ? |
+|---|---|---|
+| France Travail (8 h Paris), Adzuna (8 h 30), jugement (9 h) | `pg_cron`, chez Supabase | **tourne quand même** |
+| Free-Work, Collective.work (7 h 15) | Planificateur Windows | **ne tourne pas** |
+
+Ce n'était pas une surprise — le plan B l'assume plus haut dans ce document.
+Ce qui l'était : **une exécution manquée n'était jamais rattrapée**. Constaté
+sur la définition de la tâche « fast-travail scrapers », telle que
+`schtasks /Query /XML` la rendait :
+
+- pas de `StartWhenAvailable` → le rendez-vous du 10/09 07:15 était perdu, la
+  prochaine tentative annoncée au **11/09 07:15**. Un PC éteint le matin et
+  rallumé à 9 h perdait la journée entière ;
+- `DisallowStartIfOnBatteries` **et** `StopIfGoingOnBatteries` à `true` → rien
+  ne part sur batterie, et débrancher pendant la collecte l'interrompt. Sur un
+  portable, c'est un second mode de panne indépendant du premier.
+
+**Ce que ça coûtait, mesuré et non supposé** — sur les offres jugées à cette
+date, par source, et parmi elles celles notées 70 ou plus :
+
+| Source | Offres jugées | Notées ≥ 70 |
+|---|---:|---:|
+| adzuna | 673 | 13 |
+| france_travail | 521 | 2 |
+| collective | 217 | 2 |
+| free_work | 45 | 3 |
+
+Les deux sources scrapées pèsent **5 des 20 offres du haut de panier**, pour
+un sixième du corpus jugé. Le rendement par offre y est nettement supérieur à
+celui des deux API : les perdre en silence n'était pas un détail.
+
+**Correctif**, sans une ligne de code — trois réglages sur la tâche
+(`Set-ScheduledTask`) : `StartWhenAvailable = true`,
+`DisallowStartIfOnBatteries = false`, `StopIfGoingOnBatteries = false`. Un
+démarrage manqué est désormais rattrapé dès que la session s'ouvre.
+
+Rattrapage du 10/09 lancé à la main (`schtasks /Run`), le nouveau réglage ne
+valant que pour les rendez-vous à venir : `free_work` 85 nouvelles / 47 mises
+à jour, `collective` 373 / 497, les deux en `success`. Les quatre sources ont
+donc tourné ce jour-là.
+
+**L'accroc qui reste, et qui n'est pas corrigé** : `score-daily` passe à 9 h
+Paris. Une collecte rattrapée l'après-midi n'est donc jugée que **le
+lendemain**. C'est acceptable tant que le rattrapage est rare ; si les
+matinées PC éteint deviennent la règle, la réponse est de décaler le cron de
+jugement, pas d'avancer le rattrapage — arbitrage laissé ouvert.
+
+**Ce qui n'a pas de garde-fou** : rien ne surveille la tâche Windows
+elle-même. La bande des robots dit « partielle » quand deux sources sur
+quatre ont tourné, mais elle ne distingue pas « pas encore » de « ne tournera
+pas aujourd'hui ». La sonde reste manuelle :
+
+```bash
+schtasks /Query /TN "fast-travail scrapers" /V /FO LIST
+```
+
+### ~~P31 — Le jugement perdait ~10 % des offres en silence~~ *(résolu le 2026-09-10)*
+
+**Trouvé le 2026-09-10**, en exerçant le second passage de jugement
+(`20260910070000`). Le résumé rendu par la fonction :
+
+```
+{"candidates":83,"scored":76,"failed":7,"writeFailures":0}
+```
+
+La sonde de `CLAUDE.md` — celle qui « doit rendre 0 ligne » — en rend **18** :
+13 le 2026-09-10, 5 le 2026-09-09. Ce n'est donc pas un accident de ce
+passage-là, c'est un régime permanent que rien ne signalait.
+
+```sql
+select s.offer_id, o.title, s.error, s.scored_at
+from offer_ai_scores s join offers o on o.id = s.offer_id
+where s.error is not null order by s.scored_at desc;
+```
+
+**Pourquoi personne ne le voit** : une offre dont le jugement échoue écrit sa
+ligne dans `offer_ai_scores` avec `fit_score` nul. C'est **voulu** — sans ça
+elle reviendrait indéfiniment dans la file et serait re-payée. Mais la
+conséquence est qu'elle sort d'`offers_ai_candidates` **pour toujours** : elle
+ne sera jamais rejugée, `offers_scored` l'exclut, et aucune vue ne la signale.
+Elle disparaît, simplement.
+
+**Ce que P16 avait conclu, et pourquoi ça ne s'applique pas ici.** P16 avait
+mesuré 75 échecs sur 1 269 appels (5,9 %) et diagnostiqué un plafond de sortie
+trop bas : `claude-sonnet-5` émet un bloc `thinking` AVANT le bloc `text`, les
+deux puisent dans le même budget, donc le JSON s'arrêtait au milieu. Correctif
+appliqué : `MAX_TOKENS` porté de 1024 à 8192, plus un garde-fou explicite sur
+`stop_reason === 'max_tokens'` dans `claude.ts`.
+
+Ce diagnostic ne tient pas pour les échecs du 2026-09-10, et deux faits le
+disent :
+
+1. **Le garde-fou n'a pas déclenché.** Aucune erreur ne porte « réponse
+   tronquée : le plafond de max_tokens a été atteint ». Toutes portent
+   « sortie structurée illisible » ou « réponse Claude sans bloc de texte ».
+   Donc `stop_reason` n'était PAS `max_tokens`.
+2. **Les coupures sont bien trop précoces.** Les positions rapportées par
+   `JSON.parse` vont de 93 à 605 caractères, soit ~25 à ~150 tokens de sortie
+   utile. Atteindre un plafond de 8192 à 150 tokens de texte est impossible.
+
+**L'hypothèse formulée, puis RÉFUTÉE par la mesure.** La documentation de
+l'API décrit `stop_reason: "refusal"` : un HTTP 200 où un classificateur de
+sûreté décline la requête, sous **deux** formes qui se superposaient exactement
+aux deux familles d'erreur observées — refus avant sortie → `content` vide → « réponse
+Claude sans bloc de texte » (4 cas) ; refus en cours de génération → texte
+partiel → « Unterminated string in JSON » (14 cas). C'était net, et c'était
+faux.
+
+**L'épreuve qui a tranché**, et qui ne coûtait que 18 centimes : les 18 lignes
+d'erreur ont été supprimées, remettant les offres dans la file **telles
+quelles** — pas un octet de leur texte n'a changé, le cache de prompt a même
+resservi (`cacheReadTokens: 60480`). Résultat :
+
+```
+{"candidates":18,"scored":18,"failed":0,"failedPermanent":0,"failedRetryable":0}
+```
+
+**Dix-huit sur dix-huit, du premier coup.** Un refus est déterministe par
+nature : rejouer la même entrée se ferait refuser pareil. Ces échecs ne se sont
+pas reproduits, donc ce n'étaient pas des refus — c'est un **aléa**, dont la
+mécanique exacte reste inconnue et le restera jusqu'à ce que
+l'instrumentation en capture un.
+
+**Ce que cette réfutation change, et qui est le vrai correctif.** Si l'échec
+n'est pas attribuable à l'offre, le classer « permanent » est une erreur — et
+une erreur chère : elle perdait 18 offres en deux jours. `isRetryableFailure`
+classait tout HTTP 200 illisible comme permanent, au motif raisonnable qu'une
+réponse reçue mais incompréhensible venait de l'offre. La mesure dit le
+contraire, et l'arbitrage que le fichier énonçait déjà tranche alors tout seul :
+
+> se tromper dans un sens perd une offre définitivement ; se tromper dans
+> l'autre coûte un centime et un tour de plus.
+
+#### Ce qui a été fait le 2026-09-10
+
+**L'instrumentation, livrée.** `claude.ts` accroche désormais un suffixe de
+diagnostic — `[stop_reason=…, categorie=…, explication=…]` — à **tout** échec
+survenu sur un HTTP 200, et teste `stop_reason === 'refusal'` **avant** de
+chercher un bloc de texte, exactement comme le test de `max_tokens` posé par
+P16. Sans cette antériorité, un refus avant sortie continue de se déguiser en
+« sans bloc de texte ». Cinq tests figent la règle, dont un qui ancre qu'un
+refus reste **permanent**. `score-offers` redéployée.
+
+**Ce qu'il reste à faire, et qui demande une décision** : les 18 lignes déjà en
+base ne portent pas le diagnostic, et leurs offres ne reviendront jamais dans
+la file. Les récupérer suppose de **supprimer ces 18 lignes d'erreur** — elles
+ne contiennent aucun jugement, `fit_score` y est nul —, ce qui les rend
+candidates au prochain passage. Coût : ~18 centimes. Bénéfice double : les
+offres sont récupérées, **et** leur prochain échec éventuel portera enfin sa
+cause. Sauvegarde des 18 lignes prise avant toute suppression.
+
+**Ce qui n'est toujours pas couvert** : aucune vue ne montre les offres dont le
+jugement a échoué. La seule façon de le savoir reste la sonde SQL de
+`CLAUDE.md`, qu'il faut penser à poser. Tant que le tableau de bord ne l'affiche
+pas, ce défaut se reproduira sans être vu — c'est ce qui l'a laissé courir deux
+jours.
 
 ### P1 — Le rayon local ne peut pas être ajusté finement
 
