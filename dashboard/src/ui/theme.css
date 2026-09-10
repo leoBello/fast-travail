@@ -139,9 +139,17 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/*
+ * `background: none` fait partie de la remise à zéro, pas seulement
+ * `font`/`color`/`cursor` : le navigateur peint tout `<button>` non stylé
+ * avec un `buttonface` opaque (un gris sous Chromium), et sans cette ligne
+ * ce gris traverse tout composant qui ne déclare pas son propre fond — c'est
+ * ce qui faisait un fond gris sur le titre des cartes « Ce matin » (P25 g).
+ */
 button {
   font: inherit;
   color: inherit;
+  background: none;
   cursor: pointer;
 }
 
