@@ -1063,6 +1063,16 @@ export type CollecteStatus =
  * notion de « partiel » ou « en échec » ici, `offer_ai_scores` n'écrivant
  * jamais d'échec bloquant pour tout le lot (une offre en erreur écrit sa
  * propre ligne, voir P16 dans ETAT.md et `error is not null` plus bas). */
+/** `count` (jugements réussis d'aujourd'hui) est PLAFONNÉ par
+ * `ROBOT_STATUS_SCORES_LIMIT` (`getRobotStatus` ci-dessous), en silence : un
+ * rejugement complet (4 511 offres, un changement de `PROMPT_VERSION` ou de
+ * `profile_version`, voir CLAUDE.md) écrirait plus de lignes dans la fenêtre
+ * lue que la limite n'en rapatrie, et ce nombre sous-compterait sans qu'aucun
+ * signal ne le dise. Choix assumé plutôt qu'un `count(*)` en base (revue
+ * finale, M6) : construire la borne de journée parisienne côté SQL
+ * ajouterait un calcul de fuseau horaire (DST) à un indicateur mineur, pour
+ * un cas qui ne survient qu'un jour de rejugement complet — documenté ici,
+ * au plus près du chiffre qu'il affecte, plutôt que corrigé. */
 export type JugementStatus = { etat: 'fait'; at: string; count: number } | { etat: 'pas_encore' };
 
 export interface RobotStatusResult {
@@ -1213,10 +1223,12 @@ export function computeJugementStatus(
  * historiques d'`offer_ai_scores` pour ne retenir que celles du jour. */
 const ROBOT_STATUS_SCORE_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
 
-/** Large mais borné : `collection_runs` ne porte que quelques lignes par jour
- * (40 au 2026-09-10) — cette limite couvre des années avant de tronquer quoi
- * que ce soit, y compris la recherche de la dernière réussite CONNUE, qui
- * peut remonter à avant aujourd'hui. */
+/** Large mais borné : `collection_runs` ne porte qu'une quinzaine de lignes
+ * par jour (~13 mesuré au 2026-09-10, quatre sources) — cette limite couvre
+ * environ 75 jours avant de tronquer quoi que ce soit (corrigé en revue
+ * finale, M6 : la précédente affirmait « des années »), y compris la
+ * recherche de la dernière réussite CONNUE, qui peut remonter à avant
+ * aujourd'hui. */
 const ROBOT_STATUS_RUNS_LIMIT = 1000;
 const ROBOT_STATUS_SCORES_LIMIT = 2000;
 

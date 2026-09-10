@@ -96,8 +96,12 @@ export interface OfferListProps {
   /** Le total du CORPUS, tous onglets confondus — distinct de `total`, qui
    * est celui de l'onglet actif. Les deux ensemble permettent de dire ce que
    * l'onglet montre ET ce qu'il laisse aux autres, sans jamais prétendre
-   * « rien de masqué » sur un onglet qui filtre. */
-  totalCorpus: number;
+   * « rien de masqué » sur un onglet qui filtre. `null` tant que
+   * `GET /statut-counts` n'a pas répondu (ou a échoué) — un appel réseau
+   * INDÉPENDANT de celui qui charge `offers`/`total` (revue finale, I1) : la
+   * ligne de compte ne doit jamais afficher « sur 0 jugées » quand ce
+   * chiffre est en réalité inconnu. */
+  totalCorpus: number | null;
   /** Vrai dès qu'une dimension du panneau de filtres est sélectionnée : la
    * ligne de compte le dit alors explicitement, parce que les comptes
    * d'onglets, eux, restent globaux. */
@@ -156,10 +160,14 @@ export function OfferList({
           {chargement
             ? t('matin.chargement')
             : filtresActifs
-              ? t('matin.compteOngletFiltre', total, totalCorpus)
+              ? totalCorpus === null
+                ? t('matin.compteEnAttente')
+                : t('matin.compteOngletFiltre', total, totalCorpus)
               : onglet === 'toutes'
                 ? t('matin.offresJugeesRienMasque', total)
-                : t('matin.compteOnglet', total, totalCorpus)}
+                : totalCorpus === null
+                  ? t('matin.compteEnAttente')
+                  : t('matin.compteOnglet', total, totalCorpus)}
         </span>
         {statsChargement ? (
           <Badge ton="neutre" taille="compacte" discontinu>
@@ -208,12 +216,25 @@ export function OfferList({
           ) : total === 0 ? (
             onglet === 'toutes' ? (
               <EmptyState titre={t('matin.listeVideTitre')} detail={t('matin.listeVideDetail')} />
+            ) : filtresActifs ? (
+              // Le vide vient du FILTRE, pas de l'étape : un titre qui
+              // accuserait l'onglet (« Aucune offre à traiter ») mentirait
+              // sur la cause (revue finale, corollaire d'I2).
+              <EmptyState titre={t('matin.videFiltreTitre')} detail={t('matin.videFiltreDetail')} />
             ) : (
               <EmptyState
                 titre={libelleVideOnglet(onglet)}
                 detail={t('matin.listeOngletVideDetail')}
                 action={
-                  comptesStatut === null ? undefined : (
+                  // Rendu SEULEMENT si l'action mène quelque part : jamais
+                  // sur l'onglet « À traiter » lui-même (le clic ne
+                  // changerait rien, `statut` mémoïsé resterait identique),
+                  // et jamais si son compte est à zéro — sans quoi le
+                  // bouton promettrait « Voir les 0 à traiter » (revue
+                  // finale, I2).
+                  onglet !== 'a_traiter' &&
+                  comptesStatut !== null &&
+                  comptePourOnglet('a_traiter', comptesStatut) > 0 ? (
                     <button
                       type="button"
                       className={styles.bouton}
@@ -221,7 +242,7 @@ export function OfferList({
                     >
                       {t('matin.videVersATraiter', comptePourOnglet('a_traiter', comptesStatut))}
                     </button>
-                  )
+                  ) : undefined
                 }
               />
             )

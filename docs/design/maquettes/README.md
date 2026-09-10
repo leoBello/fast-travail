@@ -20,7 +20,7 @@ Onze artboards, répartis en trois pages dans `canvas.json`.
 |---|---|---|
 | `Main.dc.html` | Application | L'écran du matin : le brief du jour en trois cartes de décision, puis toute la veille — **barre d'onglets par statut, page bornée à la fenêtre**. |
 | `Detail.dc.html` | Application | Une offre en entier : le rang décomposé, les **deux jugements** d'un doublon, l'extraction, le suivi. |
-| `VeilleRepliee.dc.html` | Application | Le même écran, bande « Ce matin » repliée : 15 lignes au lieu de 8, onglet « Toutes », colonne *Statut*. |
+| `VeilleRepliee.dc.html` | Application | Le même écran, bande « Ce matin » repliée : moins de défilement pour atteindre la liste (page fixée à dix lignes, elle ne change pas), onglet « Toutes », colonne *Statut*. |
 | `Suivi.dc.html` | Application | Les candidatures : l'entonnoir, le pipeline en colonnes, la série et le compteur anti-perte. |
 | `OngletsSuivi.dc.html` | Application | Les quatre situations créées par les onglets : colonne contextuelle, onglet à zéro, date de relance absente, comptes pas encore reçus. |
 | `Composants.dc.html` | Système | Le vocabulaire : fondations, couple de scores, statuts, badges de fait, **les huit absences**, actions, infobulles, vides. |

@@ -1596,8 +1596,8 @@ canvas :
 | Tranché | Retenu | Écarté, et ce qu'il coûtait |
 |---|---|---|
 | Découpage des onglets | **Un onglet par statut** — les six étapes, la sortie, et « Toutes » | Quatre onglets groupés : « postulée », « relancée » et « entretien » se confondraient dans « En cours », soit exactement la distinction demandée, et deux mots de vocabulaire que rien d'autre n'emploie. Une ligne dans le panneau de filtres : le panneau est replié par défaut, donc l'état courant et les comptes resteraient invisibles |
-| Ce qu'une page contient | **La page vaut ce qui tient** — hauteur mesurée, taille de page déduite | Taille fixe à 25 : le défilement revient à l'intérieur de la liste. « Charger plus » : la liste s'allonge sans fin, le défaut signalé en pire |
-| Bande « Ce matin » | **Repliable, état mémorisé** — repliée, elle rend ~330 px à la liste (8 lignes → 15) | Ne rien faire : 158 pages sur l'onglet « À traiter » |
+| Ce qu'une page contient | ~~La page vaut ce qui tient — hauteur mesurée, taille de page déduite~~ **Revenu en arrière le 2026-09-10** : taille FIXE à dix lignes, la page défile normalement (voir « La taille de page mesurée a échoué en production » plus bas) | Taille fixe à 25 : le défilement revient à l'intérieur de la liste. « Charger plus » : la liste s'allonge sans fin, le défaut signalé en pire |
+| Bande « Ce matin » | **Repliable, état mémorisé** — repliée, elle rend ~330 px de défilement à la liste (la page reste fixée à dix lignes, revirement du 2026-09-10 : voir ci-dessous) | Ne rien faire : 126 pages sur l'onglet « À traiter » |
 
 **Trois règles que le dessin a imposées**, et qui gouvernent l'implémentation :
 
@@ -1624,7 +1624,7 @@ canvas :
 | Mesure | Valeur |
 |---|---:|
 | `offers_dashboard_status_counts` (`explain analyze`, 3 appels, les deux derniers retenus) | **~60 ms** |
-| Requêtes au chargement du tableau de bord | **6** (5 avant le chantier, plus `statut-counts`) |
+| Requêtes au chargement du tableau de bord | **7** — remesuré le 2026-09-10 (Playwright, `networkidle`) : `/brief`, `/offers`, `/stats`, `/config`, `/work-mode-counts`, `/statut-counts`, `/robot-status`. La mesure « 6 » ci-dessus datait d'avant le commit qui ajoute la bande des robots (`/robot-status`) |
 | Lignes de liste par page | **10**, en dur |
 | Comptes en base au 2026-09-10 | 1 258 sans décision · 6 postulées · 1 relancée · 7 écartées · **1 272** au total |
 
@@ -1722,11 +1722,11 @@ onglets :
 |---|---|---|
 | ~~a~~ | ~~Le bouton de **réglages** de la barre d'application n'existe pas~~ — **corrigé le 2026-09-10** : construit, posé `disabled`, `title`/`aria-label` en français | `MatinScreen`, barre d'application |
 | ~~b~~ | ~~L'**icône de document** de « Mon CV » manque~~ — **corrigé le 2026-09-10**, `path` repris verbatim de `Main.dc.html` | idem |
-| ~~c~~ | ~~Le libellé est « Importer mon CV » là où la maquette écrit « Mon CV »~~ — **corrigé le 2026-09-10**, nouvelle clé `app.monCv` (`profil.importerCv` conservée pour l'écran de profil, verbe d'action distinct) | idem |
+| ~~c~~ | ~~Le libellé est « Importer mon CV » là où la maquette écrit « Mon CV »~~ — **corrigé le 2026-09-10**, nouvelle clé `app.monCv` (`profil.boutonImporter` reste le verbe d'action, distinct, de l'écran de profil) | idem |
 | ~~d~~ | ~~L'état des deux crons n'est pas affiché~~ — **corrigé le 2026-09-10** | `GET /robot-status`, `RobotStatusBand` |
 | ~~e~~ | ~~« Mes candidatures » n'a **pas d'icône**~~ — **corrigé le 2026-09-10**, icône pipeline (trois colonnes) ajoutée à la maquette puis reprise verbatim | idem |
 | ~~f~~ | ~~Le bouton **« Suivantes »** est collé à la carte du dessus~~ — **corrigé le 2026-09-10** : `margin-top` posé sur la bande (`MorningBand`), pas sur `Pagination` (partagé avec « Toute la veille »). 11px hors échelle de tokens : `--space-3` (12px) est le plus proche, écart de 1px assumé | `MorningBand` / `Pagination` |
-| g | Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas | `theme.css` — voir la cause ci-dessous |
+| ~~g~~ | ~~Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas~~ — **corrigé le 2026-09-10, en deux temps** : la remise à zéro des `<button>` n'avait ni `background` ni `border`, et la première passe a laissé le contour | `theme.css` — voir la cause ci-dessous |
 | ~~h~~ | ~~Le couple de scores ne porte pas les couleurs de la maquette (`77`/`68` en ambre là où la maquette met encre et gris)~~ — **corrigé le 2026-09-10** : `Score.module.css` `.fit` en `--color-text-muted` ; `--color-warning` reste réservé aux états (`theme.css`) | `Score` / `OfferCard` |
 | ~~i~~ | ~~Le badge « Texte coupé à 500 car. » paraît plein là où la maquette le veut **discontinu**~~ — **faux, retiré le 2026-09-10** : mesuré au navigateur, `border-style: dashed` — déjà conforme. Relevé à l'œil sur une capture d'écran, à une résolution où une bordure discontinue de 1px se lit comme pleine | `OfferCard` |
 | ~~j~~ | ~~La légende `MODE DE TRAVAIL` chevauche « Full remote »~~ — **retiré, ce n'était pas un défaut du panneau** | — |
@@ -2000,6 +2000,88 @@ qu'ils parlent de la même chose.
 
 ---
 
+### P26 — `StatusTabs` porte `role="tablist"`/`role="tab"` sans le reste du motif ARIA
+
+`StatusTabs.tsx` pose `role="tablist"` sur le conteneur et `role="tab"` sur
+chaque bouton, avec `aria-selected`, mais rien du reste du motif WAI-ARIA
+« tabs » : aucun `role="tabpanel"` sur la zone qu'un onglet gouverne, aucun
+`aria-controls` du tab vers ce panneau, et aucune navigation par flèches
+(gauche/droite) entre onglets. **Scénario** : un utilisateur au clavier ou au
+lecteur d'écran qui active le mode navigation par composant (`Tab` puis
+flèches, le motif standard) trouve huit boutons ordinaires — `Tab` avance d'un
+bouton à l'autre au lieu que les flèches le fassent, et rien n'annonce quelle
+zone de la page l'onglet actif gouverne. Fonctionnel à la souris et au
+`Tab`/`Entrée` seuls, dégradé pour qui attend le motif complet. Relevé en
+revue finale (M4), pas corrigé : hors périmètre de cette passe.
+
+### P27 — Deux arithmétiques de date coexistent, et peuvent se contredire sur la même offre
+
+`formatPublication` (`data/format.ts`) calcule `(maintenant − published_at) /
+86 400 000` — une différence d'instants en millisecondes. `joursDepuisParis`
+(`data/parisDate.ts`) compare des **clés de jour calendaire** en heure de
+Paris (`YYYY-MM-DD`, comme `parisDateKey` côté serveur — voir CLAUDE.md sur la
+série de candidatures). Les deux répondent à « il y a combien de jours ? »,
+mais pas à la même question : l'un compte des heures écoulées, l'autre des
+minuits franchis.
+
+**Scénario mesuré en tête** : une candidature envoyée hier à 23 h 30 heure de
+Paris, écran rouvert aujourd'hui à 9 h — 9 h 30 se sont écoulées, donc
+`formatPublication` répond « aujourd'hui » (moins de 24 h), tandis que
+`joursDepuisParis` répond « hier » (un minuit a été franchi). La même
+candidature, au même instant, affiche deux réponses contradictoires selon la
+colonne qui la montre.
+
+**Origine** : `formatPublication` est hérité de `published_at` (phase 3,
+avant l'introduction de la notion de « jour calendaire parisien » par la
+tâche 6 du chantier suivi). La branche `veille-par-onglets` étend l'usage de
+dates de candidature à des composants qui consomment l'une ou l'autre
+fonction selon l'endroit, sans qu'aucune règle n'ait tranché laquelle est
+correcte pour un contexte donné. Relevé en revue finale (M5), pas corrigé :
+unifier les deux demande de choisir laquelle des deux sémantiques est la
+bonne pour chaque appelant, une décision de produit plutôt qu'un correctif
+mécanique.
+
+### P28 — Au changement d'onglet, la liste garde un instant les lignes de l'onglet précédent
+
+`useAsync` (voir son propre commentaire) choisit délibérément de garder les
+données précédentes affichées pendant qu'un rechargement est en vol, pour
+éviter un clignotement à chaque page ou filtre. Ce choix s'applique aussi au
+changement d'onglet de statut : les **en-têtes** (titre de colonne, onglet actif)
+basculent immédiatement, mais les **lignes** restent celles de l'ancien onglet
+jusqu'à ce que `GET /offers` réponde sous le nouveau filtre.
+
+**Scénario mesuré** : cliquer « Postulées » depuis « À traiter » affiche,
+pendant ~0,4 s, des lignes sans décision sous un en-tête « Postulées » — une
+incohérence transitoire entre le titre de la section et son contenu. Relevé
+en revue finale (M8). **Compromis assumé, pas corrigé** : la seule
+alternative (repasser par l'état `chargement` à chaque changement d'onglet)
+réintroduit le clignotement que `useAsync` a été écrit pour éliminer, un
+défaut jugé pire par la phase 3.
+
+### P29 — Deux hypothèses de mise en page à mesurer, pas encore vérifiées
+
+Relevées en revue finale, formulées comme des hypothèses parce qu'aucune des
+deux n'a été mesurée au navigateur (voir §5.4 de `GUIDELINES.md` — un
+diagnostic de mise en page déduit du code n'est pas un diagnostic, la leçon de
+P25 (j)) :
+
+- **La sixième colonne de la liste (date) fait 58 px, et `.publiee` (la
+  cellule qui y affiche la date de publication) ne porte ni `overflow` ni
+  ellipse.** Depuis la tâche 4 (colonne de date qui suit l'onglet), cette
+  cellule peut désormais afficher « non datée » (`joursPublication`/absence de
+  date) plutôt qu'un nombre de jours court (« 9 j ») — un texte plus long qui
+  pourrait déborder de 58 px sans qu'aucune règle ne l'en empêche.
+- **`html, body, #root { height: 100% }` (`theme.css:109-113`) pourrait
+  survivre inutilement à l'abandon de la coque à hauteur fixe** (revue du
+  2026-09-10, voir le commentaire de `LIST_PAGE_SIZE` dans `MatinScreen.tsx` :
+  « la page défile désormais normalement »). Si plus aucun composant ne
+  dépend d'une hauteur à 100 % pour se dimensionner, cette règle est un
+  résidu inoffensif mais mort ; si un composant en dépend encore, la retirer
+  casserait sa mise en page. Les deux sont possibles sans une mesure au
+  navigateur (`getComputedStyle`, `clientHeight`).
+
+Ni corrigées ni réfutées dans cette passe : à mesurer avant d'agir dans un
+sens ou dans l'autre.
 
 ### P1 — Le rayon local ne peut pas être ajusté finement
 

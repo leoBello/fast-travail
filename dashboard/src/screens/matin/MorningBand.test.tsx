@@ -163,11 +163,11 @@ describe('MorningBand', () => {
     expect(screen.getByText('3 jours de suite')).toBeDefined();
   });
 
-  it('repliée : le bouton porte aria-controls vers le conteneur des cartes (même sans carte affichée)', () => {
+  it('repliée : le bouton ne porte PAS aria-controls, car le conteneur des cartes n’existe dans AUCUN cas de cette branche', () => {
     render(<MorningBand {...props({ replie: true })} />);
-    expect(screen.getByRole('button', { name: /Déplier/ }).getAttribute('aria-controls')).toBe(
-      'ce-matin-cartes',
-    );
+    expect(
+      screen.getByRole('button', { name: /Déplier/ }).getAttribute('aria-controls'),
+    ).toBeNull();
   });
 
   it('dépliée : le bouton propose de replier, et pointe vers le conteneur des cartes', () => {

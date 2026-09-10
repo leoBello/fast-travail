@@ -231,6 +231,35 @@ describe('MatinScreen', () => {
   });
 
   it('changer d’onglet remet la liste en page 1 et envoie le bon statut', async () => {
+    // Le piège fermé ici (revue finale, M3) : la liste EST DÉJÀ en page 1 au
+    // moment du montage, donc cliquer un onglet sans être allé en page 2
+    // d'abord ne peut jamais faire échouer l'assertion « remet en page 1 ».
+    // `total: 25` (> `LIST_PAGE_SIZE`, 10) rend le bouton « Suivantes »
+    // cliquable pour y aller réellement avant de changer d'onglet.
+    const appels: OffersListFilters[] = [];
+    const client = {
+      ...clientFactice(),
+      listOffers: (filtres: OffersListFilters = {}) => {
+        appels.push(filtres);
+        return Promise.resolve({ rows: [], total: 25, page: filtres.page ?? 1, pageSize: 10 });
+      },
+    };
+
+    render(<MatinScreen client={client} onOuvrirOffre={vi.fn()} />);
+    // Deux boutons « Suivantes » coexistent (bande « Ce matin » ET liste) :
+    // on scope au conteneur de la barre d'onglets, propre à la liste.
+    const sectionListe = (await screen.findAllByRole('tab'))[0].closest('section')!;
+    await userEvent.click(within(sectionListe).getByRole('button', { name: 'Suivantes' }));
+    await waitFor(() => expect(appels.at(-1)?.page).toBe(2));
+
+    await userEvent.click(await screen.findByRole('tab', { name: /Postulée/ }));
+
+    const dernier = appels.at(-1);
+    expect(dernier?.page).toBe(1);
+    expect(dernier?.statut).toEqual(['postulee']);
+  });
+
+  it('demande dix lignes par page à "Toute la veille" (LIST_PAGE_SIZE, R3)', async () => {
     const appels: OffersListFilters[] = [];
     const client = {
       ...clientFactice(),
@@ -239,13 +268,9 @@ describe('MatinScreen', () => {
         return Promise.resolve({ rows: [], total: 0, page: 1, pageSize: 8 });
       },
     };
-
     render(<MatinScreen client={client} onOuvrirOffre={vi.fn()} />);
-    await userEvent.click(await screen.findByRole('tab', { name: /Postulée/ }));
-
-    const dernier = appels.at(-1);
-    expect(dernier?.page).toBe(1);
-    expect(dernier?.statut).toEqual(['postulee']);
+    await waitFor(() => expect(appels.length).toBeGreaterThan(0));
+    expect(appels[0]?.pageSize).toBe(10);
   });
 
   it('l’onglet par défaut demande les deux valeurs « à traiter »', async () => {

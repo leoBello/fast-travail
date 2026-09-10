@@ -128,8 +128,14 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
       });
       // `decidesAujourdhui` est dérivé de `/stats` (tâche 10) : le recharger
       // suffit à le faire avancer, aucun état local à maintenir en plus.
+      // `recargerListe`/`recargerComptesStatut` (revue finale, I3) : sans
+      // eux, l'onglet « Retenues »/« Écartées » restait à son ancien compte
+      // et l'offre décidée restait visible sous « À traiter » jusqu'au
+      // prochain rechargement manuel.
       recargerBrief();
       recargerStats();
+      recargerListe();
+      recargerComptesStatut();
     } catch {
       // La décision a échoué : l'offre revient dans la bande plutôt que de
       // disparaître silencieusement (une absence de décision n'est pas une
@@ -155,7 +161,7 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
   const [listPage, setListPage] = useState(1);
   const [filtres, setFiltres] = useState<FilterState>({});
   const [filtresOuverts, setFiltresOuverts] = useState(false);
-  const [comptesStatutState] = useStatutCounts(client);
+  const [comptesStatutState, recargerComptesStatut] = useStatutCounts(client);
 
   // `useMemo` obligatoire : `statut` est un TABLEAU, et il est la dépendance
   // du `useCallback` d'`useOffersList`. Reconstruit à chaque rendu, il
@@ -193,7 +199,10 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
     filtres.agenticAi !== undefined;
 
   const comptesStatut = comptesStatutState.statut === 'succes' ? comptesStatutState.donnees : null;
-  const totalCorpus = comptesStatut === null ? 0 : comptePourOnglet('toutes', comptesStatut);
+  // `null`, jamais `0`, tant que `GET /statut-counts` n'a pas répondu (ou a
+  // échoué) — confondre les deux affirmerait « 10 dans cet onglet, sur 0
+  // jugées » alors que dix lignes sont à l'écran (revue finale, I1).
+  const totalCorpus = comptesStatut === null ? null : comptePourOnglet('toutes', comptesStatut);
 
   const listeOffres = listState.statut === 'succes' ? listState.donnees.rows : [];
   const listeTotal = listState.statut === 'succes' ? listState.donnees.total : 0;

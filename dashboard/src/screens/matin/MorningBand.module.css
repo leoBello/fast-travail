@@ -74,10 +74,12 @@
 
 /*
  * La bande REPLIÉE (`VeilleRepliee.dc.html`) : une ligne unique de hauteur
- * fixe, tout en ligne, avec une bordure basse — c'est elle qui rend sa
- * hauteur à la liste (15 lignes au lieu de 8, revue de tâche 8, défaut 1).
- * Remplace `.bande` (padding vertical 20px/22px) plutôt que de s'y
- * imbriquer : additionner les deux aurait gardé une bonne partie de la
+ * fixe, tout en ligne, avec une bordure basse (revue de tâche 8, défaut 1).
+ * La page défile désormais normalement et la liste garde une taille de page
+ * fixe (dix lignes) : le repli ne change plus le nombre de lignes affichées,
+ * seulement le défilement à parcourir pour les atteindre (revue du
+ * 2026-09-10). Remplace `.bande` (padding vertical 20px/22px) plutôt que de
+ * s'y imbriquer : additionner les deux aurait gardé une bonne partie de la
  * hauteur que le repli est censé rendre à la liste.
  */
 .bandeRepliee {

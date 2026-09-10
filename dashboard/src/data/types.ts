@@ -379,6 +379,10 @@ export type CollecteStatus =
   | { etat: 'en_echec'; at: string; derniereReussite: string | null }
   | { etat: 'pas_encore'; derniere: string | null };
 
+/** `count` est PLAFONNÉ côté serveur (`ROBOT_STATUS_SCORES_LIMIT`,
+ * `dashboard-query.ts`) : un jour de rejugement complet du corpus
+ * sous-compterait en silence — voir le commentaire de ce champ côté serveur
+ * (revue finale, M6) avant d'afficher ce nombre comme un fait absolu. */
 export type JugementStatus = { etat: 'fait'; at: string; count: number } | { etat: 'pas_encore' };
 
 export interface RobotStatusResult {

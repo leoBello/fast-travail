@@ -40,7 +40,7 @@ export const fr = {
     erreurConfigDetail:
       'Les variables VITE_DASHBOARD_API_URL, VITE_SUPABASE_ANON_KEY et VITE_DASHBOARD_TOKEN doivent être définies (voir dashboard/.env.example).',
     // Bouton de navigation de la barre d'application (`Main.dc.html`) vers
-    // l'écran de profil — distinct de `profil.importerCv`, le verbe d'une
+    // l'écran de profil — distinct de `profil.boutonImporter`, le verbe d'une
     // ACTION (soumettre un nouveau CV) que porte le bouton de cet écran-là.
     // Un bouton de navigation et un bouton d'action ne portent pas le même
     // verbe (P25, revue de l'écran du matin) : « Mon CV » ici, « Importer
@@ -381,6 +381,13 @@ export const fr = {
     // (GUIDELINES §3.3), la même règle que le tiret cadratin de
     // `StatusTabs`.
     videVersATraiter: (n: number) => `Voir les ${n} à traiter`,
+    // Le vide d'un onglet de statut quand un FILTRE, pas l'étape, en est la
+    // cause (revue finale, corollaire d'I2) : `filtresActifs` fait basculer
+    // ici plutôt que sur `libelleVideOnglet`/`listeOngletVideDetail`, qui
+    // accuseraient l'étape à tort.
+    videFiltreTitre: 'Aucune offre ne correspond, avec ces filtres',
+    videFiltreDetail:
+      'Essayez de retirer un filtre — cet onglet peut contenir des offres qu’il masque.',
   },
 
   /**
@@ -566,7 +573,6 @@ export const fr = {
    * explicitement ce que l'import NE fait PAS.
    */
   profil: {
-    importerCv: 'Importer mon CV',
     titre: 'Importer mon CV',
     sousTitre:
       'Met à jour le CV utilisé pour juger les offres. Ne rejuge rien : les jugements déjà ' +
