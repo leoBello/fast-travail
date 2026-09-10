@@ -2258,19 +2258,50 @@ P16. Sans cette antériorité, un refus avant sortie continue de se déguiser en
 « sans bloc de texte ». Cinq tests figent la règle, dont un qui ancre qu'un
 refus reste **permanent**. `score-offers` redéployée.
 
-**Ce qu'il reste à faire, et qui demande une décision** : les 18 lignes déjà en
-base ne portent pas le diagnostic, et leurs offres ne reviendront jamais dans
-la file. Les récupérer suppose de **supprimer ces 18 lignes d'erreur** — elles
-ne contiennent aucun jugement, `fit_score` y est nul —, ce qui les rend
-candidates au prochain passage. Coût : ~18 centimes. Bénéfice double : les
-offres sont récupérées, **et** leur prochain échec éventuel portera enfin sa
-cause. Sauvegarde des 18 lignes prise avant toute suppression.
+**Les 18 offres, récupérées.** Lignes d'erreur sauvegardées, puis supprimées,
+puis un passage : les 18 jugées sans erreur. La sonde de `CLAUDE.md` rend
+désormais **0**, et le corpus est passé de 1 467 à **1 550 jugements valides**.
 
-**Ce qui n'est toujours pas couvert** : aucune vue ne montre les offres dont le
-jugement a échoué. La seule façon de le savoir reste la sonde SQL de
-`CLAUDE.md`, qu'il faut penser à poser. Tant que le tableau de bord ne l'affiche
-pas, ce défaut se reproduira sans être vu — c'est ce qui l'a laissé courir deux
-jours.
+**La reclassification, livrée** — c'est le correctif de fond :
+
+| Cas | Avant | Après |
+|---|---|---|
+| HTTP 200 illisible, cause inconnue | permanent → **offre perdue** | **rejouable** → rien n'est écrit, l'offre repasse |
+| HTTP 200, `stop_reason = refusal` | permanent | permanent *(inchangé, et c'est juste)* |
+| 4xx hors 429 | permanent | permanent |
+| 429, 5xx, statut 0, exception non-HTTP | rejouable | rejouable |
+
+Le refus ne se reconnaît **pas au statut** — refus et troncature portent tous
+deux 200. D'où un drapeau `permanent` porté par `ClaudeApiError`, posé par
+`callClaudeStructured` sur `stop_reason === 'refusal'` et sur rien d'autre.
+Le porter dans le **type** plutôt que de le déduire du message évite de faire
+dépendre une décision de facturation d'une comparaison de chaînes.
+
+`verify` vert (385 tests Deno, 341 dashboard), `score-offers` redéployée en
+version 6.
+
+**Le risque qu'on a accepté en échange, et où le surveiller.** Une offre
+durablement injugeable sera désormais rejouée à chaque passage — ~2 centimes
+par jour et une place dans la file. C'est le côté sûr de l'arbitrage, mais il
+n'est **pas** borné automatiquement sur le chemin du cron : le fusible « lot
+entier en échec » vit dans `run-backfill`, pas dans `runScoring`. Le signal
+existe (`failedRetryable` dans le résumé, et un `warn` par offre), mais il faut
+aller le lire :
+
+```sql
+select r.status_code, r.content from net._http_response r
+order by r.created desc limit 5;
+```
+
+Si `failedRetryable` devient durablement non nul, c'est le moment de poser le
+compteur de tentatives — écarté aujourd'hui parce qu'il traite un risque jamais
+observé.
+
+**Ce qui reste ouvert, et qui a laissé le défaut courir deux jours** : aucune
+vue ne montre les offres dont le jugement a échoué, et le tableau de bord n'en
+dit rien. La seule façon de le savoir reste la sonde SQL de `CLAUDE.md`, qu'il
+faut penser à poser. La cause première de la troncature reste elle aussi
+inconnue — mais elle ne coûte plus d'offres, seulement un appel de plus.
 
 ### P1 — Le rayon local ne peut pas être ajusté finement
 
