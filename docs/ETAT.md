@@ -1723,7 +1723,7 @@ onglets :
 | ~~a~~ | ~~Le bouton de **réglages** de la barre d'application n'existe pas~~ — **corrigé le 2026-09-10** : construit, posé `disabled`, `title`/`aria-label` en français | `MatinScreen`, barre d'application |
 | ~~b~~ | ~~L'**icône de document** de « Mon CV » manque~~ — **corrigé le 2026-09-10**, `path` repris verbatim de `Main.dc.html` | idem |
 | ~~c~~ | ~~Le libellé est « Importer mon CV » là où la maquette écrit « Mon CV »~~ — **corrigé le 2026-09-10**, nouvelle clé `app.monCv` (`profil.importerCv` conservée pour l'écran de profil, verbe d'action distinct) | idem |
-| d | L'état des **deux crons** — « Collecte 6 h 30 · Jugement 7 h 00 · N lues » — n'est pas affiché | idem ; demande un point d'API sur `collection_runs` |
+| ~~d~~ | ~~L'état des deux crons n'est pas affiché~~ — **corrigé le 2026-09-10** | `GET /robot-status`, `RobotStatusBand` |
 | ~~e~~ | ~~« Mes candidatures » n'a **pas d'icône**~~ — **corrigé le 2026-09-10**, icône pipeline (trois colonnes) ajoutée à la maquette puis reprise verbatim | idem |
 | ~~f~~ | ~~Le bouton **« Suivantes »** est collé à la carte du dessus~~ — **corrigé le 2026-09-10** : `margin-top` posé sur la bande (`MorningBand`), pas sur `Pagination` (partagé avec « Toute la veille »). 11px hors échelle de tokens : `--space-3` (12px) est le plus proche, écart de 1px assumé | `MorningBand` / `Pagination` |
 | g | Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas | `theme.css` — voir la cause ci-dessous |
@@ -1793,6 +1793,26 @@ que la ligne qu'elle occupe :
 Les points **d** et **h** restent à **remesurer sur le code** avant correction :
 ils sont lus sur une capture, et une capture ne dit pas si la couleur vient
 d'une règle délibérée. Les autres sont directement constatables.
+
+**P25 est clos.** Les neuf entrées : (a) (b) (c) (e) (f) (h) corrigées en
+passe 1, (g) en deux temps — la remise à zéro des `<button>` n'avait ni
+`background` ni `border`, et la première passe a laissé le contour —, (d) par
+`GET /robot-status` et ses quatre états, (i) et (j) **retirées comme fausses**.
+(k) documenté et écarté du périmètre.
+
+**Deux des neuf « écarts » n'en étaient pas**, et c'est le chiffre à retenir :
+(j) diagnostiquée en lisant le CSS sans mesurer, (i) relevée à l'œil sur une
+capture où une bordure discontinue de 1 px se lit comme pleine. Un écart de
+mise en page ne se constate ni dans un éditeur ni sur une image redimensionnée
+— il se mesure dans un navigateur, avec `getComputedStyle` et
+`getBoundingClientRect`.
+
+**Un neuvième défaut a été trouvé pendant la passe, hors liste** : la barre
+d'application portait `align-items: baseline` là où la maquette a **deux
+niveaux** imbriqués. Mesuré : le titre avait **0 px** au-dessus de lui et 34 en
+dessous, dans une barre de 56. Après correctif, 17 et 18. Il n'était dans
+aucune liste parce que personne ne l'avait mesuré — c'est le propriétaire du
+produit qui l'a vu à l'œil, sur une capture.
 
 **Ce qui empêchera la récidive** : la relecture du §5.4 — l'écran réel à côté
 de l'artboard, à la même largeur — à la fin de chaque chantier d'interface. Pas
