@@ -203,14 +203,76 @@ export function MatinScreen({ client, onOuvrirOffre, onVoirSuivi, onImporterCv }
         <div className={styles.spacer} />
         {onImporterCv === undefined ? null : (
           <button type="button" className={styles.suiviBouton} onClick={onImporterCv}>
-            {t('profil.importerCv')}
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+            </svg>
+            {t('app.monCv')}
           </button>
         )}
         {onVoirSuivi === undefined ? null : (
           <button type="button" className={styles.suiviBouton} onClick={onVoirSuivi}>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M9 4v16" />
+              <path d="M15 4v16" />
+            </svg>
             {t('suivi.titre')}
           </button>
         )}
+        {/* Bouton de réglages (`Main.dc.html`, après « Mon CV ») : DESSINÉ
+         * mais DÉSACTIVÉ — l'écran de préférences n'existe pas encore
+         * (GUIDELINES §5.2). Un bouton désactivé n'annonce aucun fait
+         * (§3.3) : il se voit, se compte, et se rebranche en une ligne. */}
+        <button
+          type="button"
+          className={styles.reglagesBouton}
+          disabled
+          title={t('app.reglagesIndisponible')}
+          aria-label={t('app.reglages')}
+        >
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 21v-7" />
+            <path d="M4 10V3" />
+            <path d="M12 21v-9" />
+            <path d="M12 8V3" />
+            <path d="M20 21v-5" />
+            <path d="M20 12V3" />
+            <path d="M1 14h6" />
+            <path d="M9 8h6" />
+            <path d="M17 16h6" />
+          </svg>
+        </button>
       </header>
 
       {erreurDecision ? (

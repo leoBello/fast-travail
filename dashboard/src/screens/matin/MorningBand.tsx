@@ -216,15 +216,17 @@ export function MorningBand({
             </AnimatePresence>
           </div>
 
-          <Pagination
-            debut={debut}
-            fin={fin}
-            total={total}
-            onSuivant={() => onPageChange(page + 1)}
-            onPrecedent={() => onPageChange(page - 1)}
-            suivantDisponible={fin < total}
-            precedentDisponible={page > 1}
-          />
+          <div className={styles.paginationEspacement}>
+            <Pagination
+              debut={debut}
+              fin={fin}
+              total={total}
+              onSuivant={() => onPageChange(page + 1)}
+              onPrecedent={() => onPageChange(page - 1)}
+              suivantDisponible={fin < total}
+              precedentDisponible={page > 1}
+            />
+          </div>
         </>
       )}
 

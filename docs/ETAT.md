@@ -1720,15 +1720,15 @@ onglets :
 
 | # | Écart | Où |
 |---|---|---|
-| a | Le bouton de **réglages** de la barre d'application n'existe pas | `MatinScreen`, barre d'application |
-| b | L'**icône de document** de « Mon CV » manque | idem |
-| c | Le libellé est « Importer mon CV » là où la maquette écrit « Mon CV » | idem |
+| ~~a~~ | ~~Le bouton de **réglages** de la barre d'application n'existe pas~~ — **corrigé le 2026-09-10** : construit, posé `disabled`, `title`/`aria-label` en français | `MatinScreen`, barre d'application |
+| ~~b~~ | ~~L'**icône de document** de « Mon CV » manque~~ — **corrigé le 2026-09-10**, `path` repris verbatim de `Main.dc.html` | idem |
+| ~~c~~ | ~~Le libellé est « Importer mon CV » là où la maquette écrit « Mon CV »~~ — **corrigé le 2026-09-10**, nouvelle clé `app.monCv` (`profil.importerCv` conservée pour l'écran de profil, verbe d'action distinct) | idem |
 | d | L'état des **deux crons** — « Collecte 6 h 30 · Jugement 7 h 00 · N lues » — n'est pas affiché | idem ; demande un point d'API sur `collection_runs` |
-| e | « Mes candidatures » n'a **pas d'icône** | idem |
-| f | Le bouton **« Suivantes »** est collé à la carte du dessus | `MorningBand` / `Pagination` |
+| ~~e~~ | ~~« Mes candidatures » n'a **pas d'icône**~~ — **corrigé le 2026-09-10**, icône pipeline (trois colonnes) ajoutée à la maquette puis reprise verbatim | idem |
+| ~~f~~ | ~~Le bouton **« Suivantes »** est collé à la carte du dessus~~ — **corrigé le 2026-09-10** : `margin-top` posé sur la bande (`MorningBand`), pas sur `Pagination` (partagé avec « Toute la veille »). 11px hors échelle de tokens : `--space-3` (12px) est le plus proche, écart de 1px assumé | `MorningBand` / `Pagination` |
 | g | Le **titre des cartes** « Ce matin » porte un fond gris que la maquette ne dessine pas | `theme.css` — voir la cause ci-dessous |
-| h | Le couple de scores ne porte pas les couleurs de la maquette (`77`/`68` en ambre là où la maquette met encre et gris) | `Score` / `OfferCard` |
-| i | Le badge « Texte coupé à 500 car. » paraît plein là où la maquette le veut **discontinu** | `OfferCard` |
+| ~~h~~ | ~~Le couple de scores ne porte pas les couleurs de la maquette (`77`/`68` en ambre là où la maquette met encre et gris)~~ — **corrigé le 2026-09-10** : `Score.module.css` `.fit` en `--color-text-muted` ; `--color-warning` reste réservé aux états (`theme.css`) | `Score` / `OfferCard` |
+| ~~i~~ | ~~Le badge « Texte coupé à 500 car. » paraît plein là où la maquette le veut **discontinu**~~ — **faux, retiré le 2026-09-10** : mesuré au navigateur, `border-style: dashed` — déjà conforme. Relevé à l'œil sur une capture d'écran, à une résolution où une bordure discontinue de 1px se lit comme pleine | `OfferCard` |
 | ~~j~~ | ~~La légende `MODE DE TRAVAIL` chevauche « Full remote »~~ — **retiré, ce n'était pas un défaut du panneau** | — |
 | k | **L'écran casse en dessous de ~1 024 px de large** | plusieurs composants, voir ci-dessous |
 
@@ -1797,6 +1797,13 @@ d'une règle délibérée. Les autres sont directement constatables.
 **Ce qui empêchera la récidive** : la relecture du §5.4 — l'écran réel à côté
 de l'artboard, à la même largeur — à la fin de chaque chantier d'interface. Pas
 un test : `jsdom` ne verra jamais un chevauchement.
+
+**Passe 1, 2026-09-10** : les six écarts mesurés au navigateur — a, b, c, e, f,
+h — sont corrigés (voir le tableau plus haut). **i** s'est révélé faux à la
+mesure et est retiré. **d**, **g** et **k** restent ouverts : **d** demande un
+nouveau point d'API (`collection_runs`), **g** et **k** n'étaient pas dans le
+périmètre de cette passe. Détail des corrections, valeurs de maquette et
+mesures avant/après : `.superpowers/sdd/p25-passe1-report.md`.
 
 ### ~~P-perf-1 — Sept vues restaient lisibles par la clé `anon`~~ *(résolu le 2026-09-09)*
 

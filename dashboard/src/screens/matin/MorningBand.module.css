@@ -45,6 +45,19 @@
   gap: 18px;
 }
 
+/*
+ * L'espace entre la grille de cartes et « Suivantes » (`Main.dc.html` :
+ * `margin-top: 11px` sur la ligne de pagination) — posé ICI, sur la BANDE,
+ * jamais dans `Pagination.module.css` : ce composant est partagé avec la
+ * liste « Toute la veille », où la maquette ne pose pas cette marge (P25
+ * point f). 11px ne correspond à aucun token de `theme.css` (échelle
+ * 4/8/12/16/24) ; `--space-3` (12px) est le plus proche — écart de 1px
+ * documenté ici, comme l'exige GUIDELINES §5.1.
+ */
+.paginationEspacement {
+  margin-top: var(--space-3);
+}
+
 .reessayer {
   margin-top: var(--space-3);
   height: 32px;

@@ -153,22 +153,52 @@ describe('MatinScreen', () => {
     expect(onVoirSuivi).toHaveBeenCalledOnce();
   });
 
-  it("n'affiche aucun bouton d'import du CV quand onImporterCv n'est pas fourni", () => {
+  it('n’affiche aucun bouton "Mon CV" quand onImporterCv n’est pas fourni', () => {
     const client = clientFactice();
     render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
-    expect(screen.queryByRole('button', { name: 'Importer mon CV' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Mon CV' })).toBeNull();
   });
 
-  it('le bouton d’en-tête "Importer mon CV" appelle onImporterCv au clic (tâche 10)', async () => {
+  it('le bouton d’en-tête "Mon CV" (libellé de la maquette, P25 point c) appelle onImporterCv au clic', async () => {
     const user = userEvent.setup();
     const client = clientFactice();
     const onImporterCv = vi.fn();
     render(<MatinScreen client={client} onOuvrirOffre={() => {}} onImporterCv={onImporterCv} />);
 
-    const bouton = screen.getByRole('button', { name: 'Importer mon CV' });
+    const bouton = screen.getByRole('button', { name: 'Mon CV' });
     await user.click(bouton);
     expect(onImporterCv).toHaveBeenCalledOnce();
   });
+
+  it('« Mon CV » et « Mes candidatures » portent chacun une icône SVG (P25 points b et e)', () => {
+    const client = clientFactice();
+    render(
+      <MatinScreen
+        client={client}
+        onOuvrirOffre={() => {}}
+        onImporterCv={() => {}}
+        onVoirSuivi={() => {}}
+      />,
+    );
+
+    const boutonCv = screen.getByRole('button', { name: 'Mon CV' });
+    const boutonSuivi = screen.getByRole('button', { name: 'Mes candidatures' });
+    expect(boutonCv.querySelector('svg')).not.toBeNull();
+    expect(boutonSuivi.querySelector('svg')).not.toBeNull();
+  });
+
+  it(
+    'affiche un bouton de réglages désactivé dans la barre d’application (P25 point a) — ' +
+      'dessiné, pas encore branché : GUIDELINES §5.2',
+    () => {
+      const client = clientFactice();
+      render(<MatinScreen client={client} onOuvrirOffre={() => {}} />);
+
+      const bouton = screen.getByRole('button', { name: 'Réglages des préférences' });
+      expect(bouton.getAttribute('disabled')).not.toBeNull();
+      expect(bouton.querySelector('svg')).not.toBeNull();
+    },
+  );
 
   it(
     'affiche "decidedToday" (vérité serveur de /stats, tâche 10) dans la bande — plus le ' +

@@ -40,6 +40,11 @@
 }
 
 .suiviBouton {
+  display: inline-flex;
+  align-items: center;
+  /* 7px dans la maquette (`.btn`, Main.dc.html) : l'espace entre l'icône et
+     le libellé. */
+  gap: 7px;
   height: 30px;
   padding: 0 13px;
   border-radius: var(--radius-md);
@@ -52,6 +57,31 @@
 
 .suiviBouton:hover {
   background: var(--color-surface-2);
+}
+
+/*
+ * Le bouton de réglages (`Main.dc.html`, après « Mon CV ») : carré, sans
+ * libellé — DESSINÉ mais DÉSACTIVÉ tant que l'écran de préférences n'existe
+ * pas (GUIDELINES §5.2, P25 point a). 32px/32px, comme la maquette.
+ */
+.reglagesBouton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text);
+  align-self: center;
+}
+
+.reglagesBouton:disabled {
+  color: var(--color-text-faint);
+  border-color: var(--color-border);
+  cursor: not-allowed;
 }
 
 .bandeauErreur {

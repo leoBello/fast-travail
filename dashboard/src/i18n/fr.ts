@@ -36,6 +36,19 @@ export const fr = {
     erreurConfigTitre: 'Configuration manquante',
     erreurConfigDetail:
       'Les variables VITE_DASHBOARD_API_URL, VITE_SUPABASE_ANON_KEY et VITE_DASHBOARD_TOKEN doivent être définies (voir dashboard/.env.example).',
+    // Bouton de navigation de la barre d'application (`Main.dc.html`) vers
+    // l'écran de profil — distinct de `profil.importerCv`, le verbe d'une
+    // ACTION (soumettre un nouveau CV) que porte le bouton de cet écran-là.
+    // Un bouton de navigation et un bouton d'action ne portent pas le même
+    // verbe (P25, revue de l'écran du matin) : « Mon CV » ici, « Importer
+    // mon CV » là-bas.
+    monCv: 'Mon CV',
+    // Bouton de réglages (`Main.dc.html`, après « Mon CV ») : dessiné,
+    // volontairement DÉSACTIVÉ tant que l'écran de préférences n'existe pas
+    // (GUIDELINES §5.2 — un élément dessiné mais pas encore branché
+    // s'implémente désactivé, jamais retiré).
+    reglages: 'Réglages des préférences',
+    reglagesIndisponible: 'Écran de réglages pas encore disponible.',
   },
 
   /**
