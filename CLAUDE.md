@@ -560,6 +560,33 @@ servie **qu'en local** : quiconque a le poste peut déjà lire `dashboard/.env`.
 le secret partagé se retrouverait alors dans un bundle JavaScript public,
 lisible par quiconque ouvre les outils de développement du navigateur.
 
+**« Toute la veille » porte une barre d'onglets par statut de candidature**
+(2026-09-10). Trois choses à savoir avant d'y toucher :
+
+- **« Rien de masqué » ne se dit QUE sur l'onglet « Toutes ».** Un onglet qui
+  filtre pendant qu'une phrase affirme le contraire est un mensonge à l'écran.
+  Les autres onglets écrivent « N dans cet onglet, sur M jugées », et
+  « N sur M dans cet onglet — filtres actifs » quand un filtre est posé.
+- **Les comptes d'onglets viennent d'une vue de comptage**
+  (`offers_dashboard_status_counts`, migration `20260910060000`, ~60 ms),
+  servie par `GET /statut-counts`. **Jamais sept `GET /offers?statut=…&pageSize=1`** :
+  le coût d'une lecture d'`offers_dashboard` ne dépend pas de `pageSize`, donc
+  ce serait sept balayages du corpus pour sept nombres.
+- **L'onglet « À traiter » porte DEUX valeurs de statut**, `aucune` et
+  `a_traiter`, composées en `OU`. Une offre jamais ouverte n'a aucune ligne
+  `offer_applications` (donc `candidature_statut` nul) ; une offre dont le
+  détail a été ouvert sans décision porte `a_traiter`. Et **`in` ne matche
+  jamais `null`** : sans ce `OU`, l'onglet par défaut rendrait zéro ligne sur
+  1 258, sans la moindre erreur.
+
+**La liste montre dix lignes par page, et la page défile.** La taille a
+d'abord été *mesurée* sur la hauteur disponible ; essayée sur un portable, la
+mesure rendait zéro — la coque `height: 100%` ne résolvait sur aucune hauteur —
+et la liste n'affichait **aucune** ligne alors que huit étaient chargées.
+Aucun test ne l'a vu, `jsdom` ne calculant pas de mise en page. **L'écran est
+conçu pour 1 024 px de large au minimum** ; en dessous il casse, et c'est
+assumé (P25 dans `ETAT.md`).
+
 **Redéployer après toute modification de `supabase/functions/api-dashboard/`
 ou de `_shared/dashboard-*.ts`** : la SPA appelle une fonction déployée, pas
 le code local. Un oubli de redéploiement est silencieux — aucun test ne le

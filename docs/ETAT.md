@@ -1617,6 +1617,50 @@ canvas :
   est intégralement matérialisée avant qu'un filtre ne retienne quoi que ce
   soit, donc un `pageSize=1` coûte le prix de la page complète.
 
+### Livrée le 2026-09-10 — ce qui a été mesuré
+
+**Onze commits, `verify` vert, dix tâches et quatre correctifs de revue.**
+
+| Mesure | Valeur |
+|---|---:|
+| `offers_dashboard_status_counts` (`explain analyze`, 3 appels, les deux derniers retenus) | **~60 ms** |
+| Requêtes au chargement du tableau de bord | **6** (5 avant le chantier, plus `statut-counts`) |
+| Lignes de liste par page | **10**, en dur |
+| Comptes en base au 2026-09-10 | 1 258 sans décision · 6 postulées · 1 relancée · 7 écartées · **1 272** au total |
+
+**Le responsive, éprouvé sur cinq gabarits** (Playwright, écran réel) : correct
+de **1 024 à 1 920 px**, à 700, 768 et 1 080 px de haut. Cassé à 820 px — le
+seuil de rupture est entre les deux. **Décidé le 2026-09-10 : hors périmètre.**
+Le tableau de bord se consulte sur le poste, en 1 440 ou 1 920 ; aucune requête
+média ne sera écrite. Le détail de ce qui casse est en P25 (k), pour le jour où
+la question se poserait.
+
+### Ce que ce chantier a appris, et qui vaut plus que la fonctionnalité
+
+**Quatre éléments dessinés dans la maquette n'avaient jamais atteint le plan.**
+Le séparateur vertical de la barre d'onglets (tâche 5), la barre repliée de
+52 px qui *rendait sa hauteur à la liste* (tâche 8), l'état vide d'un onglet et
+son bouton de retour (tâche 10), le badge « 10 par page » (revue de la tâche
+10). Trois ont été rattrapés par un implémenteur qui a comparé son brief à la
+maquette avant d'écrire — ce que le prompt lui demandait explicitement de
+faire. Le quatrième a failli être **supprimé comme un résidu mort** : la clé
+i18n existait sans appelant, et c'est la maquette qui a dit que le manque était
+à l'écran, pas dans le dictionnaire.
+
+**Un plan écrit à partir d'une maquette n'est pas la maquette.** C'est la
+justification empirique de `GUIDELINES.md` §5.
+
+**Un diagnostic de mise en page déduit du CSS n'est pas un diagnostic.**
+Voir P25 (j) : j'ai expliqué un chevauchement par l'ancrage des `<legend>`,
+sans mesurer. C'était plausible, cohérent, et faux — la cause réelle était la
+coque à hauteur nulle, trois composants plus haut.
+
+**La taille de page mesurée a échoué en production, pas en test.** La coque
+`height: 100%` ne résolvait sur aucune hauteur, `clientHeight` rendait 0, et la
+liste affichait **zéro ligne** alors que huit étaient chargées. Aucun test ne
+l'a vu : `jsdom` ne calcule aucune mise en page. C'est une capture d'écran qui
+l'a trouvé.
+
 **Deux points d'implémentation identifiés en dessinant** :
 
 - L'onglet « À traiter » ne peut pas passer par le filtre `statut` existant :
