@@ -1,6 +1,6 @@
 # État d'avancement et reste à faire
 
-**Dernière mise à jour** : 2026-09-09
+**Dernière mise à jour** : 2026-10-20 — **P32 : le jugement IA est en panne depuis le 2 octobre** (clé d'API refusée)
 **Branche de travail** : `tableau-de-bord-phase3`
 
 Reste à faire, priorités et coûts : [`RESTE-A-FAIRE.md`](RESTE-A-FAIRE.md)
@@ -1694,6 +1694,34 @@ l'a trouvé.
 
 ---
 
+## Refonte du tableau de bord sur `@automation-ia-dev/ui` *(maquette, 2026-10-20)*
+
+Demandée le 2026-10-20 : l'interface de la phase 3 vieillit, la refaire sur la
+bibliothèque de composants du socle (`automation-ia-dev/socle/packages/ui`,
+v1.3.0). **Seule la maquette existe** — le code de `dashboard/` n'a pas
+changé. Elle vit dans [`design/refonte/`](design/refonte/README.md), avec ce
+qu'il faut savoir pour la rouvrir.
+
+Ce qui la distingue des maquettes de la phase 3 : elle est **construite avec
+les vrais composants** de la bibliothèque, pas dessinée à côté. Ce qu'on y
+voit est donc ce que le code rendra, thèmes compris.
+
+À trancher avant d'écrire le code :
+
+- **React 18 → 19.** La bibliothèque exige `react >= 19` en dépendance pair ;
+  `dashboard/` est en 18.3. Montée de version préalable, isolée.
+- **Le kit de prospeo est remplacé.** `GUIDELINES.md` §1 fixe les tokens, les
+  trois familles typographiques et l'anatomie du `Badge` repris de prospeo ;
+  la refonte prend ceux du socle (Geist, `--aia-*`). Les règles de fond
+  (§3 : absences nommées, couple de scores, `null` porteur de sens, couleur
+  jamais seule) sont toutes tenues par la maquette ; c'est le vocabulaire
+  visuel qui change. `GUIDELINES.md` est à réécrire en conséquence, **avant**
+  le code (§5.3).
+- **Ajouts de la maquette, absents de la phase 3** : écran « Le marché »
+  (collecte et jugement par jour, sources, technos demandées face au profil),
+  écran « Poids du classement » (curseurs sur `scoring_weights`, reclassement
+  en direct), palette de commandes (Ctrl K), alerte de panne du jugement.
+
 ## Ce que la mesure a établi sur Adzuna
 
 Trois faits mesurés le 2026-09-08 gouvernent la conception, et l'un d'eux a
@@ -1722,6 +1750,46 @@ concordent : Marseille est un marché Angular / Java.
 ---
 
 ## Problèmes ouverts, par priorité
+
+### P32 — Le jugement IA échoue depuis le 2026-10-02, et les tâches planifiées se disent réussies
+
+**Trouvé le 2026-10-20**, en lisant la base pour la maquette de refonte : la
+série « jugées par jour » s'arrêtait au 1er octobre alors que la collecte
+continuait jusqu'au 19.
+
+Mesuré ce jour-là :
+
+| Mesure | Valeur |
+|---|---:|
+| Lignes `offer_ai_scores` avec `error` non nul | **2 147** |
+| Premier échec | 2026-10-02, 7 h UTC |
+| Dernier échec | 2026-10-19, 12 h UTC |
+| Cause, sur toutes les lignes | `ClaudeApiError: Claude a repondu 401` — `API key is invalid`, puis `invalid x-api-key` |
+| Statut de `score-daily` et `score-afternoon` dans `cron.job_run_details` | `succeeded`, tous les jours |
+
+**Deux défauts distincts**, et le second est le plus coûteux :
+
+1. **La clé `ANTHROPIC_API_KEY` des Edge Functions est refusée.** Correctif :
+   `npx supabase secrets set ANTHROPIC_API_KEY=<nouvelle clé>`, à faire par le
+   détenteur du compte.
+2. **Un 401 est traité comme un échec permanent par offre**
+   (`run-scoring.ts`, branche « echec permanent : ligne d erreur ecrite »). Une
+   clé invalide est une panne *systémique* : elle fait échouer toutes les
+   offres de la même façon, et chacune reçoit une ligne d'erreur qui la **sort
+   définitivement de la file**. Corriger la clé ne rejugera donc **aucune** des
+   2 147 offres. Il faudra les remettre en file (supprimer leurs lignes
+   d'erreur), ce qui repaie ~1 centime l'offre, soit de l'ordre de 21 €.
+
+Recommandation pour le second : classer 401 et 403 comme une erreur
+systémique qui **arrête la passe sans rien écrire**, comme le backfill le
+signale déjà dans son message (`run-backfill.ts`), plutôt que comme un échec
+propre à l'offre.
+
+Pourquoi personne ne l'a vu : `pg_cron` ne voit que l'appel HTTP à la
+fonction, qui répond. La seule sonde est la requête de `CLAUDE.md`, section
+« Une offre dont le jugement a échoué n'apparaît nulle part » — elle devait
+rendre 0 ligne, elle en rendait 2 147. La maquette de refonte l'affiche en
+tête de l'écran du matin, ce que le tableau de bord actuel ne fait pas.
 
 ### P25 — L'écran livré ne suit pas la maquette, et rien ne le voyait
 
